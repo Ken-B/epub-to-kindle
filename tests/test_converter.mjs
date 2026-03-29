@@ -39,6 +39,26 @@ const contains = (s, sub, m) => { if (!s.includes(sub)) throw new Error(`${m||'c
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
+// Must mirror docs/index.html exactly
+function palmDocCompress(data) {
+  const out = []; let i = 0; const n = data.length;
+  while (i < n) {
+    let bestLen=0, bestDist=0;
+    const maxDist=Math.min(i,2047), maxLen=Math.min(n-i,10);
+    if (maxLen>=3) for(let d=1;d<=maxDist;d++){let l=0;while(l<maxLen&&data[i-d+l]===data[i+l])l++;if(l>bestLen){bestLen=l;bestDist=d;}}
+    if (bestLen>=3) { const code=((bestDist<<3)|(bestLen-3))&0x3fff; out.push(0x80|(code>>8),code&0xff); i+=bestLen; }
+    else {
+      const b=data[i];
+      if (b===0x20&&i+1<n&&data[i+1]>=0x40&&data[i+1]<0x80) { out.push(data[i+1]|0x80); i+=2; }
+      else if (b>=0x80||(b>=0x01&&b<=0x08)) {
+        let end=i+1; while(end<n&&end-i<8){const nb=data[end];if(nb>=0x80||(nb>=0x01&&nb<=0x08))end++;else break;}
+        out.push(end-i); for(let k=i;k<end;k++)out.push(data[k]); i=end;
+      } else { out.push(b); i++; }
+    }
+  }
+  return new Uint8Array(out);
+}
+
 function concat(...a) {
   const t = a.reduce((n, x) => n + x.length, 0);
   const o = new Uint8Array(t); let p = 0;
@@ -348,6 +368,79 @@ test('FCIS text_length at offset 20', () => {
   const f=buildFcis(12345); eq(new DataView(f.buffer).getUint32(20,false),12345);
 });
 test('EOF = e9 8e 0d 0a', () => eq(Array.from(EOF_RECORD).join(','),'233,142,13,10'));
+
+console.log('\n── PalmDoc compression ─────────────────────────────────────────');
+
+// Reference decompressor to verify compress→decompress roundtrip
+function palmDocDecompress(data) {
+  const out = []; let i = 0;
+  while (i < data.length) {
+    const b = data[i++];
+    if (b === 0) { out.push(0); }
+    else if (b <= 8) { for(let k=0;k<b;k++) out.push(data[i++]); }
+    else if (b <= 0x7F) { out.push(b); }
+    else if (b <= 0xBF) {
+      const b2=data[i++]; const dist=((b&0x3F)<<5)|(b2>>3); const len=(b2&7)+3;
+      for(let k=0;k<len;k++) out.push(out[out.length-dist]);
+    } else { out.push(0x20); out.push(b&0x7F); }
+  }
+  return new Uint8Array(out);
+}
+
+function compressRoundtrip(text) {
+  const bytes = enc.encode(text);
+  const compressed = palmDocCompress(bytes);
+  const decompressed = palmDocDecompress(compressed);
+  return dec.decode(decompressed);
+}
+
+test('ASCII text compresses and decompresses correctly', () => {
+  const t = 'Hello world. The quick brown fox jumps. ' .repeat(50);
+  eq(compressRoundtrip(t), t);
+});
+test('UTF-8 multi-byte: Dutch accented chars (é ë ö)', () => {
+  const t = 'Vlak voor zijn dood gaf de grootvader zijn kleinzoon cahiers. é ë ö';
+  eq(compressRoundtrip(t), t);
+});
+test('UTF-8 multi-byte: curly quotes and em-dash (\\u2019 \\u2013 \\u2026)', () => {
+  const t = '\u2018curly quotes\u2019 and em\u2013dash and ellipsis\u2026 repeated '.repeat(20);
+  eq(compressRoundtrip(t), t);
+});
+test('UTF-8 multi-byte: 3-byte sequences (CJK)', () => {
+  const t = '\u4e2d\u6587\u6d4b\u8bd5 '.repeat(30) + 'some ASCII';
+  eq(compressRoundtrip(t), t);
+});
+test('Bytes 0x01-0x08 escaped correctly in compression', () => {
+  const raw = new Uint8Array([0x01, 0x05, 0x08, 0x41, 0x42, 0x03, 0x07]);
+  const c = palmDocCompress(raw); const d = palmDocDecompress(c);
+  assert(Array.from(d).join(',') === Array.from(raw).join(','), 'roundtrip failed');
+});
+test('Bytes 0x80-0xBF escaped correctly (UTF-8 continuation bytes)', () => {
+  const raw = new Uint8Array([0x41, 0x80, 0x9F, 0xBF, 0x42]);
+  const c = palmDocCompress(raw); const d = palmDocDecompress(c);
+  assert(Array.from(d).join(',') === Array.from(raw).join(','), 'roundtrip failed');
+});
+test('Bytes 0xC0-0xFF escaped correctly (UTF-8 lead bytes)', () => {
+  const raw = new Uint8Array([0x41, 0xC3, 0xA9, 0x42]); // 'A' + é + 'B'
+  const c = palmDocCompress(raw); const d = palmDocDecompress(c);
+  assert(Array.from(d).join(',') === Array.from(raw).join(','), 'roundtrip failed');
+});
+test('Space before non-ASCII NOT encoded as space-char shortcut', () => {
+  // ' é' = 0x20 0xC3 0xA9. The 0xC3 should NOT be packed with the space.
+  const raw = enc.encode(' é ');
+  const c = palmDocCompress(raw);
+  // Verify no output byte in 0x80-0xBF range that would be misread as back-ref
+  // (except legitimate back-references which use 0x80-0xBF as their first byte)
+  // Roundtrip is the definitive check:
+  eq(dec.decode(palmDocDecompress(c)), ' é ');
+});
+test('Long Dutch paragraph compresses and decompresses correctly', () => {
+  const t = ('Stefan Hertmans\u2019 jarenlange fascinatie voor zijn grootvaders leven ' +
+             'bracht hem uiteindelijk tot het schrijven van deze aangrijpende roman. ' +
+             'Vlak voor zijn dood in de jaren tachtig van de vorige eeuw gaf de ' +
+             'grootvader zijn kleinzoon een paar volgeschreven oude cahiers. ').repeat(5);
+  eq(compressRoundtrip(t), t);
+});
 
 console.log('\n── Text record splitting ───────────────────────────────────────');
 test('records ≤ 4097 bytes (4096 + trailing 0)', () => {

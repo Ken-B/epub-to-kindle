@@ -86,7 +86,7 @@
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.1 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.2 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -94,7 +94,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.1';
+const APP_VERSION = 'v1.0.2';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -136,6 +136,23 @@ function encint(v) {
 
 // ─── PalmDoc LZ77 compression ─────────────────────────────────────────────────
 
+/**
+ * PalmDoc LZ77 compression.
+ *
+ * Output byte ranges (PalmDoc spec):
+ *   0x00        literal null
+ *   0x01-0x08   literal run: next N bytes are copied verbatim
+ *   0x09-0x7F   literal single byte
+ *   0x80-0xBF   2-byte back-reference (distance + length)
+ *   0xC0-0xFF   space + (byte & 0x7F)
+ *
+ * Bytes ≥ 0x80 CANNOT appear as literals in the output stream — they are always
+ * interpreted as back-references or space+char. UTF-8 multi-byte sequences
+ * (continuation bytes 0x80-0xBF, lead bytes 0xC0-0xFF) must be wrapped in
+ * a literal run (0x01-0x08 prefix) to pass through unchanged.
+ * Bytes 0x01-0x08 likewise need a literal run to avoid being read as run-length
+ * prefixes themselves.
+ */
 function palmDocCompress(data) {
   const out = [];
   let i = 0;
@@ -143,7 +160,7 @@ function palmDocCompress(data) {
   while (i < n) {
     let bestLen = 0, bestDist = 0;
     const maxDist = Math.min(i, 2047);
-    const maxLen = Math.min(n - i, 10);
+    const maxLen  = Math.min(n - i, 10);
     if (maxLen >= 3) {
       for (let d = 1; d <= maxDist; d++) {
         let l = 0;
@@ -152,16 +169,30 @@ function palmDocCompress(data) {
       }
     }
     if (bestLen >= 3) {
+      // Back-reference (output bytes 0x80-0xBF + one more byte)
       const code = ((bestDist << 3) | (bestLen - 3)) & 0x3fff;
-      out.push(0x80|(code>>8), code&0xff);
+      out.push(0x80 | (code >> 8), code & 0xff);
       i += bestLen;
     } else {
       const b = data[i];
-      if (b === 0x20 && i+1 < n && data[i+1] >= 0x40) {
-        out.push(data[i+1]|0x80); i += 2;
-      } else if (b >= 0x01 && b <= 0x08) {
-        out.push(1, b); i++;
+      // Space optimisation: only safe when next byte is ASCII printable (0x40-0x7F).
+      // Next byte ≥ 0x80 would produce an output byte in 0x80-0xFF which the
+      // decompressor would misinterpret.
+      if (b === 0x20 && i+1 < n && data[i+1] >= 0x40 && data[i+1] < 0x80) {
+        out.push(data[i+1] | 0x80); i += 2;
+      } else if (b >= 0x80 || (b >= 0x01 && b <= 0x08)) {
+        // Must escape: collect a run of up to 8 consecutive "unsafe" bytes
+        let end = i + 1;
+        while (end < n && end - i < 8) {
+          const nb = data[end];
+          if (nb >= 0x80 || (nb >= 0x01 && nb <= 0x08)) end++;
+          else break;
+        }
+        out.push(end - i); // 0x01-0x08 run-length prefix
+        for (let k = i; k < end; k++) out.push(data[k]);
+        i = end;
       } else {
+        // Safe literal: 0x00 or 0x09-0x7F
         out.push(b); i++;
       }
     }
