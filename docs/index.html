@@ -85,13 +85,17 @@
   <a class="btn" id="dlBtn" style="display:none" href="#" download>⬇ Download AZW3</a>
 </div>
 <footer>
-  <a href="https://github.com/kenp/wasm-epub2azw3" target="_blank" rel="noopener">GitHub</a>
+  <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
   · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · <span id="appVersion"></span>
 </footer>
 
 <script src="jszip.min.js"></script>
 <script>
 'use strict';
+
+const APP_VERSION = 'v1.0.0';
+document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
 
@@ -750,7 +754,7 @@ function convertToAzw3(epub) {
     {tag:501, value:'EBOK'},
     {tag:524, value:metadata.language.split('-')[0]},
     {tag:528, value:'true'},
-    {tag:108, value:'epub2azw3 (https://github.com/kenp/wasm-epub2azw3)'},
+    {tag:108, value:'epub2azw3 (https://github.com/Ken-B/epub-to-kindle)'},
   ];
   if (metadata.creator)     exthRecs.push({tag:100, value:metadata.creator});
   if (metadata.publisher)   exthRecs.push({tag:101, value:metadata.publisher});

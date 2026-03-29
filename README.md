@@ -2,7 +2,7 @@
 
 A client-side web app that converts EPUB ebooks to AZW3 (Kindle KF8) format — entirely in the browser, no server, no data uploaded.
 
-**[Try it →](https://kenp.github.io/wasm-epub2azw3/)**
+**[Try it →](https://ken-b.github.io/epub-to-kindle/)**
 
 ## Features
 

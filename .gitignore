@@ -1,0 +1,7 @@
+# Never commit EPUB files (copyright)
+*.epub
+*.mobi
+*.azw3
+
+# OS
+.DS_Store
