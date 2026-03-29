@@ -569,17 +569,30 @@ async function parseEpub(buf) {
     .map(ir => manifest[ir.getAttribute('idref')]?.href)
     .filter(Boolean);
 
-  // CSS — collect all stylesheets; strip @font-face (Kindle ignores external fonts)
-  // and strip broken url() references to missing font files.
+  // CSS — extract only critical visibility rules from stylesheets.
+  // We do NOT inline the full CSS because a large <style> block in the skeleton_head
+  // can span multiple 4096-byte KF8 text records, splitting the HTML mid-tag and
+  // causing CSS to appear as visible text. Kindle provides its own typography.
+  // We only keep: display:none, visibility:hidden, and similar rules that hide
+  // publisher watermarks and other content that should be invisible.
   let css = '';
   for (const item of Object.values(manifest)) {
     if (item.mt === 'text/css') {
       const f = zip.file(resolve(item.href)) || zip.file(decodeURIComponent(resolve(item.href)));
       if (f) try {
-        let sheet = await f.async('string');
-        // Remove @font-face blocks (Kindle has its own fonts)
-        sheet = sheet.replace(/@font-face\s*\{[^}]*\}/gi, '');
-        css += sheet + '\n';
+        const sheet = await f.async('string');
+        // Extract rules that contain display:none or visibility:hidden
+        // These prevent publisher watermarks from showing as gibberish
+        const criticalRules = [];
+        const ruleRe = /([^{}]+)\{([^}]*)\}/g;
+        let m;
+        while ((m = ruleRe.exec(sheet)) !== null) {
+          const decls = m[2];
+          if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test(decls)) {
+            criticalRules.push(`${m[1].trim()}{${decls.trim()}}`);
+          }
+        }
+        if (criticalRules.length) css += criticalRules.join('\n') + '\n';
       } catch(e){}
     }
   }
@@ -645,11 +658,13 @@ function extractContent(doc, css, imageDataUris, chapterDir) {
     if (t) headContent = `<title>${t.textContent.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n`;
   }
 
-  // Inline CSS into every chapter's <head> so Kindle applies it
+  // Inline only critical CSS (visibility rules) — kept small to avoid
+  // splitting the skeleton_head across multiple 4096-byte text records.
   const styleBlock = css ? `<style type="text/css">\n${css}</style>\n` : '';
 
+  // No <?xml?> declaration: browsers render it as visible text in HTML mode,
+  // and Kindle doesn't need it.
   const skelHead =
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<html xmlns="http://www.w3.org/1999/xhtml">\n` +
     `<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n` +
     headContent + styleBlock + `</head>\n<body aid="0">\n`;

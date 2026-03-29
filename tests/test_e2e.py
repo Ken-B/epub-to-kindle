@@ -2,14 +2,16 @@
 End-to-end tests for the EPUB → AZW3 converter.
 
 Converts real EPUB files using the same pipeline as the browser app
-(simulated in Python), then validates output with Calibre.
+(simulated in Python), validates output with Calibre, and takes headless
+screenshots of the rendered KF8 chapters to visually verify correctness.
 
 Run:  uv run tests/test_e2e.py
 Deps: uv (https://docs.astral.sh/uv/) — no install needed beyond uv itself.
+      Playwright chromium is installed on first run via uv --with playwright.
 
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = ["playwright"]
 # ///
 """
 
@@ -180,13 +182,18 @@ def convert_epub(epub_path: str, out_path: str) -> dict:
                  for ir in opf.findall('.//opf:itemref', opf_ns)
                  if ir.get('idref') in manifest]
 
-        # CSS (strip @font-face)
+        # CSS — only extract critical visibility rules (display:none / visibility:hidden).
+        # Full CSS inlining causes the skeleton_head to exceed 4096 bytes, splitting
+        # the HTML mid-<style> tag across text records and making CSS appear as
+        # visible body text on Kindle.
         css = ''
         for item in manifest.values():
             if item['mt'] == 'text/css':
                 try:
                     sheet = z.read(resolve(item['href'])).decode('utf-8')
-                    css += re.sub(r'@font-face\s*\{[^}]*\}', '', sheet, flags=re.I) + '\n'
+                    for m in re.finditer(r'([^{}]+)\{([^}]*)\}', sheet):
+                        if re.search(r'display\s*:\s*none|visibility\s*:\s*hidden', m.group(2), re.I):
+                            css += m.group(1).strip() + '{' + m.group(2).strip() + '}\n'
                 except Exception: pass
 
         # Images → base64 data URIs
@@ -239,8 +246,8 @@ def convert_epub(epub_path: str, out_path: str) -> dict:
                           lambda m: add_aid(m) if m.group(1).lower() in BLOCK_TAGS else m.group(0),
                           body)
 
-            skel_head = (f'<?xml version="1.0" encoding="UTF-8"?>\n'
-                         f'<html xmlns="http://www.w3.org/1999/xhtml">\n'
+            # No <?xml?> declaration: renders as visible text in HTML mode.
+            skel_head = (f'<html xmlns="http://www.w3.org/1999/xhtml">\n'
                          f'<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n'
                          f'<title>{ch_title}</title>\n{style_block}</head>\n<body aid="0">\n')
             skel_tail = '</body>\n</html>\n'
@@ -451,8 +458,202 @@ if Path(alice_path).exists():
                data[next_off-1] == 0
         ))
 
+        def check_skeleton_fits_in_one_record():
+            """Skeleton head must fit entirely within one 4096-byte text record.
+            If it's larger, the HTML gets split mid-<style> tag causing CSS to
+            appear as visible body text on Kindle."""
+            nrec = struct.unpack_from('>H', data, 76)[0]
+            r0off = struct.unpack_from('>I', data, 78)[0]
+            skel_idx = struct.unpack_from('>I', data, r0off + 252)[0]
+            if skel_idx == 0xffffffff:
+                return  # no skeleton index
+            # Read first skeleton entry to get skeleton length
+            skel_data_off = struct.unpack_from('>I', data, 78 + (skel_idx + 1) * 8)[0]
+            idxt_off = struct.unpack_from('>I', data, skel_data_off + 20)[0]
+            entry_off = struct.unpack_from('>H', data, skel_data_off + idxt_off + 4)[0]
+            pos = skel_data_off + entry_off
+            key_len = data[pos]; pos += 1 + key_len
+            ctrl = data[pos]; pos += 1
+            # geometry values: count = (ctrl & 12) >> 2 groups of 2 values
+            count = (ctrl & 12) >> 2
+            skel_len_bytes = None
+            for _ in range(count * 2):
+                val, consumed = 0, 0
+                for i in range(pos, len(data)):
+                    b = data[i]; val = (val << 7) | (b & 0x7f); consumed += 1
+                    if b & 0x80: break
+                if skel_len_bytes is None:
+                    pass  # first value = start position
+                else:
+                    skel_len_bytes = val  # second value = length
+                    break
+                skel_len_bytes = val
+                pos += consumed
+            if skel_len_bytes is not None:
+                assert skel_len_bytes <= 4096, (
+                    f'Skeleton {skel_len_bytes} bytes > 4096 (one text record). '
+                    'CSS will appear as visible text on Kindle!')
+        test('Skeleton head fits in one text record (≤4096 bytes)', check_skeleton_fits_in_one_record)
+
     except Exception as e:
         print(f'  ⚠ Binary validation skipped: {e}')
+
+# ── Screenshot validation (requires playwright) ────────────────────────────
+
+print('\n── Screenshot validation ──')
+
+alice_azw3 = '/tmp/alice_validate.azw3'
+if Path(alice_azw3).exists():
+    try:
+        from playwright.sync_api import sync_playwright
+
+        def extract_and_screenshot(azw3_path: str) -> list[dict]:
+            """Extract KF8 chapters and screenshot them with headless Chromium."""
+            data = Path(azw3_path).read_bytes()
+            nrec = struct.unpack_from('>H', data, 76)[0]
+            rec_offsets = [struct.unpack_from('>I', data, 78 + i * 8)[0] for i in range(nrec)]
+            r0 = rec_offsets[0]
+            num_text_recs = struct.unpack_from('>H', data, r0 + 8)[0]
+            skel_idx  = struct.unpack_from('>I', data, r0 + 252)[0]
+            chunk_idx = struct.unpack_from('>I', data, r0 + 248)[0]
+            if skel_idx == 0xffffffff:
+                return []
+
+            text_bytes = b''
+            for i in range(1, num_text_recs + 1):
+                s = rec_offsets[i]; e = rec_offsets[i + 1] if i + 1 < nrec else len(data)
+                text_bytes += data[s:e - 1]
+            text = text_bytes.decode('utf-8', errors='replace')
+
+            def decode_vwi(data, pos):
+                val, consumed = 0, 0
+                for i in range(pos, len(data)):
+                    b = data[i]; val = (val << 7) | (b & 0x7f); consumed += 1
+                    if b & 0x80: break
+                return val, consumed
+
+            def read_entries(rec_off):
+                idxt_off = struct.unpack_from('>I', data, rec_off + 20)[0]
+                num = struct.unpack_from('>I', data, rec_off + 24)[0]
+                entries = []
+                for j in range(num):
+                    e_off = struct.unpack_from('>H', data, rec_off + idxt_off + 4 + j * 2)[0]
+                    pos = rec_off + e_off
+                    kl = data[pos]; key = data[pos+1:pos+1+kl].decode('utf-8','replace')
+                    entries.append({'key': key, 'ds': pos+1+kl})
+                return entries
+
+            skels_raw = read_entries(rec_offsets[skel_idx + 1])
+            skels = []
+            for e in skels_raw:
+                ctrl = data[e['ds']]; pos = e['ds'] + 1
+                n1 = ctrl & 3; n6 = (ctrl & 12) >> 2
+                cc_vals = []
+                for _ in range(n1):
+                    v, c = decode_vwi(data, pos); cc_vals.append(v); pos += c
+                geom = []
+                for _ in range(n6 * 2):
+                    v, c = decode_vwi(data, pos); geom.append(v); pos += c
+                skels.append({'cc': cc_vals[0] if cc_vals else 1,
+                              'start': geom[0] if geom else 0,
+                              'len': geom[1] if len(geom) > 1 else 0})
+
+            # Read chunk index data records
+            chunk_hdr_off = rec_offsets[chunk_idx]
+            num_chunk_dr = struct.unpack_from('>I', data, chunk_hdr_off + 24)[0]
+            chunks_raw = []
+            for dr in range(num_chunk_dr):
+                chunks_raw.extend(read_entries(rec_offsets[chunk_idx + 1 + dr]))
+            chunks = []
+            for e in chunks_raw:
+                ctrl = data[e['ds']]; pos = e['ds'] + 1
+                result = {'ins': int(e['key'])}
+                if ctrl & 1:
+                    v, c = decode_vwi(data, pos); result['cncx'] = v; pos += c
+                if ctrl & 2:
+                    v, c = decode_vwi(data, pos); result['fn'] = v; pos += c
+                if ctrl & 4:
+                    v, c = decode_vwi(data, pos); result['sn'] = v; pos += c
+                if ctrl & 8:
+                    s, c = decode_vwi(data, pos); pos += c
+                    l, c = decode_vwi(data, pos); pos += c
+                    result['start'] = s; result['len'] = l
+                chunks.append(result)
+
+            # Reconstruct chapters
+            chapters = []
+            cp = 0
+            for sk in skels:
+                skel_text = text[sk['start']:sk['start'] + sk['len']]
+                html = skel_text
+                for _ in range(sk['cc']):
+                    if cp >= len(chunks): break
+                    ch = chunks[cp]; cp += 1
+                    li = ch['ins'] - sk['start']
+                    content = text[ch.get('start', sk['start'] + sk['len']):
+                                   ch.get('start', sk['start'] + sk['len']) + ch.get('len', 0)]
+                    html = html[:li] + content + html[li:]
+                body_text = re.sub(r'<[^>]+>', '', html).strip()
+                if len(body_text) > 50:
+                    chapters.append({'html': html, 'body_text': body_text})
+            return chapters
+
+        chapters = extract_and_screenshot(alice_azw3)
+        test('KF8 chapter extraction yields chapters', lambda: len(chapters) > 3)
+
+        if chapters:
+            def screenshot_and_check():
+                issues = []
+                with sync_playwright() as p:
+                    browser = p.chromium.launch()
+                    for i, ch in enumerate(chapters[:4]):
+                        page = browser.new_page(viewport={'width': 600, 'height': 800})
+                        page.set_content(ch['html'], wait_until='domcontentloaded')
+
+                        shot_path = f'/tmp/e2e_screenshot_ch{i:02d}.png'
+                        page.screenshot(path=shot_path, full_page=False)
+
+                        # Check for CSS leaking into body text
+                        body_text = page.evaluate('() => document.body?.innerText || ""')
+                        if '{' in body_text and 'margin' in body_text and '<' not in body_text[:50]:
+                            issues.append(f'ch{i}: CSS appearing as visible text')
+
+                        # Check XML declaration isn't visible
+                        if '<?xml' in body_text or 'encoding="UTF-8"' in body_text:
+                            issues.append(f'ch{i}: XML declaration visible as text')
+
+                        # Check for readable prose (not just CSS/tags)
+                        words = re.findall(r'[a-zA-Z]{4,}', body_text)
+                        if i > 0 and len(words) < 10:
+                            issues.append(f'ch{i}: very little prose text ({len(words)} words)')
+
+                        page.close()
+                    browser.close()
+
+                if issues:
+                    raise AssertionError('Visual rendering issues: ' + '; '.join(issues))
+
+            test('Screenshots: no CSS leakage, no XML declaration, readable prose', screenshot_and_check)
+
+            def check_skel_head_size():
+                """Verify skeleton heads are small enough to fit in one text record."""
+                for i, ch in enumerate(chapters[:4]):
+                    skel_start = ch['html'].find('<html')
+                    skel_end = ch['html'].find('<body aid=')
+                    if skel_end > 0:
+                        skel_head = ch['html'][skel_start:skel_end + len('<body aid="0">\n')]
+                        size = len(skel_head.encode())
+                        if size > 4096:
+                            raise AssertionError(
+                                f'ch{i} skeleton head is {size} bytes > 4096 (one text record). '
+                                'Inlined CSS is too large!')
+            test('Skeleton heads are each ≤4096 bytes (fit in one text record)', check_skel_head_size)
+
+    except ImportError:
+        print('  ⚠ playwright not installed — run: uvx --with playwright playwright install chromium')
+    except Exception as e:
+        print(f'  ⚠ Screenshot tests skipped: {e}')
+        import traceback; traceback.print_exc()
 
 # ── Results ────────────────────────────────────────────────────────────────
 
