@@ -86,7 +86,7 @@
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.3 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.4 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -94,7 +94,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.3';
+const APP_VERSION = 'v1.0.4';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -661,6 +661,7 @@ async function parseEpub(buf) {
     manifest[item.getAttribute('id')] = {
       href: item.getAttribute('href'),
       mt: item.getAttribute('media-type')||'',
+      properties: item.getAttribute('properties')||'',
     };
 
   // Spine
@@ -717,11 +718,46 @@ async function parseEpub(buf) {
   }
 
   // Chapters
+  // Read NCX (toc.ncx) or EPUB3 nav document to get proper chapter titles.
+  // Maps spine href (filename without fragment) → human-readable title.
+  const ncxTitles = {};
+  for (const item of Object.values(manifest)) {
+    const isNcx  = item.mt === 'application/x-dtbncx+xml';
+    const isNav  = item.mt === 'application/xhtml+xml' && item.properties === 'nav';
+    if (!isNcx && !isNav) continue;
+    const f = zip.file(resolve(item.href)) || zip.file(decodeURIComponent(resolve(item.href)));
+    if (!f) continue;
+    try {
+      const src = await f.async('string');
+      const doc = new DOMParser().parseFromString(src, 'application/xhtml+xml');
+      if (isNcx) {
+        // EPUB2 NCX: <navPoint><navLabel><text>Title</text></navLabel><content src="..."/></navPoint>
+        const ns = 'http://www.daisy.org/z3986/2005/ncx/';
+        for (const np of doc.getElementsByTagNameNS(ns, 'navPoint')) {
+          const text = np.getElementsByTagNameNS(ns, 'text')[0]?.textContent?.trim();
+          const src  = np.getElementsByTagNameNS(ns, 'content')[0]?.getAttribute('src');
+          if (text && src) {
+            const hrefBase = src.split('#')[0].split('/').pop();
+            if (!ncxTitles[hrefBase]) ncxTitles[hrefBase] = text;
+          }
+        }
+      } else {
+        // EPUB3 nav: <nav epub:type="toc"><ol><li><a href="...">Title</a></li></ol></nav>
+        for (const a of doc.querySelectorAll('nav a[href]')) {
+          const text = a.textContent.trim();
+          const href = a.getAttribute('href').split('#')[0].split('/').pop();
+          if (text && href && !ncxTitles[href]) ncxTitles[href] = text;
+        }
+      }
+    } catch(e) {}
+  }
+
   const chapters = [];
   for (const href of spineHrefs) {
     const path = resolve(href);
-    // Chapter's directory relative to opfDir, for resolving relative image paths
     const chapterDir = href.includes('/') ? href.split('/').slice(0,-1).join('/') + '/' : '';
+    const hrefBase = href.split('/').pop().split('#')[0];
+    const ncxTitle = ncxTitles[hrefBase] || null;
     const f = zip.file(path) || zip.file(decodeURIComponent(path));
     if (!f) continue;
     try {
@@ -730,7 +766,10 @@ async function parseEpub(buf) {
       const parsed = doc.querySelector('parsererror')
         ? new DOMParser().parseFromString(xhtml, 'text/html')
         : doc;
-      chapters.push(extractContent(parsed, css, imageDataUris, chapterDir));
+      const ch = extractContent(parsed, css, imageDataUris, chapterDir);
+      // Prefer NCX title over auto-detected heading (more authoritative)
+      if (ncxTitle) ch.title = ncxTitle;
+      chapters.push(ch);
     } catch(e) { console.warn('Skip chapter:', path, e); }
   }
   return {metadata, chapters, css};
@@ -861,10 +900,17 @@ function convertToAzw3(epub) {
   for (const r of chunkRecs) recs.push(r);
 
   // NCX index (Table of Contents)
-  // Use chapter titles from the parsed chapters; fall back to "Chapter N"
-  const chapterTitles = chapters.map((ch, i) =>
-    ch.title || metadata.title || `Chapter ${i + 1}`
-  );
+  // Priority: NCX/nav title (set by parseEpub) > heading > HTML title > "Chapter N"
+  // Reject internal file IDs (e.g. "x9789023479314.html1") — they look like
+  // hex strings with dots and no spaces.
+  // Detect internal file IDs used as titles (e.g. "x9789023479314.html1").
+  // Pattern: no spaces, contains many digits, ends with .html or .xhtml.
+  const looksLikeFileId = s => /^[^\s]*\d{5,}[^\s]*\.x?html\d*$/i.test(s.trim());
+  const chapterTitles = chapters.map((ch, i) => {
+    const t = ch.title || '';
+    if (t && !looksLikeFileId(t)) return t;
+    return `Chapter ${i + 1}`;
+  });
   const ncxRecs = buildNcxIndex(idxParts, chapterTitles);
   const ncxIdx = ncxRecs ? recs.length : 0xffffffff;
   if (ncxRecs) for (const r of ncxRecs) recs.push(r);
