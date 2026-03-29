@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EPUB → AZW3 Converter</title>
+  <meta name="description" content="Convert EPUB ebooks to AZW3 (Kindle) format — free, private, works offline">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EPUB→AZW3">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #f8f9fa; --surface: #ffffff; --border: #dee2e6;
+      --text: #212529; --muted: #6c757d; --accent: #4361ee;
+      --accent-h: #3a56d4; --ok: #2dc653; --err: #e63946;
+      --drop-bg: #eef2ff; --r: 12px; --sh: 0 2px 12px rgba(0,0,0,.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f0f17; --surface: #1a1a2e; --border: #2d2d44;
+        --text: #e9ecef; --muted: #adb5bd; --accent: #6c8dff;
+        --accent-h: #7f9dff; --drop-bg: #1e1e36; --sh: 0 2px 12px rgba(0,0,0,.3);
+      }
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100dvh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+      box-shadow: var(--sh); width: 100%; max-width: 520px; padding: 2rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -.02em; margin-bottom: .25rem; }
+    h1 span { color: var(--accent); }
+    .sub { color: var(--muted); font-size: .9rem; margin-bottom: 1.75rem; }
+    .drop { border: 2px dashed var(--border); border-radius: var(--r); background: var(--drop-bg);
+      padding: 2.5rem 1.5rem; text-align: center; cursor: pointer;
+      transition: border-color .15s; position: relative; }
+    .drop:hover, .drop.over { border-color: var(--accent); }
+    .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .drop-icon { font-size: 2.5rem; margin-bottom: .75rem; display: block; line-height: 1; }
+    .drop p { color: var(--muted); font-size: .9rem; }
+    .drop strong { color: var(--accent); }
+    .status { margin-top: 1.25rem; padding: .75rem 1rem; border-radius: 8px; font-size: .9rem; display: none; }
+    .status.info  { background: #e8edff; color: #2a3eb1; }
+    .status.ok    { background: #d4f7dc; color: #145a23; }
+    .status.error { background: #fde8ea; color: #8b1c24; }
+    @media (prefers-color-scheme: dark) {
+      .status.info  { background: #1e2456; color: #a8b8ff; }
+      .status.ok    { background: #1a3d27; color: #7de89a; }
+      .status.error { background: #3d1a1e; color: #ff9aa0; }
+    }
+    .btn { display: block; width: 100%; margin-top: 1rem; padding: .8rem 1.5rem;
+      background: var(--accent); color: #fff; border: none; border-radius: 8px;
+      font-size: 1rem; font-weight: 600; cursor: pointer; text-align: center;
+      text-decoration: none; transition: background .15s; }
+    .btn:hover { background: var(--accent-h); }
+    .prog { height: 4px; background: var(--border); border-radius: 2px; margin-top: 1rem; overflow: hidden; display: none; }
+    .prog-inner { height: 100%; background: var(--accent); width: 0%; transition: width .2s; border-radius: 2px; }
+    footer { margin-top: 1.5rem; text-align: center; font-size: .8rem; color: var(--muted); }
+    footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+    .badges { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .badge { font-size: .72rem; font-weight: 600; padding: .2em .6em; border-radius: 100px;
+      border: 1px solid var(--border); color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>EPUB <span>→</span> AZW3</h1>
+  <p class="sub">Convert ebooks to Kindle format — free, private, offline</p>
+  <div class="badges">
+    <span class="badge">🔒 No upload</span>
+    <span class="badge">📱 iPhone &amp; Android</span>
+    <span class="badge">✈️ Works offline</span>
+  </div>
+  <div class="drop" id="drop">
+    <input type="file" id="fileInput" accept=".epub" aria-label="Choose EPUB file">
+    <span class="drop-icon">📖</span>
+    <p><strong>Tap to choose</strong> or drop an EPUB file</p>
+    <p style="margin-top:.3rem;font-size:.8rem">Converts to .azw3 (Kindle KF8)</p>
+  </div>
+  <div class="prog" id="prog"><div class="prog-inner" id="progInner"></div></div>
+  <div class="status" id="status"></div>
+  <a class="btn" id="dlBtn" style="display:none" href="#" download>⬇ Download AZW3</a>
+</div>
+<footer>
+  <a href="https://github.com/kenp/wasm-epub2azw3" target="_blank" rel="noopener">GitHub</a>
+  · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+</footer>
+
+<script src="jszip.min.js"></script>
+<script>
+'use strict';
+
+// ─── Binary helpers ───────────────────────────────────────────────────────────
+
+const enc = new TextEncoder();
+
+function concat(...arrays) {
+  const total = arrays.reduce((n, a) => n + a.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(a, off); off += a.length; }
+  return out;
+}
+function u32(v) { const b=new Uint8Array(4); new DataView(b.buffer).setUint32(0,v>>>0,false); return b; }
+function u16(v) { const b=new Uint8Array(2); new DataView(b.buffer).setUint16(0,v&0xffff,false); return b; }
+function fill(byte, n) { return new Uint8Array(n).fill(byte); }
+
+/** Pad byte array to 4-byte alignment */
+function align4(bytes) {
+  const rem = bytes.length % 4;
+  return rem === 0 ? bytes : concat(bytes, fill(0, 4 - rem));
+}
+
+/**
+ * MOBI variable-width integer encoding (Calibre convention).
+ * High bit is set on the LAST byte only (terminator), unlike MIDI VLQ.
+ * encint(0)→[0x80], encint(15)→[0x8f], encint(128)→[0x01,0x80]
+ * Reference: calibre/ebooks/mobi/utils.py encint(value, forward=True)
+ */
+function encint(v) {
+  v = v >>> 0;
+  const bytes = [];
+  while (v > 0) { bytes.push(v & 0x7f); v >>>= 7; }
+  if (bytes.length === 0) bytes.push(0);
+  bytes[0] |= 0x80; // Calibre: set high bit on bytes[0] BEFORE reversing
+  bytes.reverse();  // → high bit ends up on the LAST byte
+  return new Uint8Array(bytes);
+}
+
+// ─── PalmDoc LZ77 compression ─────────────────────────────────────────────────
+
+function palmDocCompress(data) {
+  const out = [];
+  let i = 0;
+  const n = data.length;
+  while (i < n) {
+    let bestLen = 0, bestDist = 0;
+    const maxDist = Math.min(i, 2047);
+    const maxLen = Math.min(n - i, 10);
+    if (maxLen >= 3) {
+      for (let d = 1; d <= maxDist; d++) {
+        let l = 0;
+        while (l < maxLen && data[i-d+l] === data[i+l]) l++;
+        if (l > bestLen) { bestLen = l; bestDist = d; }
+      }
+    }
+    if (bestLen >= 3) {
+      const code = ((bestDist << 3) | (bestLen - 3)) & 0x3fff;
+      out.push(0x80|(code>>8), code&0xff);
+      i += bestLen;
+    } else {
+      const b = data[i];
+      if (b === 0x20 && i+1 < n && data[i+1] >= 0x40) {
+        out.push(data[i+1]|0x80); i += 2;
+      } else if (b >= 0x01 && b <= 0x08) {
+        out.push(1, b); i++;
+      } else {
+        out.push(b); i++;
+      }
+    }
+  }
+  return new Uint8Array(out);
+}
+
+// ─── EXTH builder ─────────────────────────────────────────────────────────────
+
+function buildExth(records) {
+  const parts = records.map(({tag, value}) => {
+    const data = value instanceof Uint8Array ? value : enc.encode(String(value));
+    return concat(u32(tag), u32(8 + data.length), data);
+  });
+  const raw = concat(...parts);
+  const pad = 4 - (raw.length % 4); // always 1-4 bytes
+  return concat(enc.encode('EXTH'), u32(12 + raw.length), u32(records.length), raw, fill(0, pad));
+}
+
+// ─── FDST table ───────────────────────────────────────────────────────────────
+
+function buildFdst(flows) {
+  return concat(enc.encode('FDST'), u32(12), u32(flows.length),
+    concat(...flows.map(f => concat(u32(f.start), u32(f.end)))));
+}
+
+// ─── Fixed records ────────────────────────────────────────────────────────────
+
+const FLIS_RECORD = new Uint8Array([
+  0x46,0x4c,0x49,0x53,0x00,0x00,0x00,0x08,0x00,0x41,0x00,0x00,0x00,0x00,0x00,0x00,
+  0xff,0xff,0xff,0xff,0x00,0x01,0x00,0x03,0x00,0x00,0x00,0x03,0x00,0x00,0x00,0x01,
+  0xff,0xff,0xff,0xff
+]);
+
+function buildFcis(textLen) {
+  return concat(enc.encode('FCIS'),u32(0x14),u32(0x10),u32(0x02),u32(0x00),
+    u32(textLen),u32(0x00),u32(0x28),u32(0x00),u32(0x28),u32(0x08),
+    new Uint8Array([0x00,0x01,0x00,0x01,0x00,0x00,0x00,0x00]));
+}
+
+const EOF_RECORD = new Uint8Array([0xe9,0x8e,0x0d,0x0a]);
+
+// ─── Text records ─────────────────────────────────────────────────────────────
+
+const TEXT_RECORD_SIZE = 4096;
+
+function buildTextRecords(text, compress) {
+  const bytes = enc.encode(text);
+  const records = [];
+  let pos = 0;
+  while (pos < bytes.length) {
+    let end = Math.min(pos + TEXT_RECORD_SIZE, bytes.length);
+    while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end++;
+    const chunk = bytes.slice(pos, end);
+    records.push(concat(compress ? palmDocCompress(chunk) : chunk, new Uint8Array([0])));
+    pos = end;
+  }
+  if (!records.length) records.push(new Uint8Array([0]));
+  return records;
+}
+
+// ─── KF8 Index (INDX) records ─────────────────────────────────────────────────
+//
+// Reference: Calibre src/calibre/ebooks/mobi/writer8/index.py
+//            kf8-rs src/serialization/index/
+//
+// Structure: 1 header INDX record + N data INDX records + optional CNCX records
+//
+// mask_to_bit_shifts: maps a bitmask to the bit shift for encoding entry count
+const M2S = {1:0,2:1,3:0,4:2,8:3,12:2,16:4,32:5,48:4,64:6,128:7,192:6};
+
+/**
+ * Build TAGX section.
+ * tagTypes: [{num, vpe, mask}]  (number, values_per_entry, bitmask)
+ */
+function buildTagx(tagTypes) {
+  const body = [];
+  for (const t of tagTypes) body.push(t.num, t.vpe, t.mask, 0);
+  body.push(0, 0, 0, 1); // END tag: end_flag=1
+  return concat(enc.encode('TAGX'), u32(12 + body.length), u32(1), new Uint8Array(body));
+}
+
+/**
+ * Serialize one index entry.
+ * key: string (the entry key, e.g. "SKEL0000000000")
+ * tags: {[tagNum]: Uint32Array | number[]}
+ * tagTypes: [{num, vpe, mask}]
+ */
+function serializeEntry(key, tags, tagTypes) {
+  const keyB = enc.encode(key);
+  let ctrl = 0;
+  for (const t of tagTypes) {
+    const vals = tags[t.num] || [];
+    ctrl |= t.mask & ((vals.length / t.vpe) << M2S[t.mask]);
+  }
+  const valParts = [];
+  for (const t of tagTypes) {
+    for (const v of (tags[t.num] || [])) valParts.push(encint(v));
+  }
+  return concat(new Uint8Array([keyB.length]), keyB, new Uint8Array([ctrl]), ...valParts);
+}
+
+/**
+ * Build all INDX records for one index.
+ * entries: [{key, tags}]
+ * tagTypes: [{num, vpe, mask}]
+ * cncxRecord: Uint8Array | null
+ */
+function buildIndxRecords(entries, tagTypes, cncxRecord) {
+  const HDR = 192;
+  const LIMIT = 0x10000 - HDR - 1048;
+
+  // Pack entries into data record blocks
+  const blocks = [[]], idxts = [[]], counts = [0], lastKeys = [new Uint8Array(0)];
+  for (const e of entries) {
+    const eb = serializeEntry(e.key, e.tags, tagTypes);
+    const bi = blocks.length - 1;
+    const used = blocks[bi].reduce((s,b)=>s+b.length,0) + idxts[bi].length * 2;
+    if (used + eb.length + 2 > LIMIT && blocks[bi].length > 0) {
+      blocks.push([]); idxts.push([]); counts.push(0); lastKeys.push(new Uint8Array(0));
+    }
+    const ci = blocks.length - 1;
+    idxts[ci].push(HDR + blocks[ci].reduce((s,b)=>s+b.length,0));
+    blocks[ci].push(eb);
+    counts[ci]++;
+    lastKeys[ci] = enc.encode(e.key);
+  }
+
+  // Build data records
+  const dataRecs = [];
+  for (let i = 0; i < blocks.length; i++) {
+    const body = align4(concat(...blocks[i]));
+    const idxtData = new Uint8Array(idxts[i].length * 2);
+    const idv = new DataView(idxtData.buffer);
+    idxts[i].forEach((off, j) => idv.setUint16(j*2, off, false));
+    const idxtBlock = align4(concat(enc.encode('IDXT'), idxtData));
+    const idxtOff = HDR + body.length;
+    const h = new Uint8Array(HDR);
+    const hv = new DataView(h.buffer);
+    h[0]=0x49;h[1]=0x4e;h[2]=0x44;h[3]=0x58;  // INDX
+    hv.setUint32(4, HDR, false);
+    hv.setUint32(12, 1, false);   // type=1 (data record)
+    hv.setUint32(20, idxtOff, false);
+    hv.setUint32(24, counts[i], false);
+    for (let k=28;k<36;k++) h[k]=0xff;
+    dataRecs.push(concat(h, body, idxtBlock));
+  }
+
+  // Build header record
+  const tagx = align4(buildTagx(tagTypes));
+
+  // Geometry: last key of each data record + count
+  const geomParts = blocks.map((_, i) => concat(
+    new Uint8Array([lastKeys[i].length]), lastKeys[i], u16(counts[i])
+  ));
+  const geom = align4(concat(...geomParts));
+
+  // Header IDXT: offsets to geometry entries
+  let gPos = HDR + tagx.length;
+  let gOff = 0;
+  const hIdxts = [];
+  for (let i = 0; i < blocks.length; i++) {
+    hIdxts.push(gPos + gOff);
+    gOff += 1 + lastKeys[i].length + 2;
+  }
+  const hIdxtData = new Uint8Array(hIdxts.length * 2);
+  const hidv = new DataView(hIdxtData.buffer);
+  hIdxts.forEach((off, i) => hidv.setUint16(i*2, off, false));
+  const hIdxt = align4(concat(enc.encode('IDXT'), hIdxtData));
+  const idxtOffHdr = HDR + tagx.length + geom.length;
+
+  const hh = new Uint8Array(HDR);
+  const hv2 = new DataView(hh.buffer);
+  hh[0]=0x49;hh[1]=0x4e;hh[2]=0x44;hh[3]=0x58; // INDX
+  hv2.setUint32(4, HDR, false);
+  hv2.setUint32(16, 2, false);  // type=2 (header record)
+  hv2.setUint32(20, idxtOffHdr, false);
+  hv2.setUint32(24, dataRecs.length, false);
+  hv2.setUint32(28, 65001, false);
+  hv2.setUint32(32, 0xffffffff, false);
+  hv2.setUint32(36, entries.length, false);
+  hv2.setUint32(52, cncxRecord ? 1 : 0, false);
+  hv2.setUint32(180, HDR, false); // tagx_offset = 192
+
+  const headerRec = concat(hh, tagx, geom, hIdxt);
+  return [headerRec, ...dataRecs, ...(cncxRecord ? [cncxRecord] : [])];
+}
+
+// ─── Skeleton index ───────────────────────────────────────────────────────────
+// Tag defs from Calibre SkelIndex: chunk_count(1,1,3), geometry(6,2,12)
+
+const SKEL_TAGS = [{num:1,vpe:1,mask:3}, {num:6,vpe:2,mask:12}];
+
+/**
+ * parts: [{skelHeadByteLen, skelTailByteLen, contentByteLen, flowStart}]
+ * where flowStart is the byte offset of this chapter's flow in the full text
+ */
+function buildSkeletonIndex(parts) {
+  const entries = parts.map((p, i) => {
+    const skelLen = p.skelHeadByteLen + p.skelTailByteLen;
+    return {
+      key: `SKEL${String(i).padStart(10, '0')}`,
+      tags: {
+        1: [p.chunkCount, p.chunkCount],  // chunk_count repeated twice (Calibre convention)
+        6: [p.flowStart, skelLen, p.flowStart, skelLen], // geometry repeated twice
+      }
+    };
+  });
+  return buildIndxRecords(entries, SKEL_TAGS, null);
+}
+
+// ─── Chunk index ──────────────────────────────────────────────────────────────
+// Tag defs from Calibre ChunkIndex: cncx_offset(2,1,1), file_number(3,1,2),
+//   sequence_number(4,1,4), geometry(6,2,8)
+
+const CHUNK_TAGS = [{num:2,vpe:1,mask:1},{num:3,vpe:1,mask:2},{num:4,vpe:1,mask:4},{num:6,vpe:2,mask:8}];
+
+/**
+ * Build CNCX record for chunk entries.
+ * Each entry is VLQ-length-prefixed UTF-8 string.
+ * Format per Calibre: "P-//*[@aid='AID_VALUE']"
+ * Returns {record: Uint8Array, offsets: number[]}
+ *
+ * Calibre reads these as: cncx[cncx_offset] → aidtext
+ * Then: aidtext = idtext[12:-2] → aid value (used only in fallback insert-pos calculation)
+ */
+function buildCncx(selectors) {
+  const parts = [];
+  const offsets = [];
+  let byteOff = 0;
+  for (const sel of selectors) {
+    const sb = enc.encode(sel);
+    offsets.push(byteOff);
+    parts.push(encint(sb.length), sb);
+    byteOff += encint(sb.length).length + sb.length;
+  }
+  return { record: align4(concat(...parts)), offsets };
+}
+
+/**
+ * parts: [{skelHeadByteLen, skelTailByteLen, contentByteLen, flowStart, chapterIndex, firstAid}]
+ */
+function buildChunkIndex(parts) {
+  // Build CNCX selector strings: "P-//*[@aid='N']"
+  // Used by Calibre to find insert position in skeleton (fallback only)
+  const selectors = parts.map(p => `P-//*[@aid='${p.firstAid}']`);
+  const { record: cncxRecord, offsets } = buildCncx(selectors);
+
+  const entries = parts.map((p, i) => {
+    // insertPos must be GLOBAL (absolute byte offset in full text) so each
+    // chapter gets a unique key. Calibre converts to local via: insertpos - skelpos.
+    const globalInsertPos = p.flowStart + p.skelHeadByteLen - 1;
+    const contentStart = p.flowStart + p.skelHeadByteLen + p.skelTailByteLen;
+    return {
+      key: String(globalInsertPos).padStart(10, '0'),
+      tags: {
+        2: [offsets[i]],     // cncx_offset → points to selector string
+        3: [p.chapterIndex], // file_number (0-indexed chapter)
+        4: [0],              // sequence_number
+        6: [contentStart, p.contentByteLen],
+      }
+    };
+  });
+  return buildIndxRecords(entries, CHUNK_TAGS, cncxRecord);
+}
+
+// ─── MOBI header (record 0) ───────────────────────────────────────────────────
+
+function buildRecord0(o) {
+  const titleB = enc.encode(o.fullTitle);
+  const exthB = buildExth(o.exthRecords);
+  const HDR = 280;
+  const titleOff = HDR + exthB.length;
+  const h = new Uint8Array(HDR);
+  const dv = new DataView(h.buffer);
+  let p = 0;
+  dv.setUint16(p, o.compress?2:1, false); p+=2;
+  p+=2;
+  dv.setUint32(p, o.textLen>>>0, false); p+=4;
+  dv.setUint16(p, o.numTextRecs, false); p+=2;
+  dv.setUint16(p, TEXT_RECORD_SIZE, false); p+=2;
+  p+=4; // encryption=0, unused
+  h[p]=0x4d;h[p+1]=0x4f;h[p+2]=0x42;h[p+3]=0x49; p+=4; // MOBI
+  dv.setUint32(p,264,false); p+=4;
+  dv.setUint32(p,2,false); p+=4;   // book_type=Book
+  dv.setUint32(p,65001,false); p+=4; // UTF-8
+  dv.setUint32(p,o.uid>>>0,false); p+=4;
+  dv.setUint32(p,8,false); p+=4;   // file_version=8 (KF8)
+  dv.setUint32(p,0xffffffff,false); p+=4; // meta_orth
+  dv.setUint32(p,0xffffffff,false); p+=4; // meta_infl
+  for(let i=0;i<8;i++){dv.setUint32(p,0xffffffff,false);p+=4;} // extra_indices
+  dv.setUint32(p,o.firstNonText,false); p+=4;
+  dv.setUint32(p,titleOff,false); p+=4;
+  dv.setUint32(p,titleB.length,false); p+=4;
+  dv.setUint32(p,o.langCode,false); p+=4;
+  p+=8; // in/out lang
+  dv.setUint32(p,8,false); p+=4; // min_version
+  dv.setUint32(p,o.firstResource,false); p+=4;
+  p+=16; // huff fields = 0
+  dv.setUint32(p,0x50,false); p+=4; // exth_flags=has_exth
+  p+=32; // unknown[32]=0
+  dv.setUint32(p,0xffffffff,false); p+=4; // unknown_index
+  dv.setUint32(p,0xffffffff,false); p+=4; // drm_offset
+  p+=12; // drm fields
+  p+=8;  // unknown2
+  dv.setUint32(p,o.fdstRec,false); p+=4;
+  dv.setUint32(p,o.fdstCount,false); p+=4;
+  dv.setUint32(p,o.fcisRec,false); p+=4;
+  dv.setUint32(p,1,false); p+=4; // fcis_count
+  dv.setUint32(p,o.flisRec,false); p+=4;
+  dv.setUint32(p,1,false); p+=4; // flis_count
+  p+=8; // unknown3
+  dv.setUint32(p,0xffffffff,false); p+=4; // srcs_record
+  p+=4;  // srcs_count
+  for(let i=0;i<8;i++) h[p++]=0xff; // unknown4[8]=0xff
+  dv.setUint32(p,1,false); p+=4; // extra_data_flags=0b1
+  dv.setUint32(p,o.ncxIdx,false); p+=4;
+  dv.setUint32(p,o.chunkIdx,false); p+=4;
+  dv.setUint32(p,o.skelIdx,false); p+=4;
+  dv.setUint32(p,0xffffffff,false); p+=4; // datp
+  dv.setUint32(p,0xffffffff,false); p+=4; // guide
+  h[p]=0xff;h[p+1]=0xff;h[p+2]=0xff;h[p+3]=0xff; p+=4;
+  p+=4;
+  h[p]=0xff;h[p+1]=0xff;h[p+2]=0xff;h[p+3]=0xff; p+=4;
+  p+=4;
+  return concat(h, exthB, titleB, fill(0, 8192));
+}
+
+// ─── PalmDoc/PDB container ───────────────────────────────────────────────────
+
+function buildPalmDoc(title, records) {
+  const now = Math.floor(Date.now() / 1000);
+  const nRec = records.length;
+  const hdrSize = 78 + 8*nRec + 2;
+  const h = new Uint8Array(hdrSize);
+  const dv = new DataView(h.buffer);
+  const t = title.replace(/[^\x20-\x7e]/g,'?').replace(/ /g,'_').slice(0,31);
+  for(let i=0;i<t.length;i++) h[i]=t.charCodeAt(i);
+  dv.setUint32(36,now,false); dv.setUint32(40,now,false);
+  h[60]=0x42;h[61]=0x4f;h[62]=0x4f;h[63]=0x4b; // BOOK
+  h[64]=0x4d;h[65]=0x4f;h[66]=0x42;h[67]=0x49; // MOBI
+  dv.setUint32(68,2*nRec-1,false);
+  dv.setUint16(76,nRec,false);
+  let off = hdrSize;
+  for(let i=0;i<nRec;i++){
+    dv.setUint32(78+i*8,off,false);
+    h[78+i*8+4]=0;
+    h[78+i*8+5]=(2*i>>16)&0xff;
+    h[78+i*8+6]=(2*i>>8)&0xff;
+    h[78+i*8+7]=(2*i)&0xff;
+    off+=records[i].length;
+  }
+  return concat(h,...records);
+}
+
+// ─── Language encoding ────────────────────────────────────────────────────────
+
+const LANG = {'af':54,'ar':1,'bg':2,'ca':3,'zh':4,'cs':5,'da':6,'nl':19,
+  'en':9,'et':37,'fi':11,'fr':12,'de':7,'el':8,'he':13,'hi':57,
+  'hu':14,'id':33,'it':16,'ja':17,'ko':18,'lv':38,'lt':39,'ms':62,
+  'no':20,'pl':21,'pt':22,'ro':24,'ru':25,'sr':26,'sk':27,'sl':36,
+  'es':10,'sv':29,'th':30,'tr':31,'uk':34,'vi':42};
+
+function langCode(tag) { return LANG[(tag||'en').toLowerCase().split('-')[0]] || 9; }
+
+// ─── EPUB Parser ─────────────────────────────────────────────────────────────
+
+async function parseEpub(buf) {
+  const zip = await JSZip.loadAsync(buf);
+
+  // Find OPF
+  const containerXml = await zip.file('META-INF/container.xml').async('string');
+  const cDoc = new DOMParser().parseFromString(containerXml, 'text/xml');
+  const opfPath = cDoc.querySelector('rootfile')?.getAttribute('full-path');
+  if (!opfPath) throw new Error('Cannot find rootfile in container.xml');
+
+  const opfXml = await zip.file(opfPath).async('string');
+  const opf = new DOMParser().parseFromString(opfXml, 'application/xhtml+xml');
+  const opfDir = opfPath.includes('/') ? opfPath.split('/').slice(0,-1).join('/')+'/' : '';
+  const resolve = h => opfDir + h.split('#')[0];
+
+  // Metadata
+  const dc = 'http://purl.org/dc/elements/1.1/';
+  const g = n => opf.getElementsByTagNameNS(dc,n)[0]?.textContent?.trim()||'';
+  const metadata = {
+    title:    g('title') || 'Unknown Title',
+    creator:  g('creator'),
+    publisher:g('publisher'),
+    language: g('language') || 'en',
+    description: g('description'),
+    date:     g('date') || new Date().toISOString().slice(0,10),
+    identifier: g('identifier') || crypto.randomUUID(),
+  };
+
+  // Manifest
+  const manifest = {};
+  for (const item of opf.querySelectorAll('manifest item'))
+    manifest[item.getAttribute('id')] = {
+      href: item.getAttribute('href'),
+      mt: item.getAttribute('media-type')||'',
+    };
+
+  // Spine
+  const spineHrefs = [...opf.querySelectorAll('spine itemref')]
+    .map(ir => manifest[ir.getAttribute('idref')]?.href)
+    .filter(Boolean);
+
+  // CSS
+  let css = '';
+  for (const item of Object.values(manifest)) {
+    if (item.mt === 'text/css') {
+      const f = zip.file(resolve(item.href)) || zip.file(decodeURIComponent(resolve(item.href)));
+      if (f) try { css += await f.async('string') + '\n'; } catch(e){}
+    }
+  }
+
+  // Chapters
+  const chapters = [];
+  for (const href of spineHrefs) {
+    const path = resolve(href);
+    const f = zip.file(path) || zip.file(decodeURIComponent(path));
+    if (!f) continue;
+    try {
+      const xhtml = await f.async('string');
+      const doc = new DOMParser().parseFromString(xhtml, 'application/xhtml+xml');
+      chapters.push(
+        doc.querySelector('parsererror')
+          ? extractContent(new DOMParser().parseFromString(xhtml,'text/html'))
+          : extractContent(doc)
+      );
+    } catch(e) { console.warn('Skip chapter:', path, e); }
+  }
+  return {metadata, chapters, css};
+}
+
+let _aid = 1;
+const BLOCKS = new Set(['p','div','h1','h2','h3','h4','h5','h6','section',
+  'article','blockquote','pre','ul','ol','li','table','tr','td','th',
+  'figure','figcaption','nav','header','footer','aside','main']);
+
+function extractContent(doc) {
+  const head = doc.head || doc.querySelector('head');
+  const body = doc.body || doc.querySelector('body');
+  let headContent = '';
+  if (head) {
+    const t = head.querySelector('title');
+    if (t) headContent = `<title>${t.textContent.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n`;
+  }
+  const skelHead =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<html xmlns="http://www.w3.org/1999/xhtml">\n` +
+    `<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n` +
+    headContent + `</head>\n<body aid="0">\n`;
+  const skelTail = `</body>\n</html>\n`;
+
+  // Add aid attributes to block elements; track the first aid value used
+  const firstAid = _aid; // aid of the first content block element
+  if (body) {
+    const walk = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
+    let n = walk.nextNode();
+    while (n) {
+      if (BLOCKS.has(n.tagName.toLowerCase()) && !n.getAttribute('aid'))
+        n.setAttribute('aid', String(_aid++));
+      n = walk.nextNode();
+    }
+  }
+  const content = body ? body.innerHTML : '';
+  return {skelHead, skelTail, content, firstAid};
+}
+
+// ─── EPUB → AZW3 converter ───────────────────────────────────────────────────
+
+function convertToAzw3(epub) {
+  _aid = 1;
+  const {metadata, chapters, css} = epub;
+
+  // Compute byte lengths for each chapter's parts
+  let htmlByteOffset = 0;
+  const idxParts = chapters.map((ch, i) => {
+    const headB = enc.encode(ch.skelHead).length;
+    const tailB = enc.encode(ch.skelTail).length;
+    const contB = enc.encode(ch.content).length;
+    const part = {
+      chapterIndex: i,
+      chunkCount: 1,
+      skelHeadByteLen: headB,
+      skelTailByteLen: tailB,
+      contentByteLen: contB,
+      flowStart: htmlByteOffset,  // byte offset within all-HTML text (flow 0)
+      firstAid: ch.firstAid,
+    };
+    htmlByteOffset += headB + tailB + contB;
+    return part;
+  });
+  const htmlByteLen = htmlByteOffset;
+
+  // FDST: flow 0 = ALL HTML content (single flow for Calibre's KF8 reader)
+  //        flow 1 = CSS (optional)
+  const fdstEntries = [{start: 0, end: htmlByteLen}];
+  if (css) {
+    const cssLen = enc.encode(css).length;
+    fdstEntries.push({start: htmlByteLen, end: htmlByteLen + cssLen});
+  }
+
+  // Full text for PDB text records = all HTML + CSS concatenated
+  const fullText = chapters.map(ch => ch.skelHead + ch.skelTail + ch.content).join('') + (css || '');
+  const textLen = enc.encode(fullText).length;
+  const compress = textLen > 2048;
+  const textRecs = buildTextRecords(fullText, compress);
+  const numTextRecs = textRecs.length;
+
+  // Build record list (record 0 = placeholder)
+  const recs = [new Uint8Array(0)];
+  for (const tr of textRecs) recs.push(tr);
+
+  // 4-byte align data section
+  const dataLen = recs.slice(1).reduce((s,r)=>s+r.length,0);
+  if (dataLen % 4) recs.push(fill(0, 4 - (dataLen%4)));
+
+  const firstNonText = recs.length;
+
+  // Skeleton index records
+  const skelRecs = buildSkeletonIndex(idxParts);
+  const skelIdx = recs.length;
+  for (const r of skelRecs) recs.push(r);
+
+  // Chunk index records
+  const chunkRecs = buildChunkIndex(idxParts);
+  const chunkIdx = recs.length;
+  for (const r of chunkRecs) recs.push(r);
+
+  // FDST, FLIS, FCIS, EOF
+  const fdstRec = recs.length; recs.push(buildFdst(fdstEntries));
+  const flisRec = recs.length; recs.push(FLIS_RECORD);
+  const fcisRec = recs.length; recs.push(buildFcis(textLen));
+  recs.push(EOF_RECORD);
+
+  // EXTH
+  const uid = (Math.random() * 0xffffffff) >>> 0;
+  const uuid = metadata.identifier.replace(/^urn:uuid:/i,'').slice(0,36);
+  const exthRecs = [
+    {tag:503, value:metadata.title},
+    {tag:112, value:'epub2azw3:'+uuid},
+    {tag:113, value:uuid},
+    {tag:501, value:'EBOK'},
+    {tag:524, value:metadata.language.split('-')[0]},
+    {tag:528, value:'true'},
+    {tag:108, value:'epub2azw3 (https://github.com/kenp/wasm-epub2azw3)'},
+  ];
+  if (metadata.creator)     exthRecs.push({tag:100, value:metadata.creator});
+  if (metadata.publisher)   exthRecs.push({tag:101, value:metadata.publisher});
+  if (metadata.date)        exthRecs.push({tag:106, value:metadata.date});
+  if (metadata.description) exthRecs.push({tag:103, value:metadata.description});
+
+  // Record 0
+  recs[0] = buildRecord0({
+    compress, textLen, numTextRecs,
+    firstNonText, fdstRec, fdstCount: fdstRec,
+    flisRec, fcisRec,
+    chunkIdx, skelIdx,
+    ncxIdx: 0xffffffff,
+    firstResource: 0xffffffff,
+    uid, langCode: langCode(metadata.language),
+    exthRecords: exthRecs, fullTitle: metadata.title,
+  });
+
+  return buildPalmDoc(metadata.title, recs);
+}
+
+// ─── UI ───────────────────────────────────────────────────────────────────────
+
+const dropEl = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const statusEl = document.getElementById('status');
+const dlBtn = document.getElementById('dlBtn');
+const prog = document.getElementById('prog');
+const progInner = document.getElementById('progInner');
+let blobUrl = null;
+
+function showStatus(msg, type='info') {
+  statusEl.textContent = msg;
+  statusEl.className = 'status ' + type;
+  statusEl.style.display = 'block';
+}
+function setProgress(pct) { prog.style.display='block'; progInner.style.width=pct+'%'; }
+function hideProgress() { prog.style.display='none'; progInner.style.width='0%'; }
+
+async function handleFile(file) {
+  if (!file?.name.toLowerCase().endsWith('.epub')) {
+    showStatus('Please choose an .epub file', 'error'); return;
+  }
+  dlBtn.style.display = 'none';
+  if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl=null; }
+  showStatus('Reading EPUB…', 'info'); setProgress(10);
+  try {
+    const buf = await file.arrayBuffer();
+    setProgress(30);
+    showStatus('Parsing EPUB structure…', 'info');
+    const epub = await parseEpub(buf);
+    setProgress(60);
+    showStatus(`Converting "${epub.metadata.title}"…`, 'info');
+    await new Promise(r => setTimeout(r, 20)); // yield for UI update
+    const azw3 = convertToAzw3(epub);
+    setProgress(95);
+    const blob = new Blob([azw3], {type:'application/vnd.amazon.ebook'});
+    blobUrl = URL.createObjectURL(blob);
+    const name = file.name.replace(/\.epub$/i, '.azw3');
+    dlBtn.href = blobUrl; dlBtn.download = name;
+    dlBtn.textContent = `⬇ Download ${name}`;
+    dlBtn.style.display = 'block';
+    setProgress(100);
+    showStatus(`✓ Converted "${epub.metadata.title}" — ${epub.chapters.length} chapter(s), ${(azw3.length/1024).toFixed(0)} KB`, 'ok');
+    setTimeout(hideProgress, 800);
+  } catch(err) {
+    hideProgress(); showStatus(`Error: ${err.message}`, 'error'); console.error(err);
+  }
+}
+
+dropEl.addEventListener('dragover', e => { e.preventDefault(); dropEl.classList.add('over'); });
+dropEl.addEventListener('dragleave', () => dropEl.classList.remove('over'));
+dropEl.addEventListener('drop', e => {
+  e.preventDefault(); dropEl.classList.remove('over');
+  const f = e.dataTransfer?.files?.[0]; if (f) handleFile(f);
+});
+fileInput.addEventListener('change', () => { const f=fileInput.files?.[0]; if(f) handleFile(f); });
+
+// ─── Service Worker ───────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator)
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
