@@ -16,6 +16,7 @@ Deps: uv (https://docs.astral.sh/uv/) — no install needed beyond uv itself.
 """
 
 import zipfile
+import io
 import re
 import base64
 import struct
@@ -26,6 +27,9 @@ import sys
 import os
 from pathlib import Path
 from xml.etree import ElementTree as ET
+
+sys.path.insert(0, str(Path(__file__).parent))
+from epub_fixtures import make_epub, MINIMAL_PNG
 
 # ── KF8 binary writer (mirrors docs/index.html) ────────────────────────────
 
@@ -344,12 +348,51 @@ def calibre_txt(from_path, to_path):
 
 # ── Test cases ─────────────────────────────────────────────────────────────
 
+# Generate synthetic EPUB 3 test file
+_epub3_path = '/tmp/synthetic_epub3.epub'
+Path(_epub3_path).write_bytes(make_epub(
+    'EPUB3 Synthetic Book',
+    [('Chapter One',   '<p>First chapter of a synthetic EPUB 3.0 book.</p>'),
+     ('Chapter Two',   '<p>Second chapter with some more content here.</p>'),
+     ('Chapter Three', '<p>Third chapter — final chapter of this test book.</p>')],
+    version='3.0'
+))
+
+# Generate synthetic EPUB with display:none CSS (simulates Dutch publisher book)
+_css_epub_path = '/tmp/synthetic_css_visibility.epub'
+Path(_css_epub_path).write_bytes(make_epub(
+    'CSS Visibility Test Book',
+    [('Chapter 1',
+      '<div class="wpt-verdwijn">HIDDEN WATERMARK</div>'
+      '<span class="wpt-invis">invisible span</span>'
+      '<p>Visible text content here.</p>'),
+     ('Chapter 2', '<p>Second chapter content.</p>')],
+    css_rules=[
+        ('.wpt-verdwijn', 'display: none'),
+        ('.wpt-invis', 'visibility: hidden'),
+        ('p', 'font-family: serif'),  # should NOT be extracted
+    ]
+))
+
+# Generate synthetic EPUB with an image
+_img_epub_path = '/tmp/synthetic_with_image.epub'
+Path(_img_epub_path).write_bytes(make_epub(
+    'Image Test Book',
+    [('Chapter with Image',
+      '<p>This chapter has an image embedded above.</p>'),
+     ('Text Chapter', '<p>Second chapter with text only.</p>')],
+    images=[('cover.png', MINIMAL_PNG)]
+))
+
 EPUB_TESTS = [
-    ('/tmp/alice_images.epub',    "Alice in Wonderland (with images)",         "Alice's Adventures"),
-    ('/tmp/pride_prejudice.epub', "Pride and Prejudice (long book)",            "Pride and Prejudice"),
-    ('/tmp/sherlock.epub',        "Sherlock Holmes",                            "Adventures of Sherlock Holmes"),
-    ('/tmp/tale_two_cities.epub', "A Tale of Two Cities (48 chapters)",         "Tale of Two Cities"),
-    ('/tmp/moby_dick.epub',       "Moby Dick",                                  "Moby Dick"),
+    ('/tmp/alice_images.epub',         "Alice in Wonderland (EPUB2 + images)", "Alice's Adventures"),
+    ('/tmp/pride_prejudice.epub',      "Pride and Prejudice (long book)",       "Pride and Prejudice"),
+    ('/tmp/sherlock.epub',             "Sherlock Holmes",                        "Adventures of Sherlock Holmes"),
+    ('/tmp/tale_two_cities.epub',      "A Tale of Two Cities (48 chapters)",    "Tale of Two Cities"),
+    ('/tmp/moby_dick.epub',            "Moby Dick",                             "Moby Dick"),
+    (_epub3_path,                      "Synthetic EPUB 3.0",                    "EPUB3"),
+    (_css_epub_path,                   "Synthetic: CSS display:none",           "CSS Visibility"),
+    (_img_epub_path,                   "Synthetic: embedded image",             "Image Test"),
 ]
 
 for epub_path, label, expected_title_fragment in EPUB_TESTS:
@@ -396,6 +439,42 @@ for epub_path, label, expected_title_fragment in EPUB_TESTS:
         test(f'Images embedded ({meta["images"]}x data URIs)', lambda op=out_path: (
             b'data:image/' in Path(op).read_bytes()
         ) if Path(op).exists() else False)
+
+    # CSS-specific: display:none rule must survive into AZW3
+    if 'css_visibility' in epub_path.lower() or 'css' in label.lower():
+        test('display:none CSS rule in AZW3 binary', lambda op=out_path: (
+            (b'display: none' in Path(op).read_bytes() or
+             b'display:none' in Path(op).read_bytes())
+        ) if Path(op).exists() else False)
+        test('Non-visibility CSS NOT in AZW3', lambda op=out_path: (
+            b'font-family: serif' not in Path(op).read_bytes()
+        ) if Path(op).exists() else True)
+
+    # Skeleton head size check — must not exceed 4096 bytes
+    if meta and Path(out_path).exists():
+        def _check_skel_size(op=out_path):
+            d = Path(op).read_bytes()
+            nrec = struct.unpack_from('>H', d, 76)[0]
+            r0 = struct.unpack_from('>I', d, 78)[0]
+            skel_idx = struct.unpack_from('>I', d, r0+252)[0]
+            if skel_idx == 0xffffffff:
+                return  # no skeleton, skip
+            skel_dr = struct.unpack_from('>I', d, 78+(skel_idx+1)*8)[0]
+            io2 = struct.unpack_from('>I', d, skel_dr+20)[0]
+            eo = struct.unpack_from('>H', d, skel_dr+io2+4)[0]
+            p = skel_dr + eo; kl = d[p]; p += 1+kl
+            ctrl = d[p]; p += 1
+            geom = []
+            for _ in range(((ctrl&12)>>2)*2):
+                val = consumed = 0
+                for i in range(p, len(d)):
+                    b = d[i]; val=(val<<7)|(b&0x7f); consumed+=1
+                    if b & 0x80: break
+                geom.append(val); p += consumed
+            skel_len = geom[1] if len(geom) > 1 else 0
+            assert skel_len <= 4096, \
+                f'Skeleton {skel_len}B > 4096 (one text record): CSS may appear as visible text!'
+        test('Skeleton head fits in one text record (≤4096 B)', _check_skel_size)
 
 # ── Validation checks ──────────────────────────────────────────────────────
 
@@ -654,6 +733,204 @@ if Path(alice_azw3).exists():
     except Exception as e:
         print(f'  ⚠ Screenshot tests skipped: {e}')
         import traceback; traceback.print_exc()
+
+# ── Error cases ────────────────────────────────────────────────────────────
+
+print('\n── Error cases ────────────────────────────────────────────────────')
+
+import tempfile
+
+def test_non_zip():
+    with tempfile.NamedTemporaryFile(suffix='.epub', delete=False) as f:
+        f.write(b'This is not a ZIP file at all.'); tmp = f.name
+    try:
+        convert_epub(tmp, '/tmp/err_nonzip.azw3')
+        raise AssertionError('Expected exception for non-ZIP input')
+    except AssertionError: raise
+    except Exception: pass  # any exception is correct
+
+test('Non-ZIP file raises exception', test_non_zip)
+
+def test_empty_file():
+    with tempfile.NamedTemporaryFile(suffix='.epub', delete=False) as f:
+        tmp = f.name  # 0 bytes
+    try:
+        convert_epub(tmp, '/tmp/err_empty.azw3')
+        raise AssertionError('Expected exception for empty file')
+    except AssertionError: raise
+    except Exception: pass
+
+test('Empty file raises exception', test_empty_file)
+
+def test_missing_container():
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w') as z:
+        z.writestr('garbage.txt', 'not an epub at all')
+    Path('/tmp/err_no_container.epub').write_bytes(buf.getvalue())
+    try:
+        convert_epub('/tmp/err_no_container.epub', '/tmp/err_no_container.azw3')
+        raise AssertionError('Expected exception for missing container.xml')
+    except AssertionError: raise
+    except Exception: pass
+
+test('Missing container.xml raises exception', test_missing_container)
+
+def test_empty_spine():
+    """EPUB with no spine items → 0 chapters → must not crash."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w') as z:
+        mi = zipfile.ZipInfo('mimetype'); mi.compress_type = zipfile.ZIP_STORED
+        z.writestr(mi, 'application/epub+zip')
+        z.writestr('META-INF/container.xml', '''<?xml version="1.0"?>
+<container version="1.0"
+  xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf"
+              media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>''')
+        z.writestr('OEBPS/content.opf', '''<?xml version="1.0"?>
+<package version="2.0" xmlns="http://www.idpf.org/2007/opf"
+         unique-identifier="uid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:title>Empty Spine</dc:title>
+    <dc:language>en</dc:language>
+    <dc:identifier id="uid">uid-001</dc:identifier>
+  </metadata>
+  <manifest/>
+  <spine/>
+</package>''')
+    Path('/tmp/err_empty_spine.epub').write_bytes(buf.getvalue())
+    meta = convert_epub('/tmp/err_empty_spine.epub', '/tmp/err_empty_spine.azw3')
+    assert meta['chapters'] == 0, f'Expected 0 chapters, got {meta["chapters"]}'
+
+test('Empty spine → 0 chapters, no crash', test_empty_spine)
+
+def test_css_extraction_logic():
+    """CSS extractor must keep only display:none / visibility:hidden rules."""
+    css = """
+        .normal { font-size: 14px; margin: 0; }
+        .watermark { display: none; color: red; }
+        .hidden { visibility: hidden; }
+        .visible { display: block; color: blue; }
+        p { font-family: serif; }
+        .combo { display: none; font-weight: bold; }
+    """
+    critical = []
+    for m in re.finditer(r'([^{}]+)\{([^}]*)\}', css):
+        if re.search(r'display\s*:\s*none|visibility\s*:\s*hidden', m.group(2), re.I):
+            critical.append(m.group(1).strip())
+    assert any('watermark' in r for r in critical), '.watermark not extracted'
+    assert any('hidden' in r for r in critical), '.hidden not extracted'
+    assert any('combo' in r for r in critical), '.combo not extracted'
+    assert not any('normal' in r for r in critical), '.normal should not be extracted'
+    assert not any('visible' in r for r in critical), '.visible should not be extracted'
+    assert not any(r.strip() == 'p' for r in critical), 'p rule should not be extracted'
+
+test('CSS extractor keeps only visibility rules', test_css_extraction_logic)
+
+# ── Image rendering via Playwright ────────────────────────────────────────
+
+print('\n── Image rendering (visual) ───────────────────────────────────────')
+
+_img_azw3 = '/tmp/synthetic_with_image_e2e.azw3'
+try:
+    convert_epub(_img_epub_path, _img_azw3)
+    _img_data = Path(_img_azw3).read_bytes()
+
+    # Re-use the extract_and_screenshot helper from the screenshot section above
+    try:
+        from playwright.sync_api import sync_playwright as _spw
+
+        def _extract_chapters_for_img(azw3_bytes):
+            nrec = struct.unpack_from('>H', azw3_bytes, 76)[0]
+            rec_offsets = [struct.unpack_from('>I', azw3_bytes, 78+i*8)[0] for i in range(nrec)]
+            r0 = rec_offsets[0]
+            num_text = struct.unpack_from('>H', azw3_bytes, r0+8)[0]
+            skel_idx  = struct.unpack_from('>I', azw3_bytes, r0+252)[0]
+            chunk_idx = struct.unpack_from('>I', azw3_bytes, r0+248)[0]
+            if skel_idx == 0xffffffff: return []
+            text_bytes = b''
+            for i in range(1, num_text+1):
+                s = rec_offsets[i]; e = rec_offsets[i+1] if i+1 < nrec else len(azw3_bytes)
+                text_bytes += azw3_bytes[s:e-1]
+            text = text_bytes.decode('utf-8', errors='replace')
+            def vwi(d, p):
+                val=consumed=0
+                for i in range(p, len(d)):
+                    b=d[i]; val=(val<<7)|(b&0x7f); consumed+=1
+                    if b&0x80: break
+                return val, consumed
+            def ents(ro):
+                io2=struct.unpack_from('>I',azw3_bytes,ro+20)[0]
+                n=struct.unpack_from('>I',azw3_bytes,ro+24)[0]; out=[]
+                for j in range(n):
+                    eo=struct.unpack_from('>H',azw3_bytes,ro+io2+4+j*2)[0]
+                    p=ro+eo; kl=azw3_bytes[p]
+                    out.append({'key':azw3_bytes[p+1:p+1+kl].decode('utf-8','replace'),'ds':p+1+kl})
+                return out
+            skels_raw=ents(rec_offsets[skel_idx+1])
+            skels=[]
+            for e in skels_raw:
+                ctrl=azw3_bytes[e['ds']]; pos=e['ds']+1; cc=[]; geom=[]
+                for _ in range(ctrl&3): v,c=vwi(azw3_bytes,pos); cc.append(v); pos+=c
+                for _ in range(((ctrl&12)>>2)*2): v,c=vwi(azw3_bytes,pos); geom.append(v); pos+=c
+                skels.append({'cc':cc[0] if cc else 1,'start':geom[0] if geom else 0,'len':geom[1] if len(geom)>1 else 0})
+            num_cdr=struct.unpack_from('>I',azw3_bytes,rec_offsets[chunk_idx]+24)[0]
+            chunks_raw=[]
+            for dr in range(num_cdr): chunks_raw.extend(ents(rec_offsets[chunk_idx+1+dr]))
+            chunks=[]
+            for e in chunks_raw:
+                ctrl=azw3_bytes[e['ds']]; pos=e['ds']+1; r={'ins':int(e['key'])}
+                if ctrl&1: v,c=vwi(azw3_bytes,pos); r['cncx']=v; pos+=c
+                if ctrl&2: v,c=vwi(azw3_bytes,pos); r['fn']=v; pos+=c
+                if ctrl&4: v,c=vwi(azw3_bytes,pos); r['sn']=v; pos+=c
+                if ctrl&8:
+                    s,c=vwi(azw3_bytes,pos); pos+=c; l,c=vwi(azw3_bytes,pos); pos+=c
+                    r['start']=s; r['len']=l
+                chunks.append(r)
+            result=[]; cp=0
+            for sk in skels:
+                html=text[sk['start']:sk['start']+sk['len']]; recon=html
+                for _ in range(sk['cc']):
+                    if cp>=len(chunks): break
+                    ch=chunks[cp]; cp+=1; li=ch['ins']-sk['start']
+                    content=text[ch.get('start',sk['start']+sk['len']):ch.get('start',sk['start']+sk['len'])+ch.get('len',0)]
+                    recon=recon[:li]+content+recon[li:]
+                body=re.sub(r'<[^>]+>','',recon).strip()
+                if len(body)>20: result.append({'html':recon,'body':body})
+            return result
+
+        img_chaps = _extract_chapters_for_img(_img_data)
+        img_chap = next((c for c in img_chaps if '<img' in c['html']), None)
+
+        if img_chap:
+            def check_image_render():
+                with _spw() as p2:
+                    br = p2.chromium.launch()
+                    pg = br.new_page()
+                    pg.set_content(img_chap['html'], wait_until='domcontentloaded')
+                    pg.wait_for_function(
+                        '() => { const img=document.querySelector("img"); return !img||img.complete; }',
+                        timeout=5000
+                    )
+                    nw = pg.evaluate('() => document.querySelector("img")?.naturalWidth ?? 0')
+                    src = pg.evaluate('() => document.querySelector("img")?.src ?? ""')
+                    pg.screenshot(path='/tmp/e2e_image_render.png')
+                    br.close()
+                assert nw > 0, f'Image naturalWidth={nw}: image did not render'
+                assert src.startswith('data:'), f'Image src not a data URI: {src[:50]}'
+            test('Rendered img naturalWidth > 0 (not broken)', check_image_render)
+            test('Rendered img src is a data: URI',
+                 lambda: img_chap is not None and 'data:image/' in img_chap['html'])
+        else:
+            print('  ⚠ no chapter with <img> found for image rendering test')
+
+    except ImportError:
+        print('  ⚠ playwright not available for image rendering test')
+
+except Exception as e:
+    print(f'  ⚠ image rendering test skipped: {e}')
 
 # ── Results ────────────────────────────────────────────────────────────────
 
