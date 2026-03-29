@@ -1,7 +1,7 @@
 // Service Worker for EPUB → AZW3 Converter
 // Cache-first strategy — all assets cached on install for full offline use
 
-const CACHE = 'epub2azw3-v1.0.4';
+const CACHE = 'epub2azw3-v1.0.5';
 const ASSETS = [
   './',
   './index.html',

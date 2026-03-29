@@ -86,7 +86,7 @@
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.4 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.5 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -94,7 +94,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.4';
+const APP_VERSION = 'v1.0.5';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -653,6 +653,7 @@ async function parseEpub(buf) {
     description: g('description'),
     date:     g('date') || new Date().toISOString().slice(0,10),
     identifier: g('identifier') || crypto.randomUUID(),
+    coverImage: null,  // filled below: {bytes: Uint8Array, mt: string}
   };
 
   // Manifest
@@ -663,6 +664,31 @@ async function parseEpub(buf) {
       mt: item.getAttribute('media-type')||'',
       properties: item.getAttribute('properties')||'',
     };
+
+  // Cover image — EPUB2: <meta name="cover" content="item-id">
+  //               EPUB3: manifest item with properties="cover-image"
+  {
+    let coverId = null;
+    for (const meta of opf.querySelectorAll('meta')) {
+      if (meta.getAttribute('name') === 'cover') { coverId = meta.getAttribute('content'); break; }
+    }
+    // EPUB3 fallback
+    if (!coverId) {
+      for (const [id, item] of Object.entries(manifest)) {
+        if (item.properties.includes('cover-image')) { coverId = id; break; }
+      }
+    }
+    if (coverId && manifest[coverId]) {
+      const coverPath = resolve(manifest[coverId].href);
+      const coverFile = zip.file(coverPath) || zip.file(decodeURIComponent(coverPath));
+      if (coverFile) {
+        try {
+          const bytes = await coverFile.async('uint8array');
+          metadata.coverImage = { bytes, mt: manifest[coverId].mt || 'image/jpeg' };
+        } catch(e) { console.warn('Could not load cover:', e); }
+      }
+    }
+  }
 
   // Spine
   const spineHrefs = [...opf.querySelectorAll('spine itemref')]
@@ -915,6 +941,15 @@ function convertToAzw3(epub) {
   const ncxIdx = ncxRecs ? recs.length : 0xffffffff;
   if (ncxRecs) for (const r of ncxRecs) recs.push(r);
 
+  // Cover image resource record (binary JPEG/PNG, not base64).
+  // KF8 stores images as raw binary PDB records; first_resource_record points
+  // to the first one. CoverOffset EXTH (201) = index relative to first resource.
+  let firstResource = 0xffffffff;
+  if (metadata.coverImage) {
+    firstResource = recs.length;
+    recs.push(metadata.coverImage.bytes);
+  }
+
   // FDST, FLIS, FCIS, EOF
   const fdstRec = recs.length; recs.push(buildFdst(fdstEntries));
   const flisRec = recs.length; recs.push(FLIS_RECORD);
@@ -937,6 +972,12 @@ function convertToAzw3(epub) {
   if (metadata.publisher)   exthRecs.push({tag:101, value:metadata.publisher});
   if (metadata.date)        exthRecs.push({tag:106, value:metadata.date});
   if (metadata.description) exthRecs.push({tag:103, value:metadata.description});
+  // Cover offset: index of cover within resource records (0 = first resource)
+  if (firstResource !== 0xffffffff) {
+    exthRecs.push({tag:201, value: u32(0)});  // CoverOffset = 0 (first resource)
+    exthRecs.push({tag:202, value: u32(0)});  // ThumbOffset = 0 (same image)
+    exthRecs.push({tag:203, value: u32(0)});  // HasFakeCover = 0 (real cover)
+  }
 
   // Record 0
   recs[0] = buildRecord0({
@@ -945,7 +986,7 @@ function convertToAzw3(epub) {
     flisRec, fcisRec,
     chunkIdx, skelIdx,
     ncxIdx,
-    firstResource: 0xffffffff,
+    firstResource,
     uid, langCode: langCode(metadata.language),
     exthRecords: exthRecs, fullTitle: metadata.title,
   });
@@ -979,13 +1020,36 @@ async function handleFile(file) {
   if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl=null; }
   showStatus('Reading EPUB…', 'info'); setProgress(10);
   try {
+    // Check file size before reading — a 0 or tiny file usually means the EPUB
+    // is stored in iCloud and hasn't been downloaded to the device yet.
+    if (file.size < 100) {
+      throw new Error(
+        file.size === 0
+          ? 'File is empty. On iPhone, make sure the EPUB is downloaded from iCloud first (tap and hold the file → Download).'
+          : 'File is too small to be a valid EPUB. It may be an iCloud placeholder — open Files, download the EPUB, then try again.'
+      );
+    }
+
     const buf = await file.arrayBuffer();
     setProgress(30);
     showStatus('Parsing EPUB structure…', 'info');
-    const epub = await parseEpub(buf);
+    let epub;
+    try {
+      epub = await parseEpub(buf);
+    } catch(parseErr) {
+      // JSZip throws "Can't find end of central directory" for non-ZIP data.
+      // On iOS this usually means the file wasn't fully downloaded from iCloud.
+      if (parseErr.message && parseErr.message.includes('central directory')) {
+        throw new Error(
+          'Could not read the EPUB file. On iPhone/iPad, the file may not be fully downloaded from iCloud. ' +
+          'Open the Files app, long-press the file and choose "Download", then try again.'
+        );
+      }
+      throw parseErr;
+    }
     setProgress(60);
     showStatus(`Converting "${epub.metadata.title}"…`, 'info');
-    await new Promise(r => setTimeout(r, 20)); // yield for UI update
+    await new Promise(r => setTimeout(r, 20));
     const azw3 = convertToAzw3(epub);
     setProgress(95);
     const blob = new Blob([azw3], {type:'application/vnd.amazon.ebook'});
