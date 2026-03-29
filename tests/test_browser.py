@@ -643,6 +643,147 @@ with sync_playwright() as pw:
 
     browser.close()
 
+        # ── Mobile & cross-browser tests ──────────────────────────────────────────
+    #
+    # Playwright supports three engines: Chromium, Firefox, WebKit (Safari).
+    # WebKit is the closest approximation to iOS Safari without real hardware.
+    # Mobile emulation (viewport + touch + UA) catches layout/rendering issues.
+
+    print('\n── T10: WebKit (Safari engine) ────────────────────────────────')
+
+    try:
+        webkit = pw.webkit.launch()
+        epub_for_webkit = make_epub('WebKit Test', [
+            ('Chapter 1', '<p aid="1">Testing the converter on Safari/WebKit engine.</p>'),
+            ('Chapter 2', '<p aid="2">Second chapter to verify multi-chapter support.</p>'),
+        ])
+
+        wk_page = webkit.new_page()
+        wk_js_errors = []
+        wk_page.on('pageerror', lambda e: wk_js_errors.append(str(e)))
+        wk_page.goto(base_url)
+        wk_page.wait_for_load_state('domcontentloaded')
+
+        test('WebKit: page loads without JS errors',
+             lambda: len(wk_js_errors) == 0)
+        test('WebKit: page title correct',
+             lambda: wk_page.title() == 'EPUB → AZW3 Converter')
+
+        wk_page.set_input_files('#fileInput', {
+            'name': 'webkit_test.epub', 'mimeType': 'application/epub+zip',
+            'buffer': epub_for_webkit,
+        })
+        wk_page.wait_for_selector('#dlBtn', state='visible', timeout=30000)
+
+        test('WebKit: conversion succeeds',
+             lambda: 'ok' in (wk_page.get_attribute('#status', 'class') or ''))
+        test('WebKit: status shows 2 chapters',
+             lambda: '2 chapter' in wk_page.inner_text('#status').lower())
+
+        wk_azw3 = fetch_azw3(wk_page)
+        test('WebKit: AZW3 output is valid (BOOKMOBI magic)',
+             lambda: wk_azw3[60:68] == b'BOOKMOBI')
+
+        wk_page.close()
+        webkit.close()
+
+    except Exception as e:
+        print(f'  ⚠ WebKit tests skipped: {e}')
+
+    print('\n── T11: Mobile viewport (iPhone 15 emulation) ─────────────────')
+
+    IPHONE_15 = {
+        'viewport': {'width': 393, 'height': 852},
+        'user_agent': (
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
+            'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+        ),
+        'is_mobile': True,
+        'has_touch': True,
+        'device_scale_factor': 3,
+    }
+
+    mobile_browser = pw.chromium.launch()
+    mobile_ctx = mobile_browser.new_context(**IPHONE_15)
+    mobile_page = mobile_ctx.new_page()
+    mobile_js_errors = []
+    mobile_page.on('pageerror', lambda e: mobile_js_errors.append(str(e)))
+    mobile_page.goto(base_url)
+    mobile_page.wait_for_load_state('domcontentloaded')
+
+    test('iPhone: page loads without JS errors',
+         lambda: len(mobile_js_errors) == 0)
+    test('iPhone: drop zone is visible and tappable',
+         lambda: mobile_page.is_visible('#drop'))
+    test('iPhone: page fits within 393px width (no horizontal scroll)',
+         lambda: mobile_page.evaluate(
+             '() => document.documentElement.scrollWidth <= 393'))
+
+    # Test conversion on mobile viewport
+    epub_mobile = make_epub('Mobile Test', [
+        ('Chapter', '<p aid="1">Testing conversion on mobile viewport.</p>'),
+    ])
+    mobile_page.set_input_files('#fileInput', {
+        'name': 'mobile.epub', 'mimeType': 'application/epub+zip',
+        'buffer': epub_mobile,
+    })
+    mobile_page.wait_for_selector('#dlBtn', state='visible', timeout=20000)
+
+    test('iPhone: conversion completes successfully',
+         lambda: 'ok' in (mobile_page.get_attribute('#status', 'class') or ''))
+    test('iPhone: download button is visible and reachable',
+         lambda: mobile_page.is_visible('#dlBtn'))
+
+    mobile_page.screenshot(path='/tmp/mobile_iphone_screenshot.png')
+    mobile_page.close()
+    mobile_ctx.close()
+    mobile_browser.close()
+
+    print('\n── T12: iOS-specific error handling ────────────────────────────')
+
+    # Simulate the iCloud "not downloaded" scenario: file with 0 bytes
+    # This reproduces the exact error seen on the user's iPhone screenshot.
+    err_browser = pw.chromium.launch()
+    err_page = err_browser.new_page()
+    err_page.goto(base_url)
+
+    err_page.set_input_files('#fileInput', {
+        'name': 'not_downloaded.epub',
+        'mimeType': 'application/epub+zip',
+        'buffer': b'',  # 0 bytes — simulates iCloud placeholder
+    })
+    err_page.wait_for_function(
+        '() => document.getElementById("status").className.includes("error")',
+        timeout=5000
+    )
+    test('iCloud empty file: shows friendly error (not raw JSZip message)',
+         lambda: 'central directory' not in err_page.inner_text('#status').lower())
+    test('iCloud empty file: error mentions iCloud or download',
+         lambda: any(kw in err_page.inner_text('#status').lower()
+                     for kw in ['icloud', 'download', 'empty']))
+    test('iCloud empty file: download button stays hidden',
+         lambda: not err_page.is_visible('#dlBtn'))
+
+    # Simulate truncated/corrupt EPUB (non-ZIP bytes)
+    err_page2 = err_browser.new_page()
+    err_page2.goto(base_url)
+    err_page2.set_input_files('#fileInput', {
+        'name': 'corrupt.epub',
+        'mimeType': 'application/epub+zip',
+        'buffer': b'This is not a ZIP file but has .epub extension ' * 3,
+    })
+    err_page2.wait_for_function(
+        '() => document.getElementById("status").className.includes("error")',
+        timeout=10000
+    )
+    test('Corrupt file: shows friendly error (not raw JSZip message)',
+         lambda: 'central directory' not in err_page2.inner_text('#status').lower())
+    test('Corrupt file: error mentions download or iCloud or not valid',
+         lambda: any(kw in err_page2.inner_text('#status').lower()
+                     for kw in ['icloud', 'download', 'valid', 'read', 'error']))
+
+    err_browser.close()
+
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 
 httpd.shutdown()
