@@ -565,29 +565,56 @@ async function parseEpub(buf) {
     .map(ir => manifest[ir.getAttribute('idref')]?.href)
     .filter(Boolean);
 
-  // CSS
+  // CSS — collect all stylesheets; strip @font-face (Kindle ignores external fonts)
+  // and strip broken url() references to missing font files.
   let css = '';
   for (const item of Object.values(manifest)) {
     if (item.mt === 'text/css') {
       const f = zip.file(resolve(item.href)) || zip.file(decodeURIComponent(resolve(item.href)));
-      if (f) try { css += await f.async('string') + '\n'; } catch(e){}
+      if (f) try {
+        let sheet = await f.async('string');
+        // Remove @font-face blocks (Kindle has its own fonts)
+        sheet = sheet.replace(/@font-face\s*\{[^}]*\}/gi, '');
+        css += sheet + '\n';
+      } catch(e){}
     }
+  }
+
+  // Images — extract all image files as base64 data URIs.
+  // Key: path relative to OPF dir (e.g. "images/cover.jpg")
+  const imageDataUris = {};
+  for (const item of Object.values(manifest)) {
+    if (!item.mt.startsWith('image/')) continue;
+    const fullPath = resolve(item.href);
+    const f = zip.file(fullPath) || zip.file(decodeURIComponent(fullPath));
+    if (!f) continue;
+    try {
+      const bytes = await f.async('uint8array');
+      // btoa only works on latin1; use this approach for binary data
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const b64 = btoa(binary);
+      // Store under both the manifest href and just the filename
+      imageDataUris[item.href] = `data:${item.mt};base64,${b64}`;
+      imageDataUris[item.href.split('/').pop()] = `data:${item.mt};base64,${b64}`;
+    } catch(e) { console.warn('Could not load image:', item.href, e); }
   }
 
   // Chapters
   const chapters = [];
   for (const href of spineHrefs) {
     const path = resolve(href);
+    // Chapter's directory relative to opfDir, for resolving relative image paths
+    const chapterDir = href.includes('/') ? href.split('/').slice(0,-1).join('/') + '/' : '';
     const f = zip.file(path) || zip.file(decodeURIComponent(path));
     if (!f) continue;
     try {
       const xhtml = await f.async('string');
       const doc = new DOMParser().parseFromString(xhtml, 'application/xhtml+xml');
-      chapters.push(
-        doc.querySelector('parsererror')
-          ? extractContent(new DOMParser().parseFromString(xhtml,'text/html'))
-          : extractContent(doc)
-      );
+      const parsed = doc.querySelector('parsererror')
+        ? new DOMParser().parseFromString(xhtml, 'text/html')
+        : doc;
+      chapters.push(extractContent(parsed, css, imageDataUris, chapterDir));
     } catch(e) { console.warn('Skip chapter:', path, e); }
   }
   return {metadata, chapters, css};
@@ -598,24 +625,46 @@ const BLOCKS = new Set(['p','div','h1','h2','h3','h4','h5','h6','section',
   'article','blockquote','pre','ul','ol','li','table','tr','td','th',
   'figure','figcaption','nav','header','footer','aside','main']);
 
-function extractContent(doc) {
+/**
+ * @param {Document} doc - parsed chapter DOM
+ * @param {string} css - combined stylesheet text (will be inlined in <head>)
+ * @param {Object} imageDataUris - map of image href → data URI
+ * @param {string} chapterDir - chapter's directory prefix for resolving relative img src
+ */
+function extractContent(doc, css, imageDataUris, chapterDir) {
   const head = doc.head || doc.querySelector('head');
   const body = doc.body || doc.querySelector('body');
+
   let headContent = '';
   if (head) {
     const t = head.querySelector('title');
     if (t) headContent = `<title>${t.textContent.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n`;
   }
+
+  // Inline CSS into every chapter's <head> so Kindle applies it
+  const styleBlock = css ? `<style type="text/css">\n${css}</style>\n` : '';
+
   const skelHead =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<html xmlns="http://www.w3.org/1999/xhtml">\n` +
     `<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n` +
-    headContent + `</head>\n<body aid="0">\n`;
+    headContent + styleBlock + `</head>\n<body aid="0">\n`;
   const skelTail = `</body>\n</html>\n`;
 
-  // Add aid attributes to block elements; track the first aid value used
-  const firstAid = _aid; // aid of the first content block element
+  const firstAid = _aid; // capture before adding aids to this chapter
   if (body) {
+    // Replace external image src with base64 data URIs
+    for (const img of body.querySelectorAll('img[src]')) {
+      const src = img.getAttribute('src');
+      if (src && !src.startsWith('data:')) {
+        const candidates = [chapterDir + src, src, src.split('/').pop()];
+        for (const key of candidates) {
+          if (imageDataUris[key]) { img.setAttribute('src', imageDataUris[key]); break; }
+        }
+      }
+    }
+
+    // Add aid attributes to all block elements
     const walk = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
     let n = walk.nextNode();
     while (n) {
@@ -624,6 +673,7 @@ function extractContent(doc) {
       n = walk.nextNode();
     }
   }
+
   const content = body ? body.innerHTML : '';
   return {skelHead, skelTail, content, firstAid};
 }
@@ -654,16 +704,11 @@ function convertToAzw3(epub) {
   });
   const htmlByteLen = htmlByteOffset;
 
-  // FDST: flow 0 = ALL HTML content (single flow for Calibre's KF8 reader)
-  //        flow 1 = CSS (optional)
+  // FDST: single flow containing all HTML (CSS is now inlined in each chapter's <head>)
   const fdstEntries = [{start: 0, end: htmlByteLen}];
-  if (css) {
-    const cssLen = enc.encode(css).length;
-    fdstEntries.push({start: htmlByteLen, end: htmlByteLen + cssLen});
-  }
 
-  // Full text for PDB text records = all HTML + CSS concatenated
-  const fullText = chapters.map(ch => ch.skelHead + ch.skelTail + ch.content).join('') + (css || '');
+  // Full text for PDB text records = all HTML concatenated (no separate CSS flow)
+  const fullText = chapters.map(ch => ch.skelHead + ch.skelTail + ch.content).join('');
   const textLen = enc.encode(fullText).length;
   const compress = textLen > 2048;
   const textRecs = buildTextRecords(fullText, compress);
