@@ -86,7 +86,7 @@
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.2 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.3 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -94,7 +94,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.2';
+const APP_VERSION = 'v1.0.3';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -459,6 +459,74 @@ function buildChunkIndex(parts) {
   return buildIndxRecords(entries, CHUNK_TAGS, cncxRecord);
 }
 
+// ─── NCX index (Table of Contents) ───────────────────────────────────────────
+//
+// Tag defs from Calibre NCXIndex (flat ToC, depth=0, no parent/children):
+//   offset(1,1,1), length(2,1,2), label(3,1,4), depth(4,1,8),
+//   parent(21,1,16), first_child(22,1,32), last_child(23,1,64), pos_fid(6,2,128)
+//
+// Each entry:
+//   key     = hex index (e.g. '00', '01', '0A')
+//   offset  = byte offset of chapter content in full text
+//   length  = byte length of chapter content
+//   label   = CNCX offset for the title string
+//   depth   = 0 (flat)
+//   parent/first_child/last_child = 0xffffffff (none)
+//   pos_fid = [file_number, 0]  (which skeleton/chunk entry)
+
+const NCX_TAGS = [
+  {num:1,  vpe:1, mask:1},    // offset
+  {num:2,  vpe:1, mask:2},    // length
+  {num:3,  vpe:1, mask:4},    // label (CNCX offset)
+  {num:4,  vpe:1, mask:8},    // depth
+  {num:21, vpe:1, mask:16},   // parent
+  {num:22, vpe:1, mask:32},   // first_child
+  {num:23, vpe:1, mask:64},   // last_child
+  {num:6,  vpe:2, mask:128},  // pos_fid [file_num, frag_offset]
+];
+
+/**
+ * Build NCX index for Kindle Table of Contents.
+ * @param {Array} parts - same idxParts array used by skeleton/chunk
+ * @param {Array} titles - chapter title strings (one per part)
+ */
+function buildNcxIndex(parts, titles) {
+  if (!parts.length) return null;
+
+  // CNCX record: VLQ-length-prefixed title strings
+  const cncxParts = []; const cncxOffsets = []; let cncxOff = 0;
+  for (const title of titles) {
+    const tb = enc.encode(title || 'Chapter');
+    cncxOffsets.push(cncxOff);
+    const lv = encint(tb.length);
+    cncxParts.push(lv, tb);
+    cncxOff += lv.length + tb.length;
+  }
+  const cncxRecord = align4(concat(...cncxParts));
+
+  const largest = parts.length - 1;
+  const hexLen = Math.max(2, largest.toString(16).length);
+
+  const entries = parts.map((p, i) => {
+    const contentStart = p.flowStart + p.skelHeadByteLen + p.skelTailByteLen;
+    return {
+      key: i.toString(16).toUpperCase().padStart(hexLen, '0'),
+      tags: {
+        1: [contentStart],       // offset in text
+        2: [p.contentByteLen],   // length
+        3: [cncxOffsets[i]],     // label → CNCX offset
+        4: [0],                  // depth = 0 (flat — no hierarchy)
+        6: [p.chapterIndex, 0],  // pos_fid = [file_number, fragment_offset]
+        // Omit parent(21), first_child(22), last_child(23) for flat ToC.
+        // Setting them to 0xffffffff causes Calibre to throw KeyError when
+        // it tries entries[0xffffffff]. Absent = correct for a flat list.
+      }
+    };
+  });
+
+  return buildIndxRecords(entries, NCX_TAGS, cncxRecord);
+}
+
 // ─── MOBI header (record 0) ───────────────────────────────────────────────────
 
 function buildRecord0(o) {
@@ -684,9 +752,17 @@ function extractContent(doc, css, imageDataUris, chapterDir) {
   const body = doc.body || doc.querySelector('body');
 
   let headContent = '';
+  let chapterTitle = '';
+  // Prefer first heading in body (actual chapter name) over generic HTML <title>
+  if (body) {
+    const h = body.querySelector('h1,h2,h3');
+    if (h) chapterTitle = h.textContent.trim().slice(0, 80);
+  }
   if (head) {
     const t = head.querySelector('title');
-    if (t) headContent = `<title>${t.textContent.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n`;
+    const htmlTitle = t ? t.textContent.trim() : '';
+    if (!chapterTitle) chapterTitle = htmlTitle;
+    headContent = `<title>${(chapterTitle || htmlTitle).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n`;
   }
 
   // Inline only critical CSS (visibility rules) — kept small to avoid
@@ -725,7 +801,7 @@ function extractContent(doc, css, imageDataUris, chapterDir) {
   }
 
   const content = body ? body.innerHTML : '';
-  return {skelHead, skelTail, content, firstAid};
+  return {skelHead, skelTail, content, firstAid, title: chapterTitle};
 }
 
 // ─── EPUB → AZW3 converter ───────────────────────────────────────────────────
@@ -784,6 +860,15 @@ function convertToAzw3(epub) {
   const chunkIdx = recs.length;
   for (const r of chunkRecs) recs.push(r);
 
+  // NCX index (Table of Contents)
+  // Use chapter titles from the parsed chapters; fall back to "Chapter N"
+  const chapterTitles = chapters.map((ch, i) =>
+    ch.title || metadata.title || `Chapter ${i + 1}`
+  );
+  const ncxRecs = buildNcxIndex(idxParts, chapterTitles);
+  const ncxIdx = ncxRecs ? recs.length : 0xffffffff;
+  if (ncxRecs) for (const r of ncxRecs) recs.push(r);
+
   // FDST, FLIS, FCIS, EOF
   const fdstRec = recs.length; recs.push(buildFdst(fdstEntries));
   const flisRec = recs.length; recs.push(FLIS_RECORD);
@@ -813,7 +898,7 @@ function convertToAzw3(epub) {
     firstNonText, fdstRec, fdstCount: fdstRec,
     flisRec, fcisRec,
     chunkIdx, skelIdx,
-    ncxIdx: 0xffffffff,
+    ncxIdx,
     firstResource: 0xffffffff,
     uid, langCode: langCode(metadata.language),
     exthRecords: exthRecs, fullTitle: metadata.title,
