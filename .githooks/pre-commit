@@ -1,0 +1,45 @@
+#!/bin/bash
+# Auto-bump patch version when docs/ files change.
+# The version in docs/index.html and docs/sw.js must stay in sync so the
+# service worker cache is busted for returning users on every new deploy.
+
+# Only trigger if docs/ files are staged
+if ! git diff --cached --name-only | grep -q '^docs/'; then
+  exit 0
+fi
+
+INDEX="docs/index.html"
+SW="docs/sw.js"
+
+# Read current version (format: v1.2.3)
+CURRENT=$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' "$INDEX" | head -1)
+if [ -z "$CURRENT" ]; then
+  echo "⚠ pre-commit: could not find version in $INDEX — skipping auto-bump"
+  exit 0
+fi
+
+# Parse components
+MAJOR=$(echo "$CURRENT" | cut -d. -f1 | tr -d 'v')
+MINOR=$(echo "$CURRENT" | cut -d. -f2)
+PATCH=$(echo "$CURRENT" | cut -d. -f3)
+
+# Check if version was already manually bumped in this commit
+COMMITTED_VERSION=$(git show HEAD:"$INDEX" 2>/dev/null | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+if [ "$CURRENT" != "$COMMITTED_VERSION" ]; then
+  # Version was already changed manually — don't touch it
+  echo "✓ pre-commit: version manually set to $CURRENT"
+  exit 0
+fi
+
+# Auto-bump patch
+NEW_PATCH=$((PATCH + 1))
+NEW="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+
+echo "pre-commit: auto-bumping $CURRENT → $NEW"
+
+# Update both files (macOS sed requires empty string after -i)
+sed -i '' "s/${CURRENT}/${NEW}/g" "$INDEX"
+sed -i '' "s/${CURRENT}/${NEW}/g" "$SW"
+
+# Re-stage the modified files
+git add "$INDEX" "$SW"

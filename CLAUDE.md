@@ -32,6 +32,18 @@ KF8 (Kindle Format 8) is a PalmDoc container with MOBI/EXTH headers.
 - Calibre (GPL v3): `src/calibre/ebooks/mobi/writer8/` — Python, battle-tested
 - kf8-rs: `src/serialization/` — Rust, useful for format reference
 
+## Versioning
+
+The app version lives in `docs/index.html` (`APP_VERSION`) and `docs/sw.js` (`CACHE`).
+Both must match — the SW cache name must change to bust the cache for returning users.
+
+A pre-commit hook in `.githooks/pre-commit` **auto-bumps the patch version**
+whenever any `docs/` file changes. It's wired via `git config core.hooksPath .githooks`
+(already set in this repo).
+
+- To release a minor/major bump: manually edit both files before committing.
+- The hook detects that the version already changed and leaves it alone.
+
 ## Testing
 
 ```bash
