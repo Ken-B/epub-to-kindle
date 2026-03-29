@@ -520,6 +520,127 @@ with sync_playwright() as pw:
     page.close()
     ctx.close()
 
+    # ── T9: Real-world EPUB (optional, local only) ────────────────────────────
+    # Tests any *.epub files found next to the project root.
+    # These are .gitignored (copyrighted), so they only run locally.
+    # They exercise the full pipeline on real-world complex books and verify:
+    # - No JS errors during conversion
+    # - Output is valid AZW3 (Calibre reads it)
+    # - Text decodes as clean UTF-8 (no garbled compression)
+    # - No CSS leakage in the rendered chapters
+
+    import glob
+    local_epubs = sorted(glob.glob(str(Path(docs_dir).parent / '*.epub')))
+    if local_epubs:
+        print('\n── T9: Real-world EPUBs (local only) ──────────────────────────')
+        for epub_path in local_epubs:
+            epub_name = Path(epub_path).name
+            label = epub_name.replace('.epub', '')[:50]
+            print(f'\n  Testing: {label}')
+
+            page = browser.new_page()
+            js_errs = []
+            page.on('pageerror', lambda e: js_errs.append(str(e)))
+            page.goto(base_url)
+
+            page.set_input_files('#fileInput', {
+                'name': epub_name,
+                'mimeType': 'application/epub+zip',
+                'buffer': Path(epub_path).read_bytes(),
+            })
+
+            try:
+                page.wait_for_function(
+                    '() => { const s=document.getElementById("status"); '
+                    'return s && s.style.display!=="none" && '
+                    '(s.className.includes("ok")||s.className.includes("error")); }',
+                    timeout=120000
+                )
+            except Exception as e:
+                test(f'{label}: conversion completes', lambda: (_ for _ in ()).throw(AssertionError(f'Timeout: {e}')))
+                page.close(); continue
+
+            status_cls = page.get_attribute('#status', 'class') or ''
+            status_txt = page.inner_text('#status')
+
+            test(f'{label}: no JS errors', lambda je=js_errs: len(je) == 0)
+            test(f'{label}: conversion succeeds (no error status)',
+                 lambda sc=status_cls: 'error' not in sc)
+
+            if 'error' not in status_cls:
+                azw3 = fetch_azw3(page)
+
+                # Save for Calibre validation
+                tmp_azw3 = f'/tmp/realworld_{Path(epub_path).stem}.azw3'
+                Path(tmp_azw3).write_bytes(azw3)
+
+                test(f'{label}: AZW3 > 1KB', lambda a=azw3: len(a) > 1000)
+                test(f'{label}: PDB magic BOOKMOBI', lambda a=azw3: a[60:68] == b'BOOKMOBI')
+                test(f'{label}: Calibre reads metadata',
+                     lambda p=tmp_azw3: 'Title' in calibre_meta(p))
+
+                # Decompress and verify first chapter text is valid UTF-8 (not garbled)
+                def check_utf8_clean(a=azw3):
+                    nrec = struct.unpack_from('>H', a, 76)[0]
+                    recs = [struct.unpack_from('>I', a, 78+i*8)[0] for i in range(nrec)]
+                    r0 = recs[0]
+                    compression = struct.unpack_from('>H', a, r0)[0]
+                    num_text = struct.unpack_from('>H', a, r0+8)[0]
+
+                    def palmdoc_decompress(data):
+                        out = bytearray(); i = 0
+                        while i < len(data):
+                            b = data[i]; i += 1
+                            if b == 0: out.append(0)
+                            elif b <= 8:
+                                for _ in range(b): out.append(data[i]); i += 1
+                            elif b <= 0x7F: out.append(b)
+                            elif b <= 0xBF:
+                                b2=data[i]; i+=1; dist=((b&0x3F)<<5)|(b2>>3); ln=(b2&7)+3
+                                for _ in range(ln): out.append(out[-dist] if dist<=len(out) else 0)
+                            else: out.append(0x20); out.append(b&0x7F)
+                        return bytes(out)
+
+                    # Decode first 3 text records
+                    sample = b''
+                    for idx in range(1, min(4, num_text+1)):
+                        s=recs[idx]; e=recs[idx+1] if idx+1<nrec else len(a)
+                        rec = a[s:e-1]
+                        if compression == 2:
+                            rec = palmdoc_decompress(rec)
+                        sample += rec
+
+                    # Must decode as valid UTF-8 with no replacement chars
+                    decoded = sample.decode('utf-8')  # raises if invalid
+                    assert '\ufffd' not in decoded, \
+                        f'Replacement chars (U+FFFD) in decoded text — compression bug!'
+                    # Must look like HTML (starts with <html or similar)
+                    assert '<' in decoded[:200], 'No HTML tags in decoded text'
+
+                test(f'{label}: decompressed text is valid UTF-8 (no garbled chars)',
+                     check_utf8_clean)
+
+                # Screenshot first prose chapter (reuse the open browser)
+                chapters = extract_azw3_chapters(azw3)
+                if chapters:
+                    def check_no_css_leak(chs=chapters, lbl=label, br=browser, stem=Path(epub_path).stem):
+                        issues = []
+                        for i, ch in enumerate(chs[:3]):
+                            _pg = br.new_page()
+                            _pg.set_content(ch['html'], wait_until='domcontentloaded')
+                            body_text = _pg.evaluate('() => document.body?.innerText || ""')
+                            if re.search(r'\{[^}]{5,}(display|margin|font)[^}]{0,50}\}', body_text):
+                                issues.append(f'ch{i}: CSS rules visible as body text')
+                            if '<?xml' in body_text or 'encoding="UTF-8"' in body_text:
+                                issues.append(f'ch{i}: XML declaration visible')
+                            _pg.screenshot(path=f'/tmp/realworld_{stem}_ch{i:02d}.png', full_page=False)
+                            _pg.close()
+                        if issues:
+                            raise AssertionError('; '.join(issues))
+                    test(f'{label}: no CSS/XML leakage in rendered chapters', check_no_css_leak)
+
+            page.close()
+
     browser.close()
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
