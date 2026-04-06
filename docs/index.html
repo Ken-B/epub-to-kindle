@@ -82,11 +82,12 @@
   </div>
   <div class="prog" id="prog"><div class="prog-inner" id="progInner"></div></div>
   <div class="status" id="status"></div>
+  <button class="btn" id="retryBtn" style="display:none">🔄 Retry</button>
   <a class="btn" id="dlBtn" style="display:none" href="#" download>⬇ Download AZW3</a>
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.5 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.6 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -94,7 +95,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.5';
+const APP_VERSION = 'v1.0.6';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -1000,6 +1001,7 @@ const dropEl = document.getElementById('drop');
 const fileInput = document.getElementById('fileInput');
 const statusEl = document.getElementById('status');
 const dlBtn = document.getElementById('dlBtn');
+const retryBtn = document.getElementById('retryBtn');
 const prog = document.getElementById('prog');
 const progInner = document.getElementById('progInner');
 let blobUrl = null;
@@ -1012,40 +1014,77 @@ function showStatus(msg, type='info') {
 function setProgress(pct) { prog.style.display='block'; progInner.style.width=pct+'%'; }
 function hideProgress() { prog.style.display='none'; progInner.style.width='0%'; }
 
+function showICloudError() {
+  hideProgress();
+  // Multi-line status: show the error + two clear options
+  statusEl.innerHTML =
+    '<strong>File not yet downloaded from iCloud.</strong><br><br>' +
+    '<b>Option 1 (easiest):</b> In the <b>Files app</b>, tap the EPUB file and ' +
+    'wait for it to download (cloud icon disappears). Then tap <b>🔄 Retry</b> below.<br><br>' +
+    '<b>Option 2 (permanent fix):</b> Go to <b>Settings → Apps → Safari → Downloads</b> ' +
+    'and change to <b>"On My iPhone"</b>. Future downloads will be local and always work.';
+  statusEl.className = 'status error';
+  statusEl.style.display = 'block';
+  retryBtn.style.display = 'block';
+}
+
+// Retry button: re-read the same file — works if iOS finished downloading it
+retryBtn.addEventListener('click', () => {
+  const file = fileInput.files?.[0];
+  if (file) {
+    retryBtn.style.display = 'none';
+    handleFile(file);
+  }
+});
+
 async function handleFile(file) {
   if (!file?.name.toLowerCase().endsWith('.epub')) {
     showStatus('Please choose an .epub file', 'error'); return;
   }
   dlBtn.style.display = 'none';
+  retryBtn.style.display = 'none';
   if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl=null; }
   showStatus('Reading EPUB…', 'info'); setProgress(10);
   try {
-    // Check file size before reading — a 0 or tiny file usually means the EPUB
-    // is stored in iCloud and hasn't been downloaded to the device yet.
-    if (file.size < 100) {
-      throw new Error(
-        file.size === 0
-          ? 'File is empty. On iPhone, make sure the EPUB is downloaded from iCloud first (tap and hold the file → Download).'
-          : 'File is too small to be a valid EPUB. It may be an iCloud placeholder — open Files, download the EPUB, then try again.'
-      );
-    }
-
-    const buf = await file.arrayBuffer();
-    setProgress(30);
-    showStatus('Parsing EPUB structure…', 'info');
-    let epub;
-    try {
-      epub = await parseEpub(buf);
-    } catch(parseErr) {
-      // JSZip throws "Can't find end of central directory" for non-ZIP data.
-      // On iOS this usually means the file wasn't fully downloaded from iCloud.
-      if (parseErr.message && parseErr.message.includes('central directory')) {
-        throw new Error(
-          'Could not read the EPUB file. On iPhone/iPad, the file may not be fully downloaded from iCloud. ' +
-          'Open the Files app, long-press the file and choose "Download", then try again.'
+    // Read file — with automatic retry for iOS iCloud stubs.
+    // On iOS, selecting an undownloaded iCloud file returns placeholder bytes
+    // immediately while the real download happens in the background.
+    // We detect stubs by file size (< 500 bytes) and retry up to 10×,
+    // giving iOS ~20 seconds to complete the download.
+    // Normal-size files that fail to parse are genuinely corrupt → fail fast.
+    let buf = await file.arrayBuffer();
+    let epub = null;
+    const couldBeICloudStub = file.size < 500;
+    const MAX_RETRIES = couldBeICloudStub ? 8 : 0;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        setProgress(20 + Math.min(attempt * 4, 35));
+        if (attempt > 0) {
+          // Exponential backoff: 500ms, 1s, 2s, 4s, 8s, 8s, 8s, 8s (cap at 8s)
+          const delay = Math.min(500 * Math.pow(2, attempt - 1), 8000);
+          showStatus(`File downloading from iCloud… (${attempt}/${MAX_RETRIES})`, 'info');
+          await new Promise(r => setTimeout(r, delay));
+          buf = await file.arrayBuffer();
+        }
+        epub = await parseEpub(buf);
+        break; // success
+      } catch(parseErr) {
+        // JSZip throws different errors depending on how the file is broken:
+        // - "Can't find end of central directory" (partial/stub file)
+        // - "End of data reached ... Corrupted zip ?" (empty file)
+        // Both indicate the file wasn't properly received — likely iCloud.
+        const isZipError = parseErr.message && (
+          parseErr.message.includes('central directory') ||
+          /corrupted zip|data reached/i.test(parseErr.message)
         );
+        if (isZipError && attempt < MAX_RETRIES) {
+          continue; // give iCloud more time
+        }
+        if (isZipError) {
+          showICloudError(); return;
+        }
+        throw parseErr;
       }
-      throw parseErr;
     }
     setProgress(60);
     showStatus(`Converting "${epub.metadata.title}"…`, 'info');

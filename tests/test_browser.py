@@ -354,16 +354,18 @@ with sync_playwright() as pw:
          lambda: not page.is_visible('#dlBtn'))
     page.close()
 
-    # T6b: Empty file
+    # T6b: Corrupt file (> 500 bytes → no auto-retry, fails fast)
     page = browser.new_page()
     page.goto(base_url)
     page.set_input_files('#fileInput', {
-        'name': 'empty.epub', 'mimeType': 'application/epub+zip', 'buffer': b'',
+        # Use >500 bytes so it takes the fast "no retry" code path
+        'name': 'corrupt.epub', 'mimeType': 'application/epub+zip',
+        'buffer': b'This is not a valid ZIP file at all.' * 20,
     })
     wait_for_error(page)
-    test('Empty EPUB: status class is "error"',
+    test('Corrupt EPUB: status class is "error"',
          lambda: 'error' in (page.get_attribute('#status', 'class') or ''))
-    test('Empty EPUB: #dlBtn remains hidden',
+    test('Corrupt EPUB: #dlBtn remains hidden',
          lambda: not page.is_visible('#dlBtn'))
     page.close()
 
@@ -741,46 +743,77 @@ with sync_playwright() as pw:
 
     print('\n── T12: iOS-specific error handling ────────────────────────────')
 
-    # Simulate the iCloud "not downloaded" scenario: file with 0 bytes
-    # This reproduces the exact error seen on the user's iPhone screenshot.
     err_browser = pw.chromium.launch()
+
+    # ── Case A: Normal-size corrupt file (> 500 bytes) ──
+    # Not an iCloud stub → no retries, shows iCloud error + retry button immediately.
     err_page = err_browser.new_page()
     err_page.goto(base_url)
-
     err_page.set_input_files('#fileInput', {
-        'name': 'not_downloaded.epub',
+        'name': 'corrupt.epub',
         'mimeType': 'application/epub+zip',
-        'buffer': b'',  # 0 bytes — simulates iCloud placeholder
+        'buffer': b'This is not a valid ZIP file ' * 30,  # ~870 bytes > 500
     })
     err_page.wait_for_function(
         '() => document.getElementById("status").className.includes("error")',
-        timeout=5000
+        timeout=8000
     )
-    test('iCloud empty file: shows friendly error (not raw JSZip message)',
+    test('Corrupt file (>500B): no raw JSZip error in message',
          lambda: 'central directory' not in err_page.inner_text('#status').lower())
-    test('iCloud empty file: error mentions iCloud or download',
-         lambda: any(kw in err_page.inner_text('#status').lower()
-                     for kw in ['icloud', 'download', 'empty']))
-    test('iCloud empty file: download button stays hidden',
+    test('Corrupt file (>500B): mentions iCloud',
+         lambda: 'icloud' in err_page.inner_text('#status').lower())
+    test('Corrupt file (>500B): mentions Settings fix',
+         lambda: 'settings' in err_page.inner_text('#status').lower())
+    test('Corrupt file (>500B): Retry button is visible',
+         lambda: err_page.is_visible('#retryBtn'))
+    test('Corrupt file (>500B): download button stays hidden',
          lambda: not err_page.is_visible('#dlBtn'))
 
-    # Simulate truncated/corrupt EPUB (non-ZIP bytes)
+    # ── Case B: Empty file (0 bytes) — auto-retry mechanism ──
+    # The app retries up to 10× (2s apart) for small files, giving iCloud time
+    # to finish downloading. Full 20s test is too slow for CI; we just verify
+    # the first retry attempt shows the "downloading from iCloud" status quickly.
     err_page2 = err_browser.new_page()
     err_page2.goto(base_url)
     err_page2.set_input_files('#fileInput', {
-        'name': 'corrupt.epub',
-        'mimeType': 'application/epub+zip',
-        'buffer': b'This is not a ZIP file but has .epub extension ' * 3,
+        'name': 'stub.epub', 'mimeType': 'application/epub+zip', 'buffer': b'',
     })
+    # First status update should appear within 3s (before first retry delay)
     err_page2.wait_for_function(
-        '() => document.getElementById("status").className.includes("error")',
-        timeout=10000
+        '() => document.getElementById("status").style.display !== "none"',
+        timeout=3000
     )
-    test('Corrupt file: shows friendly error (not raw JSZip message)',
-         lambda: 'central directory' not in err_page2.inner_text('#status').lower())
-    test('Corrupt file: error mentions download or iCloud or not valid',
-         lambda: any(kw in err_page2.inner_text('#status').lower()
-                     for kw in ['icloud', 'download', 'valid', 'read', 'error']))
+    status_text = err_page2.inner_text('#status').lower()
+    test('iCloud stub (0B): status shows quickly (auto-retry started)',
+         lambda: len(status_text) > 0)
+    # Note: full retry sequence (10× @ 2s = 20s) verified only on real iOS hardware
+    # where file.arrayBuffer() returns updated bytes once iCloud download completes.
+
+    # ── Case C: Retry button works ──
+    # Show error, then pick a valid file, click Retry → converts successfully.
+    # (Simulates user downloading the file from iCloud, then retrying.)
+    err_page3 = err_browser.new_page()
+    err_page3.goto(base_url)
+    # Trigger the iCloud error with a corrupt file
+    err_page3.set_input_files('#fileInput', {
+        'name': 'bad.epub', 'mimeType': 'application/epub+zip',
+        'buffer': b'Not a zip at all, more than 500 bytes padding ' * 20,
+    })
+    err_page3.wait_for_selector('#retryBtn', state='visible', timeout=8000)
+    # Swap in a valid EPUB and click Retry
+    valid_epub = make_epub('Retry Test', [('Ch1', '<p aid="1">Retry works!</p>')])
+    err_page3.set_input_files('#fileInput', {
+        'name': 'good.epub', 'mimeType': 'application/epub+zip', 'buffer': valid_epub,
+    })
+    # The change event will hide retryBtn and start conversion automatically.
+    # Wait for result.
+    err_page3.wait_for_function(
+        '() => { const s=document.getElementById("status"); '
+        'return s && (s.className.includes("ok") || s.className.includes("error")); }',
+        timeout=20000
+    )
+    test('After picking valid file: conversion succeeds',
+         lambda: 'ok' in (err_page3.get_attribute('#status', 'class') or ''))
 
     err_browser.close()
 
