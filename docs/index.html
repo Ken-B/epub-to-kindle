@@ -78,16 +78,36 @@
     <input type="file" id="fileInput" accept=".epub" aria-label="Choose EPUB file">
     <span class="drop-icon">📖</span>
     <p><strong>Tap to choose</strong> or drop an EPUB file</p>
-    <p style="margin-top:.3rem;font-size:.8rem">Converts to .azw3 (Kindle KF8)</p>
+    <p style="margin-top:.3rem;font-size:.8rem">Converts to Kindle format</p>
+  </div>
+  <div style="margin-top:.9rem" id="formatRow">
+    <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;justify-content:center">
+      <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.85rem;font-weight:600;">
+        <input type="radio" name="fmt" value="azw3" checked> AZW3
+      </label>
+      <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;font-size:.85rem;font-weight:600;">
+        <input type="radio" name="fmt" value="mobi"> MOBI
+      </label>
+      <button id="fmtHelp" type="button" onclick="document.getElementById('fmtInfo').style.display=document.getElementById('fmtInfo').style.display==='none'?'block':'none'"
+        style="background:none;border:1px solid var(--border);border-radius:50%;width:1.3em;height:1.3em;font-size:.8rem;cursor:pointer;color:var(--muted);padding:0;line-height:1">?</button>
+    </div>
+    <div id="fmtInfo" style="display:none;margin-top:.6rem;padding:.65rem .8rem;background:var(--drop-bg);border-radius:8px;font-size:.8rem;line-height:1.5;color:var(--muted)">
+      <b style="color:var(--text)">AZW3</b> — Kindle KF8 format. Use for all <b>modern Kindles</b>:<br>
+      Paperwhite (all generations), Kindle Fire / Fire HD, Kindle Oasis, Kindle Scribe, Kindle Colorsoft, Kindle app (iOS/Android/PC).<br><br>
+      <b style="color:var(--text)">MOBI</b> — Older format. Use for <b>vintage Kindles</b> (released before 2012) that don't open AZW3:<br>
+      Kindle Keyboard (K3), Kindle 1, Kindle 2, Kindle DX, Kindle 3G.<br><br>
+      <span style="font-size:.75rem">Not sure? Try AZW3 first.
+      See <a href="https://en.wikipedia.org/wiki/Kindle#Generations" target="_blank" rel="noopener" style="color:var(--accent)">Wikipedia: Kindle generations</a>.</span>
+    </div>
   </div>
   <div class="prog" id="prog"><div class="prog-inner" id="progInner"></div></div>
   <div class="status" id="status"></div>
   <button class="btn" id="retryBtn" style="display:none">🔄 Retry</button>
-  <a class="btn" id="dlBtn" style="display:none" href="#" download>⬇ Download AZW3</a>
+  <a class="btn" id="dlBtn" style="display:none" href="#" download>⬇ Download</a>
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.6 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.7 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -95,7 +115,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.6';
+const APP_VERSION = 'v1.0.7';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -549,7 +569,8 @@ function buildRecord0(o) {
   dv.setUint32(p,2,false); p+=4;   // book_type=Book
   dv.setUint32(p,65001,false); p+=4; // UTF-8
   dv.setUint32(p,o.uid>>>0,false); p+=4;
-  dv.setUint32(p,8,false); p+=4;   // file_version=8 (KF8)
+  const fileVer = o.mobi6 ? 6 : 8;
+  dv.setUint32(p,fileVer,false); p+=4; // file_version: 8=KF8(AZW3), 6=MOBI
   dv.setUint32(p,0xffffffff,false); p+=4; // meta_orth
   dv.setUint32(p,0xffffffff,false); p+=4; // meta_infl
   for(let i=0;i<8;i++){dv.setUint32(p,0xffffffff,false);p+=4;} // extra_indices
@@ -558,7 +579,7 @@ function buildRecord0(o) {
   dv.setUint32(p,titleB.length,false); p+=4;
   dv.setUint32(p,o.langCode,false); p+=4;
   p+=8; // in/out lang
-  dv.setUint32(p,8,false); p+=4; // min_version
+  dv.setUint32(p,fileVer,false); p+=4; // min_version = same as file_version
   dv.setUint32(p,o.firstResource,false); p+=4;
   p+=16; // huff fields = 0
   dv.setUint32(p,0x50,false); p+=4; // exth_flags=has_exth
@@ -872,7 +893,9 @@ function extractContent(doc, css, imageDataUris, chapterDir) {
 
 // ─── EPUB → AZW3 converter ───────────────────────────────────────────────────
 
-function convertToAzw3(epub) {
+function convertToAzw3(epub, format='azw3') {
+  // format: 'azw3' = KF8 (file_version=8), 'mobi' = MOBI v6 (file_version=6)
+  // MOBI v6 is needed for old Kindles (Kindle Keyboard etc) — no FDST/skeleton/chunk
   _aid = 1;
   const {metadata, chapters, css} = epub;
 
@@ -915,16 +938,19 @@ function convertToAzw3(epub) {
   if (dataLen % 4) recs.push(fill(0, 4 - (dataLen%4)));
 
   const firstNonText = recs.length;
+  const mobi6 = format === 'mobi';
 
-  // Skeleton index records
-  const skelRecs = buildSkeletonIndex(idxParts);
-  const skelIdx = recs.length;
-  for (const r of skelRecs) recs.push(r);
+  // Skeleton + chunk indices: KF8 only (MOBI v6 uses flat HTML, no skeleton model)
+  let skelIdx = 0xffffffff, chunkIdx = 0xffffffff;
+  if (!mobi6) {
+    const skelRecs = buildSkeletonIndex(idxParts);
+    skelIdx = recs.length;
+    for (const r of skelRecs) recs.push(r);
 
-  // Chunk index records
-  const chunkRecs = buildChunkIndex(idxParts);
-  const chunkIdx = recs.length;
-  for (const r of chunkRecs) recs.push(r);
+    const chunkRecs = buildChunkIndex(idxParts);
+    chunkIdx = recs.length;
+    for (const r of chunkRecs) recs.push(r);
+  }
 
   // NCX index (Table of Contents)
   // Priority: NCX/nav title (set by parseEpub) > heading > HTML title > "Chapter N"
@@ -942,17 +968,16 @@ function convertToAzw3(epub) {
   const ncxIdx = ncxRecs ? recs.length : 0xffffffff;
   if (ncxRecs) for (const r of ncxRecs) recs.push(r);
 
-  // Cover image resource record (binary JPEG/PNG, not base64).
-  // KF8 stores images as raw binary PDB records; first_resource_record points
-  // to the first one. CoverOffset EXTH (201) = index relative to first resource.
+  // Cover image as binary resource record (works in both AZW3 and MOBI)
   let firstResource = 0xffffffff;
   if (metadata.coverImage) {
     firstResource = recs.length;
     recs.push(metadata.coverImage.bytes);
   }
 
-  // FDST, FLIS, FCIS, EOF
-  const fdstRec = recs.length; recs.push(buildFdst(fdstEntries));
+  // FDST: KF8 only (describes flow boundaries; MOBI v6 uses flat text)
+  const fdstRec = mobi6 ? 0xffffffff : recs.length;
+  if (!mobi6) recs.push(buildFdst(fdstEntries));
   const flisRec = recs.length; recs.push(FLIS_RECORD);
   const fcisRec = recs.length; recs.push(buildFcis(textLen));
   recs.push(EOF_RECORD);
@@ -990,6 +1015,7 @@ function convertToAzw3(epub) {
     firstResource,
     uid, langCode: langCode(metadata.language),
     exthRecords: exthRecs, fullTitle: metadata.title,
+    mobi6,
   });
 
   return buildPalmDoc(metadata.title, recs);
@@ -1089,16 +1115,17 @@ async function handleFile(file) {
     setProgress(60);
     showStatus(`Converting "${epub.metadata.title}"…`, 'info');
     await new Promise(r => setTimeout(r, 20));
-    const azw3 = convertToAzw3(epub);
+    const fmt = document.querySelector('input[name="fmt"]:checked')?.value || 'azw3';
+    const azw3 = convertToAzw3(epub, fmt);
     setProgress(95);
     const blob = new Blob([azw3], {type:'application/vnd.amazon.ebook'});
     blobUrl = URL.createObjectURL(blob);
-    const name = file.name.replace(/\.epub$/i, '.azw3');
+    const name = file.name.replace(/\.epub$/i, fmt === 'mobi' ? '.mobi' : '.azw3');
     dlBtn.href = blobUrl; dlBtn.download = name;
     dlBtn.textContent = `⬇ Download ${name}`;
     dlBtn.style.display = 'block';
     setProgress(100);
-    showStatus(`✓ Converted "${epub.metadata.title}" — ${epub.chapters.length} chapter(s), ${(azw3.length/1024).toFixed(0)} KB`, 'ok');
+    showStatus(`✓ Converted "${epub.metadata.title}" — ${epub.chapters.length} chapter(s), ${(azw3.length/1024).toFixed(0)} KB (${fmt.toUpperCase()})`, 'ok');
     setTimeout(hideProgress, 800);
   } catch(err) {
     hideProgress(); showStatus(`Error: ${err.message}`, 'error'); console.error(err);
