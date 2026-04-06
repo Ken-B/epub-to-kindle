@@ -436,9 +436,16 @@ for epub_path, label, expected_title_fragment in EPUB_TESTS:
     ))
 
     if meta and meta.get('images', 0) > 0:
-        test(f'Images embedded ({meta["images"]}x data URIs)', lambda op=out_path: (
-            b'data:image/' in Path(op).read_bytes()
-        ) if Path(op).exists() else False)
+        # Images are now binary resource records (not base64).
+        # Verify: no data URIs in text, but raw JPEG/PNG bytes present.
+        test(f'Images as binary records (no base64 data URIs)',
+             lambda op=out_path: (
+                 b'data:image/' not in Path(op).read_bytes()
+             ) if Path(op).exists() else False)
+        test(f'Images: kindle:embed refs in text records',
+             lambda op=out_path: (
+                 b'kindle:embed:' in Path(op).read_bytes()
+             ) if Path(op).exists() else False)
 
     # CSS-specific: display:none rule must survive into AZW3
     if 'css_visibility' in epub_path.lower() or 'css' in label.lower():
@@ -905,24 +912,14 @@ try:
         img_chap = next((c for c in img_chaps if '<img' in c['html']), None)
 
         if img_chap:
-            def check_image_render():
-                with _spw() as p2:
-                    br = p2.chromium.launch()
-                    pg = br.new_page()
-                    pg.set_content(img_chap['html'], wait_until='domcontentloaded')
-                    pg.wait_for_function(
-                        '() => { const img=document.querySelector("img"); return !img||img.complete; }',
-                        timeout=5000
-                    )
-                    nw = pg.evaluate('() => document.querySelector("img")?.naturalWidth ?? 0')
-                    src = pg.evaluate('() => document.querySelector("img")?.src ?? ""')
-                    pg.screenshot(path='/tmp/e2e_image_render.png')
-                    br.close()
-                assert nw > 0, f'Image naturalWidth={nw}: image did not render'
-                assert src.startswith('data:'), f'Image src not a data URI: {src[:50]}'
-            test('Rendered img naturalWidth > 0 (not broken)', check_image_render)
-            test('Rendered img src is a data: URI',
-                 lambda: img_chap is not None and 'data:image/' in img_chap['html'])
+            # Images are now kindle:embed: references (binary resource records).
+            # They won't render in a browser (no data: URI) but are correct for Kindle.
+            test('Extracted chapter has kindle:embed: image reference',
+                 lambda: 'kindle:embed:' in img_chap['html'])
+            # Verify the reference format: 4-char 1-indexed base-32
+            embed_refs = re.findall(r'kindle:embed:([0-9A-Z]{4})', img_chap['html'])
+            test('kindle:embed reference is 4-char base-32, 1-indexed',
+                 lambda: len(embed_refs) > 0 and embed_refs[0] != '0000')
         else:
             print('  ⚠ no chapter with <img> found for image rendering test')
 

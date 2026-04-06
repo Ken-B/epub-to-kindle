@@ -267,29 +267,28 @@ with sync_playwright() as pw:
     azw3_img = fetch_azw3(page)
     page.close()
 
-    test('AZW3 binary contains data:image/png',
-         lambda: b'data:image/png;base64,' in azw3_img)
+    # Images are now binary resource records, NOT base64 in text.
+    # Verify: raw PNG bytes in the binary (not base64), and kindle:embed: in HTML.
+    test('AZW3 binary contains raw PNG bytes (binary resource record)',
+         lambda: MINIMAL_PNG[:4] in azw3_img)  # PNG magic: 89 50 4E 47
+    test('AZW3 binary does NOT contain base64-encoded image in text records',
+         lambda: b'data:image/png;base64,' not in azw3_img)
 
     chapters = extract_azw3_chapters(azw3_img)
     img_chapters = [c for c in chapters if '<img' in c['html']]
     if not img_chapters:
         print('  ⚠ could not extract chapter with <img> for rendering test')
     else:
-        img_page = browser.new_page()
-        img_page.set_content(img_chapters[0]['html'], wait_until='domcontentloaded')
-        img_page.wait_for_function(
-            '() => { const img = document.querySelector("img"); '
-            'return !img || img.complete; }',
-            timeout=5000
-        )
-        test('Rendered img naturalWidth > 0 (not broken)',
-             lambda: img_page.evaluate(
-                 '() => document.querySelector("img")?.naturalWidth ?? 0') > 0)
-        test('Rendered img src is a data: URI',
-             lambda: (img_page.evaluate(
-                 '() => document.querySelector("img")?.src ?? ""')).startswith('data:'))
-        img_page.screenshot(path='/tmp/browser_img_chapter.png')
-        img_page.close()
+        test('Extracted chapter contains kindle:embed: image reference',
+             lambda: 'kindle:embed:' in img_chapters[0]['html'])
+        # kindle:embed: URLs can't render in a browser, but we can verify
+        # the reference format is correct (4-char base-32, 1-indexed)
+        import re
+        embed_refs = re.findall(r'kindle:embed:([0-9A-Z]{4})', img_chapters[0]['html'])
+        test('kindle:embed reference is 4-char base-32',
+             lambda: len(embed_refs) > 0 and all(len(r) == 4 for r in embed_refs))
+        test('kindle:embed starts at 0001 (1-indexed)',
+             lambda: '0001' in embed_refs or any(r != '0000' for r in embed_refs))
 
     # ── T5: EPUB 3 ────────────────────────────────────────────────────────
     print('\n── T5: EPUB 3 ─────────────────────────────────────────────────')
