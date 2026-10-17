@@ -144,7 +144,7 @@
  */
 'use strict';
 
-const APP_VERSION = 'v1.0.15';
+const APP_VERSION = 'v1.0.16';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -1709,7 +1709,9 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
 //   collapse onto the next paragraph, as Calibre's vspace; margin-left + padding-left →
 //   one <blockquote> per ~2em (≤ 3); page-break-before/after → <mbp:pagebreak/> (not at
 //   the chapter start: chapters are already separated by one); display:none and
-//   visibility:hidden → element removed (an empty <a aid> keeps a link/TOC target).
+//   visibility:hidden, the hidden attribute (without an author display), position absolute/
+//   fixed moved ≥ 500px off the page or clipped away (cssHiddenOffPage) → element removed
+//   (an empty <a aid> keeps a link/TOC target).
 //   Headings keep their tags. Everything else (line-height, small-caps, white-space,
 //   …) has no MOBI 6 markup and is dropped.
 // The cascade: a DOMParser document is never rendered (no getComputedStyle), so the
@@ -1725,7 +1727,9 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
 const XHTML_NS = 'http://www.w3.org/1999/xhtml';
 const MOBI_PROPS = new Set(['display', 'visibility', 'font-weight', 'font-style', 'font-size',
   'text-decoration-line', 'text-align', 'text-indent', 'margin-top', 'margin-bottom', 'margin-left',
-  'margin-right', 'padding-left', 'page-break-before', 'page-break-after', 'color', 'vertical-align']);
+  'margin-right', 'padding-left', 'page-break-before', 'page-break-after', 'color', 'vertical-align',
+  // only decide whether an element hides itself off the page / clipped (cssHiddenOffPage)
+  'position', 'left', 'top', 'right', 'bottom', 'clip', 'clip-path', 'width', 'height', 'overflow']);
 const MOBI_BLOCK = new Set([...BLOCKS, 'dl', 'dt', 'dd', 'center', 'address', 'hgroup', 'details',
   'summary', 'fieldset', 'form', 'menu', 'caption', 'thead', 'tbody', 'tfoot', 'hr', 'noscript']);
 const MOBI_PARA = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'dd', 'dt']);
@@ -2134,7 +2138,9 @@ function mobiComputed(tag, d, p) {
   c.color = col === undefined ? p.color : col === '#000000' ? null : col;
   v = val('visibility');
   c.vis = v === 'hidden' || v === 'collapse' ? true : v === 'visible' ? false : p.vis;
-  c.hidden = val('display') === 'none' || c.vis;
+  // moved off the page or clipped away (Standard Ebooks' titlepage: position:absolute; left:-999em)
+  c.hidden = val('display') === 'none' || c.vis ||
+    (!!d?.has('position') && cssHiddenOffPage({get: k => d.get(k)?.[0]}, c.size));
   // not inherited
   const len = prop => { const x = val(prop); return x && x !== 'auto' && x !== 'inherit' ? cssPx(x, c.size, 600) : null; };
   c.mt = len('margin-top');
@@ -2279,7 +2285,8 @@ function mobiMarkup(doc, body, decl) {
     if (!isXhtml(el) || level >= MOBI_MAX_DEPTH) { seen = true; return; }   // svg, math: as is
     let tag = el.localName.toLowerCase();
     const c = mobiComputed(tag, decl.get(el), pc);
-    if (c.hidden) { hide(el); return; }
+    // the HTML hidden attribute (UA display:none) unless the cascade sets a display
+    if (c.hidden || (el.hasAttribute('hidden') && !decl.get(el)?.has('display'))) { hide(el); return; }
     // the style attribute is flattened like the sheets: a reader that still applies it (Calibre's
     // MOBI reader does) would add its margins/padding to the markup's (e.g. a second indent)
     el.removeAttribute('style');
@@ -2355,7 +2362,11 @@ function mobiMarkup(doc, body, decl) {
 //      the class (kpFaceLook), and a generic family is appended.
 //   3. html/body: margin-left/right and padding-left/right 0 (the device owns the page
 //      side margins); the classes go on the skeleton <html>/<body>.
-//      A winning `all` resets the longhands it beats (kpWinners).
+//      A winning `all` resets the longhands it beats and is itself never written (older Kindle
+//      engines ignore it): the explicit values stand in for it (kpAllExplicit: display, the
+//      longhands the pinned defaults give the tag and, for initial, the inherited properties a
+//      parent's class sets; initial → concrete initial values, inherit → inherit, unset → inherit
+//      for inherited properties else initial; revert → nothing).
 //   4. whitespace outside pre (white-space pre/pre-wrap/pre-line/break-spaces, inherited;
 //      pre/listing/textarea…): ASCII whitespace runs collapse to one space (never U+00A0)
 //      and are dropped at the start/end of a block's lines (block edges, around <br>, next
@@ -2373,7 +2384,10 @@ function mobiMarkup(doc, body, decl) {
 //      blockquote/dd/dt right after text/inline content is dropped unless it has clear or a
 //      page break; a <br> whose class hides it (display:none) is dropped; whitespace-only text
 //      between SVG elements (not in text/tspan/title/desc/style) is emptied.
-//   6. line-height below 1.2 (unitless, em/rem, %) → 1.2 / 1.2em / 120%; px/pt/… dropped.
+//   6. line-height below 1.2 (unitless, em/rem, %) → 1.2 / 1.2em / 120%; px/pt/… dropped; on
+//      block-level elements only (kpIsBlock). An inline element (sup, sub, span, a…) keeps its
+//      value (sup{line-height:0} stops note refs from stretching a line); there an absolute
+//      line-height up to 1.2× its own font size becomes em of that size, a larger one is dropped.
 //   7. position/top/left/right/bottom/z-index dropped on elements with text (absolute/fixed
 //      and visually hidden, ≥ 500px off the page or clipped to ≤ 1px: kpVisuallyHidden,
 //      becomes display:none); float dropped
@@ -2481,10 +2495,11 @@ function kpDecls(body, baseDir, imageByPath) {
       const img = imageByPath?.get(joinPath(baseDir, u.split(/[?#]/)[0]));
       return img ? `url(kindle:embed:${kindleEmbed(img.idx + 1)}?mime=${img.mt})` : m;
     });
-    // unset → inherit/initial; revert (the UA value) → null: it wins the cascade but nothing is
-    // written, so the pinned/UA value (or inheritance) applies
+    // unset → inherit/initial (`all: unset` stays: kpWinners resolves it per longhand); revert (the UA
+    // value) → null: it wins the cascade but nothing is written, so the pinned/UA value (or
+    // inheritance) applies
     kpExpand(prop, v, (p, x) => out.push([p, x != null && /^(revert|revert-layer)$/i.test(x) ? null
-      : x != null && /^unset$/i.test(x) ? (KP_INHERITED.has(p) ? 'inherit' : 'initial') : x, imp]));
+      : x != null && /^unset$/i.test(x) && p !== 'all' ? (KP_INHERITED.has(p) ? 'inherit' : 'initial') : x, imp]));
   }
   return out;
 }
@@ -2610,7 +2625,8 @@ function kpExpand(prop, v, add) {
 
 /** What a dropped @font-face (a url() font: not embedded) looks like, from its descriptors or,
  *  when those say normal, its src file name ("ACaslonPro-SemiboldItalic.otf"): {family
- *  (lower-cased), style, weight, variant (null: normal), generic}. */
+ *  (lower-cased), style, weight ('bold' for any weight ≥ 600, else null), variant (null:
+ *  normal), generic}. */
 function kpFontFaceInfo(body) {
   const d = new Map();
   for (const x of cssSplit(body || '', ';')) {
@@ -2620,15 +2636,19 @@ function kpFontFaceInfo(body) {
   const family = (d.get('font-family') || '').replace(/^["']|["']$/g, '').trim();
   let style = /^(italic|oblique)\b/i.test(d.get('font-style') || '') ? 'italic' : null;
   const w = (d.get('font-weight') || '').trim().toLowerCase().split(/\s+/)[0];
-  let weight = w === 'bold' || w === 'bolder' ? 'bold' : /^\d+$/.test(w) && +w >= 600 ? w : null;
+  // semibold/demi (600) is written bold too: the face is dropped, and older Kindle engines
+  // switch to bold only at 700/bold
+  let weight = w === 'bold' || w === 'bolder' || (/^\d+$/.test(w) && +w >= 600) ? 'bold' : null;
   let variant = /small-caps/i.test(d.get('font-variant') || d.get('font-variant-caps') || '') ? 'small-caps' : null;
   const names = [...(d.get('src') || '').matchAll(/url\(\s*["']?([^"')]*)/gi)].map(m => m[1].split(/[?#]/)[0].split('/').pop());
   const words = (names[0] || '').replace(/\.[a-z0-9]+$/i, '').split(/[-_.\s]+/)
     .flatMap(t => t.match(/[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+/g) || []).map(t => t.toLowerCase());
   const has = (...t) => t.some(x => words.includes(x));
   if (!style && has('italic', 'it', 'oblique', 'ital')) style = 'italic';
-  if (!weight && has('bold', 'semibold', 'demibold', 'demi', 'black', 'heavy', 'extrabold', 'ultrabold'))
-    weight = has('semi', 'semibold', 'demi', 'demibold') ? '600' : 'bold';
+  // the file name only when the descriptor says nothing (absent / normal), and never for a light name
+  // (DemiLight, SemiLight, ExtraLight: "demi"/"semi" there do not mean bold)
+  if (!weight && (!w || w === 'normal') && !has('light', 'thin', 'hairline') &&
+      has('bold', 'semibold', 'demibold', 'demi', 'black', 'heavy', 'extrabold', 'ultrabold')) weight = 'bold';
   if (!variant && (has('sc', 'smallcaps') || words.join(' ').includes('small caps'))) variant = 'small-caps';
   const all = (family + ' ' + names.join(' ')).toLowerCase();
   const generic = /sans/.test(all) ? 'sans-serif' : /mono|courier|code/.test(all) ? 'monospace' : 'serif';
@@ -2666,9 +2686,7 @@ function kpSerialize(decls) {
     KP_SIDES.forEach(drop);
     out.set('border', sides[0]);
   } else sides.forEach((t, i) => { if (t !== undefined) { drop(KP_SIDES[i]); out.set(`border-${KP_SIDES[i]}`, t); } });
-  // `all` first: the longhands after it override it
-  const key = p => p === 'all' ? '' : p;
-  return [...out].filter(([, v]) => v != null).sort(([a], [b]) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0)
+  return [...out].filter(([, v]) => v != null).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
     .map(([p, v]) => `${p}:${v}`).join(';');
 }
 
@@ -2690,12 +2708,27 @@ function kpFontSize(out, tag, ps, rs) {
   return px ?? ps;
 }
 
-/** Rule 6: line-height below 1.2 raised to 1.2, absolute line-heights dropped. */
-function kpLineHeight(out) {
+/** Is an element block-level: its display, else (inherit, none, unset) its tag? */
+function kpIsBlock(disp, tag) {
+  return KP_BLOCK_DISPLAY_RE.test(disp) ? true : KP_INLINE_BLOCK_RE.test(disp) || disp === 'inline' ? false : MOBI_BLOCK.has(tag);
+}
+
+/** Rule 6: line-height below 1.2 raised to 1.2, absolute line-heights dropped (block-level
+ *  elements; an inline element keeps its value except an absolute one: em of its own size
+ *  `size` px when ≤ 1.2×, else dropped). */
+function kpLineHeight(out, block = true, size = 16) {
   const v = out.get('line-height');
   const m = v && /^([+-]?(?:\d+\.?\d*|\.\d+))([a-z%]*)$/i.exec(v.trim());
   if (!m) return;  // normal, inherit, …
   const n = parseFloat(m[1]), u = m[2].toLowerCase();
+  if (!block) {
+    if (/^(px|pt|pc|in|cm|mm)$/.test(u)) {
+      const px = cssPx(v.trim(), size, size);
+      if (px != null && size > 0 && px <= 1.2 * size + 1e-9) out.set('line-height', kpNum(px / size) + 'em');
+      else out.delete('line-height');
+    } else if (u === 'q') out.delete('line-height');
+    return;
+  }
   if (u === '' ? n < 1.2 : u === 'em' || u === 'rem' ? n < 1.2 : u === '%' ? n < 120 : false)
     out.set('line-height', u === '%' ? '120%' : '1.2' + u);
   else if (/^(px|pt|pc|in|cm|mm|q)$/.test(u)) out.delete('line-height');
@@ -2703,20 +2736,86 @@ function kpLineHeight(out) {
 
 const KP_MAX_DEPTH = MOBI_MAX_DEPTH;
 
+/** Longhands the pinned element defaults (KP_DEFAULTS) give a tag, from the plain type
+ *  selectors: Map<longhand, value>. */
+const _kpTagDefaults = new Map();
+function kpTagDefaults(tag) {
+  if (!_kpTagDefaults.size) {
+    for (const [, sel, body] of KP_DEFAULTS.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const props = new Map();
+      for (const d of cssSplit(body, ';')) {
+        const k = d.indexOf(':');
+        if (k > 0) kpExpand(d.slice(0, k).trim(), d.slice(k + 1).trim(), (p, v) => { if (v != null) props.set(p, v); });
+      }
+      for (const t of sel.split(',')) if (/^[a-z][a-z0-9]*$/.test(t.trim())) {
+        const cur = _kpTagDefaults.get(t.trim()) || new Map();
+        for (const [p, v] of props) cur.set(p, v);
+        _kpTagDefaults.set(t.trim(), cur);
+      }
+    }
+  }
+  return _kpTagDefaults.get(tag) || KP_NO_PROPS;
+}
+const KP_NO_PROPS = new Map();
+// inherited properties whose value a parent's class (or a pinned default) can set: what
+// `all: initial` on a descendant has to reset explicitly
+const KP_INH_PROPS = ['font-size', 'font-weight', 'font-style', 'font-variant', 'font-family', 'line-height',
+  'text-align', 'text-indent', 'color', 'letter-spacing', 'text-transform', 'white-space'];
+const KP_INH_SET = new Set(KP_INH_PROPS);
+const KP_NO_INH = new Set();
+// the browser UA defaults of tags KP_DEFAULTS does not pin, which `all` has to reset too
+const KP_UA_PROPS = dict({a: ['color', 'text-decoration'], b: ['font-weight'], strong: ['font-weight'],
+  i: ['font-style'], em: ['font-style'], cite: ['font-style'], var: ['font-style'], dfn: ['font-style'],
+  u: ['text-decoration'], ins: ['text-decoration'], s: ['text-decoration'], del: ['text-decoration'],
+  strike: ['text-decoration'], sup: ['vertical-align', 'font-size'], sub: ['vertical-align', 'font-size'],
+  small: ['font-size'], big: ['font-size'], code: ['font-family'], kbd: ['font-family'], samp: ['font-family'],
+  tt: ['font-family'], center: ['text-align'], mark: ['background-color']});
+// initial values written for `all: initial|unset` (concrete values: an engine that ignores `all`
+// is likely to ignore the `initial` keyword too); margin-*/padding-* 0, border-*-style none.
+// text-align: left (right in an rtl context) rather than start. color and font-family are never
+// given a value (black can vanish in a dark theme, a family overrides the reader's font): `initial`
+// writes inherit for them (kpAllExplicit)
+const KP_INITIAL = dict({display: 'inline', 'font-size': 'medium', 'font-weight': 'normal', 'font-style': 'normal',
+  'font-variant': 'normal', 'line-height': 'normal', 'text-align': 'left', 'text-indent': '0', 'letter-spacing': 'normal',
+  'text-transform': 'none', 'white-space': 'normal', overflow: 'visible', 'text-decoration': 'none',
+  'vertical-align': 'baseline', 'background-color': 'transparent'});
+const kpInitial = p => KP_INITIAL[p] ?? (/^(margin|padding)-/.test(p) ? '0' : /^border-\w+-style$/.test(p) ? 'none' : undefined);
+
+/** What `all: initial|inherit|unset` writes for an element of tag (older Kindle engines ignore
+ *  `all`): Map<longhand, value> for display, the longhands the pinned defaults give the tag, the
+ *  UA defaults of unpinned tags (KP_UA_PROPS) and, for initial, the inherited properties (inh: a
+ *  Set) a parent's class sets. initial: their initial values (none for border widths/colors: the
+ *  style is none; text-align right when rtl); inherit: inherit; unset: inherit for inherited
+ *  properties, else initial. color and font-family, when the tag sets them, are `inherit` for
+ *  initial too (never black/serif: dark themes, the reader's font). */
+function kpAllExplicit(kw, tag, inh, rtl) {
+  const props = new Set(['display', ...kpTagDefaults(tag).keys(), ...(KP_UA_PROPS[tag] || [])]);
+  if (kw === 'initial') for (const p of inh || KP_NO_INH) if (p !== 'color' && p !== 'font-family') props.add(p);
+  const out = new Map();
+  for (const p of props) {
+    const v = kw === 'inherit' || (kw === 'unset' && KP_INHERITED.has(p)) || p === 'color' || p === 'font-family' ? 'inherit'
+      : p === 'text-align' && rtl ? 'right' : kpInitial(p);
+    if (v != null) out.set(p, v);
+  }
+  return out;
+}
+
 /** prop → value of the winning declarations d (mobiCascade). A winning `all` resets every
  *  longhand that lost to it (importance, specificity, order): those are not written, and
- *  `all` comes first in the class (kpSerialize) so the longhands that beat it override it;
- *  all:initial/unset also writes display:inline (its initial value) unless a winner sets
- *  display, for an engine that ignores `all`. */
-function kpWinners(d) {
+ *  `all` itself is never written (older Kindle engines ignore it): ctx {tag, inh} gives the
+ *  explicit values of kpAllExplicit (rtl: its text-align) for the longhands no winner sets. Without ctx (SVG
+ *  elements) the longhands are just reset. */
+function kpWinners(d, ctx) {
   const out = new Map();
   const all = d?.get('all');
   const beats = (x, y) => x[1] !== y[1] ? x[1] > y[1] : x[2] !== y[2] ? x[2] > y[2] : x[3] > y[3];
   for (const [k, e] of d || []) {
-    if (all && k !== 'all' && k !== 'direction' && k !== 'unicode-bidi' && !beats(e, all)) continue;
+    if (k === 'all') continue;
+    if (all && k !== 'direction' && k !== 'unicode-bidi' && !beats(e, all)) continue;
     out.set(k, e[0]);
   }
-  if (all && /^(initial|unset)$/i.test(all[0] || '') && !out.has('display')) out.set('display', 'inline');
+  const kw = ctx && all && /^(initial|inherit|unset)$/i.exec((all[0] || '').trim())?.[1].toLowerCase();
+  if (kw) for (const [p, v] of kpAllExplicit(kw, ctx.tag, ctx.inh, ctx.rtl)) if (!out.has(p)) out.set(p, v);
   return out;
 }
 
@@ -2765,6 +2864,12 @@ function kpFaceLook(out, inherited, faces) {
   return family;
 }
 
+/** Is an absolute/fixed element hidden (kpVisuallyHidden)? out.get(prop) → value; shared by
+ *  the Kindle profile (display:none) and MOBI v6 (element removed). */
+function cssHiddenOffPage(out, size) {
+  return /^(absolute|fixed)$/i.test((out.get('position') || '').trim()) && kpVisuallyHidden(out, size);
+}
+
 /** Does a positioned element hide itself (moved ≥ 500px off the page, clip: rect() of at most
  *  1px, clip-path inset(≥ 50%) / circle(0), or width/height ≤ 1px with overflow hidden)? */
 function kpVisuallyHidden(out, size) {
@@ -2802,34 +2907,50 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
   const info = new Map();  // clone element → {out, ps, tag, html, block, container, pre, size}
   const containers = [];   // XHTML block containers, children before parents
   const declsOf = (el, tag, p, rs, isRoot) => {
-    const out = kpWinners(cascade.decl.get(el));
+    // reading direction (an `all: initial` text-align is right in rtl): direction, else the dir attribute
+    const dir = (cascade.decl.get(el)?.get('direction')?.[0] || el.getAttribute('dir') || '').trim().toLowerCase();
+    const rtl = dir === 'rtl' ? true : dir === 'ltr' ? false : !!p.rtl;
+    const out = kpWinners(cascade.decl.get(el), {tag, inh: p.inh, rtl});
     const size = kpFontSize(out, tag, p.size, rs);
-    kpLineHeight(out);
+    const disp = (out.get('display') || '').trim().toLowerCase();
+    // inline-block/-table boxes lay out their own lines: the floor applies inside them too
+    kpLineHeight(out, isRoot || kpIsBlock(disp, tag) || KP_INLINE_BLOCK_RE.test(disp), size);
     if (isRoot) for (const k of ['margin-left', 'margin-right', 'padding-left', 'padding-right']) out.set(k, '0');
-    return {out, size};
+    return {out, size, rtl};
   };
-  const pseudoOf = (el, size, rs) => {
+  // inherited properties set on an element or an ancestor (by its class or a pinned default)
+  const inhOf = (out, tag, pinh) => {
+    let inh = pinh;
+    const add = k => { if (!inh.has(k)) { if (inh === pinh) inh = new Set(pinh); inh.add(k); } };
+    for (const k of KP_INH_PROPS) if (out.get(k) != null) add(k);
+    for (const k of kpTagDefaults(tag).keys()) if (KP_INH_SET.has(k)) add(k);
+    for (const k of KP_UA_PROPS[tag] || []) if (KP_INH_SET.has(k)) add(k);
+    return inh;
+  };
+  const pseudoOf = (el, size, rs, inh, rtl) => {
     const pm = cascade.pseudo.get(el);
     if (!pm) return null;
     const res = new Map();
     for (const [ps, d] of pm) {
-      const out = kpWinners(d);
+      const out = kpWinners(d, {tag: '', inh, rtl});
       // ::before/::after exist only with content
       if ((ps === 'before' || ps === 'after') && !/^(?!none$|normal$)\S/i.test((out.get('content') || '').trim())) continue;
-      kpFontSize(out, '', size, rs);
-      kpLineHeight(out);
+      const psize = kpFontSize(out, '', size, rs);
+      const pd = (out.get('display') || '').trim().toLowerCase();
+      kpLineHeight(out, KP_BLOCK_DISPLAY_RE.test(pd) || KP_INLINE_BLOCK_RE.test(pd), psize);
       res.set(ps, out);
     }
     return res.size ? res : null;
   };
-  const htmlD = declsOf(html, 'html', {size: 16}, 16, true);
+  const htmlD = declsOf(html, 'html', {size: 16, inh: KP_NO_INH}, 16, true);
+  const htmlInh = inhOf(htmlD.out, 'html', KP_NO_INH);
   const rs = htmlD.size;
   const visit = (o, c, p, depth) => {
     const tag = c.localName.toLowerCase();
     const xhtml = isHtml(c);
     let i;
     if (xhtml) {
-      const {out, size} = declsOf(o, tag, p, rs, c === clone);
+      const {out, size, rtl} = declsOf(o, tag, p, rs, c === clone);
       // UA rules the pinned element defaults would override: [hidden] (an author display still
       // wins), the content of a closed <details> (always hidden in browsers)
       if (c.hasAttribute('hidden') && !out.has('display')) out.set('display', 'none');
@@ -2842,34 +2963,37 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
       const pre = KP_PRE_WS_RE.test(ws) ? true : /^(normal|nowrap|initial)$/.test(ws) ? false
         : ws === 'inherit' ? p.pre : p.pre || KP_PRE_TAGS.has(tag);
       const disp = (out.get('display') || '').trim().toLowerCase();
-      const block = c === clone || (KP_BLOCK_DISPLAY_RE.test(disp) ? true : KP_INLINE_BLOCK_RE.test(disp) ||
-        disp === 'inline' ? false : MOBI_BLOCK.has(tag));
+      const block = c === clone || kpIsBlock(disp, tag);
       let text;
       const hasText = () => text ??= HAS_TEXT_RE.test(c.textContent);
       if (KP_POSITION.some(k => out.has(k)) && hasText()) {
         // "visually hidden" (absolute/fixed and moved far off the page, Standard Ebooks'
         // titlepage, or clipped away, the screen-reader-text / sr-only idiom) stays hidden;
         // any other positioning goes
-        if (/^(absolute|fixed)$/i.test((out.get('position') || '').trim()) && kpVisuallyHidden(out, size))
-          out.set('display', 'none');
+        if (cssHiddenOffPage(out, size)) out.set('display', 'none');
         for (const k of KP_POSITION) out.delete(k);
       }
       if (out.has('float') && MOBI_BLOCK.has(tag) && hasText()) out.delete('float');
       kpPresentational(c, tag, out, p.cellpadding);
       // p has a pinned text-indent:0, which would stop an ancestor's indent from inheriting
       if (tag === 'p' && !out.has('text-indent') && p.ti && !KP_ZERO_RE.test(p.ti)) out.set('text-indent', 'inherit');
+      // th has a pinned text-align:center (the UA's -internal-center): an ancestor's own alignment still wins
+      if (tag === 'th' && !out.has('text-align') && p.ta) out.set('text-align', 'inherit');
       const cp = tag === 'table' ? (/^\s*(\d+)\s*$/.exec(c.getAttribute('cellpadding') || '')?.[1] ?? null) : p.cellpadding;
-      i = {out, ps: pseudoOf(o, size, rs), tag, html: true, block,
+      const inh = inhOf(out, tag, p.inh);
+      const ta = taOf(out);
+      i = {out, ps: pseudoOf(o, size, rs, inh, rtl), inh, rtl, tag, html: true, block,
            container: block || KP_INLINE_BLOCK_RE.test(disp), pre, size, cellpadding: cp, svgStyled: false,
            ti: out.has('text-indent') && out.get('text-indent') !== 'inherit' ? out.get('text-indent').trim() : p.ti,
+           ta: ta === undefined ? p.ta : ta,
            family};
     } else {
       // an SVG with its own <style>: its rules are not in the cascade, so nothing is baked
       // inside it (a generated class would beat them)
       const svgStyled = p.svgStyled || (tag === 'svg' && c.getElementsByTagNameNS('*', 'style').length > 0);
       const out = svgStyled ? new Map() : kpWinners(cascade.decl.get(o));
-      i = {out, ps: null, tag, html: false, block: false, container: false, pre: true, size: p.size,
-           cellpadding: null, svgStyled, ti: p.ti, family: p.family};
+      i = {out, ps: null, inh: p.inh, rtl: p.rtl, tag, html: false, block: false, container: false, pre: true, size: p.size,
+           cellpadding: null, svgStyled, ti: p.ti, ta: p.ta, family: p.family};
     }
     info.set(c, i);
     if (depth < KP_MAX_DEPTH) {
@@ -2881,10 +3005,17 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
     }
     if (i.container) containers.push(c);
   };
+  // an element's own text-align for what a th below can inherit: undefined (none/inherit: the
+  // ancestors' count), a real alignment, or null (start/initial/unset/revert: browsers centre a th then)
+  const taOf = o => {
+    if (!o.has('text-align')) return undefined;
+    const v = (o.get('text-align') || '').trim();
+    return /^inherit$/i.test(v) ? undefined : /^(left|right|center|justify|end|-webkit-(?:left|right|center)|-moz-(?:left|right|center)|justify-all|match-parent)$/i.test(v) ? v : null;
+  };
   const tiOf = o => { const v = o.get('text-indent'); return v != null && v !== 'inherit' ? v.trim() : null; };
   const htmlFamily = kpFaceLook(htmlD.out, null, cascade.faces);
-  if (clone) visit(body, clone, {size: htmlD.size, pre: false, cellpadding: null, svgStyled: false, ti: tiOf(htmlD.out),
-                                 family: htmlFamily}, 0);
+  if (clone) visit(body, clone, {size: htmlD.size, pre: false, cellpadding: null, svgStyled: false, ti: tiOf(htmlD.out), ta: taOf(htmlD.out) ?? null,
+                                 family: htmlFamily, inh: htmlInh, rtl: htmlD.rtl}, 0);
 
   // Pass B (bottom-up): whitespace, nbsp indents, trailing <br>, empty paragraphs
   const removed = new Set();  // elements Pass B took out (no element children: no descendants to track)
@@ -3041,7 +3172,7 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
       c.removeAttribute('style');
     } else if (cls) c.setAttribute('class', ((c.getAttribute('class') || '') + ' ' + cls).trim());
   }
-  const htmlClass = classesOf({out: htmlD.out, ps: pseudoOf(html, htmlD.size, rs)});
+  const htmlClass = classesOf({out: htmlD.out, ps: pseudoOf(html, htmlD.size, rs, htmlInh, htmlD.rtl)});
   const content = clone ? clone.innerHTML : '';
   // success: the new classes join the book's sheet
   for (const [key, n] of pending) {

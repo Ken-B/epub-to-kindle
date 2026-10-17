@@ -621,6 +621,12 @@ with sync_playwright() as pw:
                 '<p>a <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><style>.q{fill:red}</style>'
                 '<text class="q">T</text></svg> b</p>\n<p class="rv">revert</p>\n'
                 '<div id="hd"><div id="al">Authors</div></div>\n'
+                '<p class="lh">Note<sup class="fn">1</sup><sup class="fn2">2</sup><span class="sp">x</span><span class="sq">y</span></p>\n'
+                '<table class="tl"><tr><th>Left head</th><th class="own">Own head</th></tr></table><table><tr><th>Plain head</th></tr></table>\n'
+                '<p class="ux"><a class="au2" href="#hd">Unset link</a> <strong class="sx">Initial strong</strong> <span class="ib">Inline block</span></p>\n'
+                '<table class="ts"><tr><th>Start head</th></tr></table><div dir="rtl"><center class="rc">RTL center</center></div>\n'
+                '<div class="par"><h2 class="ai">All initial heading</h2><h3 class="ah">All inherit heading</h3>'
+                '<p class="au">All unset para</p></div>\n'
                 '<div class="poem2"><p>Indented by the ancestor</p></div>\n'
                 '<p><a href="#hd"><b>I.</b><br/> EARLY LETTERS</a></p>\n'
                 '<p>before</p><div class="inl"></div><p>after</p>\n'
@@ -637,6 +643,12 @@ with sync_playwright() as pw:
         ('.sb', 'margin-top: 2em'), ('.pad', 'padding-top: 1em'), ('.poem', 'white-space: pre-wrap'),
         ('.fl', 'float: left'), ('.cl', 'clear: both'), ('text', 'fill: blue'), ('.rv', 'font-weight: revert'),
         ('div', 'display: block; margin-left: 2em'), ('#hd #al', 'all: initial; margin-top: 0'),
+        ('.lh', 'line-height: 1'), ('.fn', 'line-height: 0'), ('.fn2', 'line-height: .5em'), ('.sp', 'line-height: 1'),
+        ('.sq', 'line-height: 8px'), ('.tl', 'text-align: left'), ('.own', 'text-align: right'),
+        ('.au2', 'all: unset'), ('.sx', 'all: initial'), ('.ib', 'display: inline-block; line-height: 1'),
+        ('.ts', 'text-align: start'), ('.rc', 'all: initial'),
+        ('.par', 'font-family: Georgia; color: red; text-align: center'), ('.ai', 'all: initial'),
+        ('.ah', 'all: inherit; font-weight: bold'), ('.au', 'all: unset'),
         ('.poem2', 'text-indent: -2em; margin-left: 0'),
         ('.m', 'margin: 0 0 1em'), ('.pb', 'page-break-before: always'),
         ('.vl', 'display: block'), ('.hb', 'display: none'), ('.inl', 'display: inline'), ('.mm', 'margin: 1em 0'), ('.shown', 'display: block'),
@@ -661,6 +673,12 @@ with sync_playwright() as pw:
         return {sheet, ch, sr: decls('<span[^>]*>(?=Chapter 1)'), sr2: decls('<span[^>]*>(?=Skip)'),
             hr: decls('<hr[^>]*>'), td: decls('<td[^>]*>(?=cell)'), sb: decls('<div[^>]*>(?=</div><p[^>]*>b<)'),
             pad: decls('<p[^>]*>(?=</p>)'), rv: decls('<p[^>]*>(?=revert)'), al: decls('<div[^>]*>(?=Authors)'),
+            lh: decls('<p[^>]*>(?=Note)'), fn: decls('<sup[^>]*>(?=1<)'), fn2: decls('<sup[^>]*>(?=2<)'),
+            sp: decls('<span[^>]*>(?=x<)'), sq: decls('<span[^>]*>(?=y<)'),
+            th1: decls('<th[^>]*>(?=Left head)'), th2: decls('<th[^>]*>(?=Own head)'), th3: decls('<th[^>]*>(?=Plain head)'),
+            au2: decls('<a[^>]*>(?=Unset link)'), sx: decls('<strong[^>]*>(?=Initial strong)'), ib: decls('<span[^>]*>(?=Inline block)'),
+            th4: decls('<th[^>]*>(?=Start head)'), rc: decls('<center[^>]*>(?=RTL center)'),
+            ai: decls('<h2[^>]*>(?=All initial)'), ah: decls('<h3[^>]*>(?=All inherit)'), au: decls('<p[^>]*>(?=All unset)'),
             anc: decls('<p[^>]*>(?=Indented by the ancestor)'), plain: decls('<p[^>]*>(?=<a )'),
             h2h: decls('<h2[^>]*>(?=Hidden title)'), ph: decls('<p[^>]*>(?=Hidden para)'), shown: decls('<p[^>]*>(?=Shown para)'),
             closed: decls('<p[^>]*>(?=Closed content)'), summ: decls('<summary[^>]*>(?=Sum)'),
@@ -686,9 +704,33 @@ with sync_playwright() as pw:
 
     test('Profile: an empty div displayed inline (e.g. all:initial) is dropped',
          lambda: re.search(r'>before</p><p[^>]*>after</p>', kp2['ch']) is not None)
-    test('Profile: a winning `all: initial` resets weaker rules (no margin-left/display:block), written first',
-         lambda: kp2['al'].startswith('all:initial;') and 'display:inline' in kp2['al'] and 'margin-left' not in kp2['al']
+    test('Profile: a winning `all: initial` resets weaker rules (no margin-left/display:block), `all` itself not written',
+         lambda: 'all' not in kp2['al'] and 'display:inline' in kp2['al'] and 'margin-left' not in kp2['al']
                  and 'margin-top:0' in kp2['al'])
+    test('Profile: line-height raised to 1.2 on a block, kept as authored on inline sup/span (0, .5em, 1), small px → em of its size',
+         lambda: 'line-height:1.2' in kp2['lh'].split(';') and 'line-height:0' in kp2['fn'].split(';')
+                 and 'line-height:.5em' in kp2['fn2'].split(';') and 'line-height:1' in kp2['sp'].split(';')
+                 and 'line-height:0.5em' in kp2['sq'].split(';'))
+    test('Profile: th gets text-align:inherit under an ancestor with its own alignment (its own wins; none → pinned center)',
+         lambda: 'text-align:inherit' in kp2['th1'].split(';') and 'text-align:right' in kp2['th2'].split(';')
+                 and 'text-align' not in kp2['th3'])
+    test('Profile: all resets the UA defaults of unpinned tags (a: color inherit, text-decoration none; strong: weight normal)',
+         lambda: all(d in kp2['au2'].split(';') for d in ['color:inherit', 'text-decoration:none', 'display:inline'])
+                 and all(d in kp2['sx'].split(';') for d in ['font-weight:normal', 'display:inline']))
+    test('Profile: an inline-block gets the line-height floor too',
+         lambda: 'line-height:1.2' in kp2['ib'].split(';'))
+    test('Profile: th does not inherit a text-align:start ancestor (browsers centre it); all:initial text-align right under dir=rtl',
+         lambda: 'text-align' not in kp2['th4'] and 'text-align:right' in kp2['rc'].split(';'))
+    test('Profile: no `all:` anywhere in the sheet',
+         lambda: re.search(r'(?<![\w-])all\s*:', kp2['sheet']) is None)
+    test('Profile: all:initial writes concrete initial values (h2 size/weight/margins, inherited text-align), never color/font-family',
+         lambda: all(d in kp2['ai'].split(';') for d in ['display:inline', 'font-size:medium', 'font-weight:normal', 'margin:0',
+                     'text-align:left']) and 'color' not in kp2['ai'] and 'font-family' not in kp2['ai'])
+    test('Profile: all:inherit writes inherit per property (a longhand that beats it stays)',
+         lambda: all(d in kp2['ah'].split(';') for d in ['display:inherit', 'font-size:inherit', 'margin:inherit', 'font-weight:bold'])
+                 and 'font-weight:inherit' not in kp2['ah'])
+    test('Profile: all:unset → inherit for inherited, initial for the others (p text-indent inherit, margin 0, display inline)',
+         lambda: all(d in kp2['au'].split(';') for d in ['display:inline', 'margin:0', 'text-indent:inherit']))
     test('Profile: p under an indented ancestor gets text-indent:inherit (pinned p text-indent:0 elsewhere)',
          lambda: 'text-indent:inherit' in kp2['anc'] and 'text-indent' not in kp2['plain'])
     test('Profile: empty p whose margins collapse into its neighbours dropped; page-break div kept',
@@ -699,9 +741,10 @@ with sync_playwright() as pw:
          lambda: 'display:none' in kp2['h2h'] and 'display:none' in kp2['ph'] and 'display:block' in kp2['shown']
                  and 'display:none' not in kp2['shown'] and 'display:none' in kp2['closed'] and 'display:none' not in kp2['summ']
                  and 'summary{' not in kp2['sheet'] and ',summary' not in kp2['sheet'])
-    test('Profile: dropped @font-face looks baked: italic / semibold small caps from the src name, generic appended',
+    test('Profile: dropped @font-face looks baked: italic / semibold small caps (bold) from the src name, generic appended',
          lambda: 'font-style:italic' in kp2['cur'] and 'font-family:"fI", serif' in kp2['cur']
-                 and 'font-variant:small-caps' in kp2['sc'] and 'font-weight:600' in kp2['sc']
+                 and 'font-variant:small-caps' in kp2['sc'] and 'font-weight:bold' in kp2['sc']
+                 and 'font-weight:600' not in kp2['sc']
                  and 'font-family:fSC, Georgia, serif' in kp2['sc']
                  and 'font-style' not in kp2['pff'] and 'font-weight' not in kp2['pff'])
     test('Profile: hidden <br> (display:none, Gutenberg verse br.hidebr) dropped',
@@ -726,6 +769,52 @@ with sync_playwright() as pw:
                          ['Indented by nbsp.', 'Target paragraph.', 'verse indent']))
     test('Profile: no console warnings (besides the forced fallback above)',
          lambda: not [l for l in kp_console if l.startswith(('warning', 'error')) and 'test failure' not in l])
+
+    # ── MOBI v6: elements the CSS hides off the page / clipped / [hidden] are removed ──
+    print('\n── MOBI v6: off-page / clipped / hidden elements ───────────────')
+    mh_epub = make_epub('MOBI Hidden Test', [
+        ('One', '<section class="titlepage" id="tp"><h1 id="tph">Title Off</h1><p>By Author Off.</p></section>\n'
+                '<section class="imprint"><h2 id="imph">Imprint Off</h2><p>Imprint text kept.</p></section>\n'
+                '<p>Normal <span class="sr">Screen reader off</span>text <span class="clip">Clip off</span> '
+                '<span class="cp">Clip path off</span><span class="tiny">Tiny off</span>.</p>\n'
+                '<p class="rel">Relative kept</p><p class="abs">Absolute kept</p><p class="pct">Percent kept</p>'
+                '<p style="position:fixed;top:-9999px">Inline style off</p>\n'
+                '<p hidden="">Hidden attr off</p><p hidden="hidden" class="shown">Hidden but shown</p>\n'
+                '<p class="w">Width kept</p><p><a href="#tph">to hidden title</a></p>'),
+    ], css_rules=[
+        ('section.titlepage h1, section.titlepage p, section.imprint h2', 'left: -999em; position: absolute'),
+        ('.sr', 'position: absolute; width: 1px; height: 1px; overflow: hidden'),
+        ('.clip', 'position: absolute !important; clip: rect(1px, 1px, 1px, 1px)'),
+        ('.cp', 'position: absolute; clip-path: inset(50%)'),
+        ('.tiny', 'position: fixed; width: 1px; height: 1px; overflow: hidden'),
+        ('.rel', 'position: relative; left: -999em'), ('.abs', 'position: absolute; left: 10px; top: -20px'),
+        ('.pct', 'position: absolute; left: -10%'), ('.shown', 'display: block'),
+        ('.w', 'width: 1px; height: 1px'),
+    ], images=[('x.png', MINIMAL_PNG)])
+    page = browser.new_page()
+    page.goto(base_url)
+    mh = page.evaluate('''async (b64) => {
+        const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+        const e = await parseEpub(buf, {mobi: true, kf8: false});
+        const ch = e.chapters[0];
+        const b = convertToAzw3(e, 'mobi');
+        return {html: ch.mobiContent, len: b.length};
+    }''', base64.b64encode(mh_epub).decode())
+    page.close()
+    test('MOBI: off-page (left:-999em), sr-only, clip, clip-path, tiny-box and fixed elements removed',
+         lambda: not any(x in mh['html'] for x in ['Title Off', 'By Author Off', 'Imprint Off', 'Screen reader off', 'Clip off',
+                                                   'Clip path off', 'Tiny off', 'Inline style off']))
+    test('MOBI: an image and the visible text of a section whose heading is hidden stay',
+         lambda: '<img' in mh['html'] and 'Imprint text kept.' in mh['html'])
+    test('MOBI: not off the page (position:relative, absolute near the page, small negative %, small width) kept',
+         lambda: all(x in mh['html'] for x in ['Relative kept', 'Absolute kept', 'Percent kept', 'Width kept', 'Normal', 'text']))
+    test('MOBI: hidden attribute hides, an author display overrides it',
+         lambda: 'Hidden attr off' not in mh['html'] and 'Hidden but shown' in mh['html'])
+    test('MOBI: the removed heading keeps its link/TOC target as an empty anchor (aid)',
+         lambda: re.search(r'<a aid="\d+"></a>', mh['html']) is not None and 'to hidden title' in mh['html'])
+    # a book without hiding rules: identical output with and without the new properties (no stray markup)
+    test('MOBI: no position/left/width/... markup leaks into the output',
+         lambda: not re.search(r'position|left:|clip|overflow|style=', mh['html']))
 
     # ── T8: Offline / PWA ─────────────────────────────────────────────────
     print('\n── T8: Offline / service worker ───────────────────────────────')

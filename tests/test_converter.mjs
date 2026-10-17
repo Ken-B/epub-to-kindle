@@ -574,9 +574,11 @@ const KP = (() => {
     return html.slice(c.index, end.exec(html).index + 1);
   };
   const consts = ['dict', 'CSS_URL', 'CSS_URL_RE', 'MOBI_SIZE', 'FONT_KW', 'KP_SIDES', 'KP_BAD_VALUE_RE',
-    'KP_GLOBAL_RE', 'KP_INHERITED', 'KP_BORDER_STYLE_RE', '_kpSupports', 'kpNum'];
+    'KP_GLOBAL_RE', 'KP_INHERITED', 'KP_BORDER_STYLE_RE', '_kpSupports', 'kpNum', 'KP_DEFAULTS', 'KP_NO_PROPS',
+    '_kpTagDefaults', 'KP_UA_PROPS', 'KP_INH_PROPS', 'KP_NO_INH', 'KP_INITIAL', 'kpInitial'];
   const fns = ['cssSplit', 'cssWords', 'cssPx', 'safeDecode', 'normPath', 'joinPath', 'toBase32', 'kindleEmbed',
-    'kpSupported', 'kpDecls', 'kpExpand', 'kpBoxText', 'kpSerialize', 'kpFontSize', 'kpLineHeight', 'kpFontFaceInfo'];
+    'kpSupported', 'kpDecls', 'kpExpand', 'kpBoxText', 'kpSerialize', 'kpFontSize', 'kpLineHeight', 'kpFontFaceInfo',
+    'kpTagDefaults', 'kpAllExplicit', 'kpWinners'];
   const src = [...consts, ...fns].map(take).join('\n');
   return new Function(`${src}\nreturn {${fns.join(', ')}};`)();
 })();
@@ -613,6 +615,9 @@ test('kpDecls: unset → inherit (inherited property) / initial (other); revert 
   const d = declMap('color: unset; margin-top: unset; font-weight: revert');
   eq(d.color, 'inherit'); eq(d['margin-top'], 'initial'); eq(d['font-weight'], null);
 });
+test('kpDecls: all: unset stays unset (kpWinners resolves it per longhand); all: revert → null', () => {
+  eq(declMap('all: unset').all, 'unset'); eq(declMap('all: revert').all, null); eq(declMap('all: inherit').all, 'inherit');
+});
 test('kpDecls: url() of a manifest image → kindle:embed, relative to the sheet', () => {
   const images = new Map([['OEBPS/img/a.png', {idx: 2, mt: 'image/png'}]]);
   eq(declMap('background-image: url("../img/a.png")', 'OEBPS/css/', images)['background-image'],
@@ -636,6 +641,12 @@ test('kpLineHeight: below 1.2 raised, absolute units dropped, others kept', () =
   eq(lh('1'), '1.2'); eq(lh('0.9em'), '1.2em'); eq(lh('90%'), '120%'); eq(lh('14px'), undefined);
   eq(lh('10pt'), undefined); eq(lh('normal'), 'normal'); eq(lh('1.5'), '1.5'); eq(lh('1.25em'), '1.25em');
 });
+test('kpLineHeight: an inline element keeps its value (sup{line-height:0}); small absolute → em of its own size, large dropped', () => {
+  const lh = (v, size) => { const m = new Map([['line-height', v]]); KP.kpLineHeight(m, false, size); return m.get('line-height'); };
+  eq(lh('0', 16), '0'); eq(lh('.5em', 16), '.5em'); eq(lh('1', 16), '1'); eq(lh('50%', 16), '50%'); eq(lh('normal', 16), 'normal');
+  eq(lh('8px', 16), '0.5em'); eq(lh('0px', 16), '0em'); eq(lh('9pt', 12), '1em'); eq(lh('19px', 16), '1.188em');
+  eq(lh('20px', 16), undefined); eq(lh('2cm', 10), undefined);
+});
 test('kpFontSize: px/pt/rem → em of the parent, computed size returned', () => {
   const fs = (v, tag, ps, rs) => { const m = new Map(v ? [['font-size', v]] : []); const px = KP.kpFontSize(m, tag, ps, rs); return [m.get('font-size'), +px.toFixed(3)].join('|'); };
   eq(fs('12px', 'p', 16, 16), '0.75em|12');
@@ -649,12 +660,67 @@ test('kpFontSize: px/pt/rem → em of the parent, computed size returned', () =>
 test('kpFontFaceInfo: look of a dropped @font-face from its descriptors, else its src file name', () => {
   const f = b => { const x = KP.kpFontFaceInfo(b); return [x.family, x.style, x.weight, x.variant, x.generic].join('|'); };
   eq(f('font-family: "schreefI"; src: url(../wpfonts/ACaslonPro-Italic.otf)'), 'schreefi|italic|||serif');
-  eq(f('font-family: "wpgSCvc"; src: url(../wpfonts/ACaslonPro-SCSemiboldItalic.otf)'), 'wpgscvc|italic|600|small-caps|serif');
+  eq(f('font-family: "wpgSCvc"; src: url(../wpfonts/ACaslonPro-SCSemiboldItalic.otf)'), 'wpgscvc|italic|bold|small-caps|serif');
   eq(f('font-family: B; src: url(f/MinionPro-BoldIt.otf) format("opentype")'), 'b|italic|bold||serif');
   eq(f('font-family: S; src: url(f/OpenSans-SmallCaps.ttf)'), 's|||small-caps|sans-serif');
-  eq(f('font-family: R; font-style: italic; font-weight: 700; src: url(f/x.ttf)'), 'r|italic|700||serif');
+  eq(f('font-family: R; font-style: italic; font-weight: 700; src: url(f/x.ttf)'), 'r|italic|bold||serif');
+  eq(f('font-family: D; font-weight: 600; src: url(f/x.ttf)'), 'd||bold||serif');       // semibold/demi: bold too
+  eq(f('font-family: D2; src: url(f/Foo-DemiBold.ttf)'), 'd2||bold||serif');
+  eq(f('font-family: L; font-weight: 500; src: url(f/x.ttf)'), 'l||||serif');
+  // the file name only when the descriptor says nothing; never bold from a light name
+  eq(f('font-family: J; font-weight: 300; src: url(f/NotoSansCJKjp-DemiLight.otf)'), 'j||||sans-serif');
+  eq(f('font-family: J2; src: url(f/NotoSansCJKjp-DemiLight.otf)'), 'j2||||sans-serif');
+  eq(f('font-family: J3; src: url(f/Foo-SemiLight.otf)'), 'j3||||serif'); eq(f('font-family: J4; src: url(f/Foo-ExtraLight.otf)'), 'j4||||serif');
+  eq(f('font-family: J5; font-weight: 400; src: url(f/Foo-Bold.otf)'), 'j5||||serif');   // descriptor 400 wins over the name
+  eq(f('font-family: J6; font-weight: normal; src: url(f/Foo-ExtraBold.otf)'), 'j6||bold||serif');
   eq(f('font-family: "schreef"; src: url(../wpfonts/ACaslonPro-Regular.otf)'), 'schreef||||serif');
   eq(f('font-family: C; src: url(f/Courier-Oblique.ttf)'), 'c|italic|||monospace');
+});
+
+test('kpAllExplicit: initial → concrete initial values for display, the tag defaults and inherited props set above', () => {
+  const m = Object.fromEntries(KP.kpAllExplicit('initial', 'h1', new Set(['color', 'font-family'])));
+  eq(JSON.stringify(m), JSON.stringify({display: 'inline', 'font-size': 'medium', 'font-weight': 'normal',
+    'margin-top': '0', 'margin-right': '0', 'margin-bottom': '0', 'margin-left': '0'}));  // never color / font-family
+  // nothing inherited is reset that no parent sets; hr: border style none, overflow visible, no widths/colors
+  const hr = Object.fromEntries(KP.kpAllExplicit('initial', 'hr', null));
+  eq(hr['border-top-style'], 'none'); eq(hr.overflow, 'visible'); eq(hr['border-top-width'], undefined);
+  eq(hr.color, 'inherit');  // hr's pinned color:gray: inherit, never a fixed black
+  eq(Object.keys(Object.fromEntries(KP.kpAllExplicit('initial', 'span', null))).join(), 'display');
+});
+test('kpAllExplicit: UA defaults of unpinned tags are reset (a, strong, em, u, sup, small, code, center, mark)', () => {
+  const x = (kw, tag, inh, rtl) => Object.fromEntries(KP.kpAllExplicit(kw, tag, inh, rtl));
+  eq(JSON.stringify(x('initial', 'a')), JSON.stringify({display: 'inline', color: 'inherit', 'text-decoration': 'none'}));
+  eq(x('initial', 'strong')['font-weight'], 'normal'); eq(x('initial', 'em')['font-style'], 'normal');
+  eq(x('initial', 'u')['text-decoration'], 'none'); eq(x('initial', 's')['text-decoration'], 'none');
+  eq(x('initial', 'sup')['vertical-align'], 'baseline'); eq(x('initial', 'sup')['font-size'], 'medium');
+  eq(x('initial', 'small')['font-size'], 'medium'); eq(x('initial', 'code')['font-family'], 'inherit');
+  eq(x('initial', 'center')['text-align'], 'left'); eq(x('initial', 'center', null, true)['text-align'], 'right');
+  eq(x('initial', 'mark')['background-color'], 'transparent');
+  eq(x('inherit', 'a').color, 'inherit'); eq(x('inherit', 'strong')['font-weight'], 'inherit');
+  // unset: inherited properties inherit (color, font-family: never skipped), the others initial
+  const ua = x('unset', 'a'); eq(ua.color, 'inherit'); eq(ua['text-decoration'], 'none');
+  eq(x('unset', 'pre')['font-family'], 'inherit'); eq(x('unset', 'pre')['white-space'], 'inherit');
+  eq(x('unset', 'b')['font-weight'], 'inherit'); eq(x('unset', 'sup')['vertical-align'], 'baseline');
+  // initial: inherited properties set above: not color/font-family (inherit would be a no-op)
+  eq(JSON.stringify(x('initial', 'span', new Set(['color', 'font-family', 'font-size']))), JSON.stringify({display: 'inline', 'font-size': 'medium'}));
+});
+test('kpAllExplicit: inherit → inherit per property; unset → inherit if inherited else initial', () => {
+  const i = Object.fromEntries(KP.kpAllExplicit('inherit', 'p', new Set(['color'])));
+  eq(JSON.stringify(i), JSON.stringify({display: 'inherit', 'margin-top': 'inherit', 'margin-right': 'inherit',
+    'margin-bottom': 'inherit', 'margin-left': 'inherit', 'text-indent': 'inherit'}));
+  const u = Object.fromEntries(KP.kpAllExplicit('unset', 'p', new Set(['color'])));
+  eq(u['text-indent'], 'inherit'); eq(u['margin-top'], '0'); eq(u.display, 'inline'); eq(u.color, undefined);
+});
+test('kpWinners: `all` is never written; winners keep their value, losers are reset explicitly', () => {
+  const e = (v, imp, spec, seq) => [v, imp, spec, seq];
+  const d = new Map([['all', e('initial', false, 1e6, 0)], ['margin-top', e('2em', false, 2e6, 1)], ['margin-left', e('3em', false, 1, 2)],
+                     ['font-weight', e('bold', false, 1, 3)]]);
+  const w = KP.kpWinners(d, {tag: 'p', inh: new Set()});
+  eq(w.has('all'), false); eq(w.get('margin-top'), '2em'); eq(w.get('margin-left'), '0'); eq(w.get('display'), 'inline');
+  eq(w.get('text-indent'), '0'); eq(w.has('font-weight'), false);
+  eq(KP.kpSerialize(w), 'display:inline;margin:2em 0 0;text-indent:0');
+  eq(KP.kpWinners(new Map([['all', e('revert', false, 1, 0)]]), {tag: 'p', inh: new Set()}).size, 0);  // revert: nothing
+  eq(KP.kpWinners(d).has('display'), false);  // no ctx (SVG): reset only
 });
 
 // ── Results ─────────────────────────────────────────────────────────────────
