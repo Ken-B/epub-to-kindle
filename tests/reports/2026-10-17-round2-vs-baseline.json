@@ -1,0 +1,1136 @@
+{
+  "subset": "core-real-generated-local",
+  "date": "2026-10-17",
+  "total_results": 1772,
+  "formats": {
+    "azw3": {
+      "books": 886,
+      "converted": 876,
+      "calibre_ok": 834,
+      "gate_evaluated": 876,
+      "gate_pass": 876,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "calibre-header-diff": 833,
+        "fixed-layout-unsupported": 88,
+        "spine-non-xhtml": 41,
+        "images-unextractable": 6,
+        "app-error": 4,
+        "app-clean-error": 6,
+        "images-misreferenced": 5,
+        "toc-labels": 3,
+        "input-repair": 1
+      },
+      "actionable_category_books": {
+        "app-error": 4,
+        "images-misreferenced": 5,
+        "toc-labels": 3,
+        "input-repair": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 0,
+        "input repair": 1,
+        "writer bug": 12
+      },
+      "kind_instances": {
+        "unported Calibre transform": 0,
+        "input repair": 1,
+        "writer bug": 12
+      },
+      "kind_not_actionable": {
+        "informational": 880,
+        "out of scope": 88,
+        "acceptable": 6
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.0,
+        "input repair": 0.07692307692307693,
+        "writer bug": 0.9230769230769231
+      },
+      "gap_instances": 13,
+      "books_with_gap": 13,
+      "dominant_kind": "writer bug",
+      "top_category_by_kind": {
+        "unported Calibre transform": null,
+        "input repair": "input-repair",
+        "writer bug": "images-misreferenced"
+      },
+      "top5": [
+        {
+          "category": "images-misreferenced",
+          "books": 5,
+          "description": "Image references in the text point at the wrong image or at none",
+          "kind": "writer bug",
+          "examples": [
+            "core/03-epubcheck-invalid/epub3_03-resources__foreign-xhtml-picture-source-no-type-error",
+            "core/03-epubcheck-valid/epub3_03-resources__foreign-xhtml-picture-source-with-type-valid",
+            "core/03-epubcheck-valid/epub3_07-content-documents__content-xhtml-svg-reference-valid"
+          ]
+        },
+        {
+          "category": "app-error",
+          "books": 4,
+          "description": "App produced no file and the input is not expected to fail",
+          "kind": "writer bug",
+          "examples": [
+            "core/02-w3c-conformance/pub-foreign_bad-fallback",
+            "core/03-epubcheck-other/cli__20-severity-tester",
+            "core/03-epubcheck-other/ocf-zip-unreadable-empty-fatal"
+          ]
+        },
+        {
+          "category": "toc-labels",
+          "books": 3,
+          "description": "TOC entries whose labels/targets do not match the input",
+          "kind": "writer bug",
+          "examples": [
+            "core/03-epubcheck-invalid/epub3_B-external-identifiers__xml-external-identifier-disallowed-error",
+            "core/03-epubcheck-valid/epub2__ncx-label-empty-valid",
+            "core/03-epubcheck-valid/epub3_08-navigation-document__nav-cfi-valid"
+          ]
+        },
+        {
+          "category": "input-repair",
+          "books": 1,
+          "description": "App failed or lost text on a malformed input Calibre converted anyway",
+          "kind": "input repair",
+          "examples": [
+            "generated/gen-latin1-undeclared"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "core/03-epubcheck-valid/epub3_E-obsolete-features__outdated-manifest-fallback-xhtml-video-poster-valid",
+          "category": "epubcheck-valid",
+          "tier": 1,
+          "reasons": [
+            "image refs 0/1 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-invalid/epub3_03-resources__foreign-xhtml-picture-source-no-type-error",
+          "category": "epubcheck-invalid",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-valid/epub3_03-resources__foreign-xhtml-picture-source-with-type-valid",
+          "category": "epubcheck-valid",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-valid/epub3_07-content-documents__content-xhtml-svg-reference-valid",
+          "category": "epubcheck-valid",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-warnings/epub3_03-resources__type-picture-source-mismatch-warning",
+          "category": "epubcheck-warnings",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "idpf": {
+          "calibre-header-diff": 25,
+          "fixed-layout-unsupported": 4,
+          "spine-non-xhtml": 2
+        },
+        "w3c": {
+          "calibre-header-diff": 173,
+          "spine-non-xhtml": 12,
+          "fixed-layout-unsupported": 48,
+          "images-unextractable": 2,
+          "app-error": 1
+        },
+        "epubcheck-invalid": {
+          "calibre-header-diff": 206,
+          "fixed-layout-unsupported": 16,
+          "app-clean-error": 3,
+          "images-unextractable": 3,
+          "images-misreferenced": 1,
+          "spine-non-xhtml": 8,
+          "toc-labels": 1
+        },
+        "epubcheck-other": {
+          "app-error": 2,
+          "calibre-header-diff": 30,
+          "app-clean-error": 3,
+          "fixed-layout-unsupported": 5
+        },
+        "epubcheck-valid": {
+          "calibre-header-diff": 149,
+          "fixed-layout-unsupported": 14,
+          "toc-labels": 2,
+          "app-error": 1,
+          "images-misreferenced": 3,
+          "images-unextractable": 1,
+          "spine-non-xhtml": 14
+        },
+        "epubcheck-warnings": {
+          "calibre-header-diff": 41,
+          "images-misreferenced": 1,
+          "fixed-layout-unsupported": 1,
+          "spine-non-xhtml": 5
+        },
+        "generated": {
+          "calibre-header-diff": 8,
+          "input-repair": 1
+        },
+        "local": {
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "calibre-header-diff": 100
+        },
+        "se": {
+          "calibre-header-diff": 100
+        }
+      },
+      "corpus_category_books": {
+        "idpf": 27,
+        "w3c": 182,
+        "epubcheck-invalid": 222,
+        "epubcheck-other": 35,
+        "epubcheck-valid": 169,
+        "epubcheck-warnings": 42,
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 788,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 776,
+      "books_not_fully_evaluated": 9,
+      "books_fixed_layout": 88,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 12,
+        "images": 12,
+        "toc": 13,
+        "links": 12,
+        "style": 12
+      }
+    },
+    "mobi": {
+      "books": 886,
+      "converted": 876,
+      "calibre_ok": 833,
+      "gate_evaluated": 876,
+      "gate_pass": 876,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "links-unresolved": 223,
+        "style-lost": 320,
+        "calibre-header-diff": 833,
+        "fixed-layout-unsupported": 88,
+        "images-misreferenced": 7,
+        "spine-non-xhtml": 41,
+        "images-unextractable": 15,
+        "app-error": 4,
+        "app-clean-error": 6,
+        "toc-labels": 3,
+        "input-repair": 1
+      },
+      "actionable_category_books": {
+        "links-unresolved": 223,
+        "style-lost": 268,
+        "app-error": 4,
+        "images-misreferenced": 6,
+        "toc-labels": 3,
+        "input-repair": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 292,
+        "input repair": 1,
+        "writer bug": 13
+      },
+      "kind_instances": {
+        "unported Calibre transform": 491,
+        "input repair": 1,
+        "writer bug": 13
+      },
+      "kind_not_actionable": {
+        "informational": 889,
+        "out of scope": 141,
+        "acceptable": 6
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.9605263157894737,
+        "input repair": 0.003289473684210526,
+        "writer bug": 0.04276315789473684
+      },
+      "gap_instances": 505,
+      "books_with_gap": 304,
+      "dominant_kind": "unported Calibre transform",
+      "top_category_by_kind": {
+        "unported Calibre transform": "style-lost",
+        "input repair": "input-repair",
+        "writer bug": "images-misreferenced"
+      },
+      "top5": [
+        {
+          "category": "style-lost",
+          "books": 268,
+          "description": "Style score below 0.5, or the input has CSS rules and the output none",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/childrens-media-query",
+            "core/01-idpf-samples/cole-voyage-of-life"
+          ]
+        },
+        {
+          "category": "links-unresolved",
+          "books": 223,
+          "description": "Internal links that no longer resolve",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/epub30-spec",
+            "core/01-idpf-samples/georgia-cfi"
+          ]
+        },
+        {
+          "category": "images-misreferenced",
+          "books": 6,
+          "description": "Image references in the text point at the wrong image or at none",
+          "kind": "writer bug",
+          "examples": [
+            "core/03-epubcheck-invalid/epub3_03-resources__foreign-xhtml-picture-source-no-type-error",
+            "core/03-epubcheck-valid/epub3_03-resources__foreign-xhtml-picture-source-with-type-valid",
+            "core/03-epubcheck-valid/epub3_E-obsolete-features__outdated-manifest-fallback-xhtml-video-poster-valid"
+          ]
+        },
+        {
+          "category": "app-error",
+          "books": 4,
+          "description": "App produced no file and the input is not expected to fail",
+          "kind": "writer bug",
+          "examples": [
+            "core/02-w3c-conformance/pub-foreign_bad-fallback",
+            "core/03-epubcheck-other/cli__20-severity-tester",
+            "core/03-epubcheck-other/ocf-zip-unreadable-empty-fatal"
+          ]
+        },
+        {
+          "category": "toc-labels",
+          "books": 3,
+          "description": "TOC entries whose labels/targets do not match the input",
+          "kind": "writer bug",
+          "examples": [
+            "core/03-epubcheck-invalid/epub3_B-external-identifiers__xml-external-identifier-disallowed-error",
+            "core/03-epubcheck-valid/epub2__ncx-label-empty-valid",
+            "core/03-epubcheck-valid/epub3_08-navigation-document__nav-cfi-valid"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "core/03-epubcheck-valid/epub3_E-obsolete-features__outdated-manifest-fallback-xhtml-video-poster-valid",
+          "category": "epubcheck-valid",
+          "tier": 1,
+          "reasons": [
+            "image refs 0/1 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-invalid/epub3_03-resources__foreign-xhtml-picture-source-no-type-error",
+          "category": "epubcheck-invalid",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-valid/epub3_03-resources__foreign-xhtml-picture-source-with-type-valid",
+          "category": "epubcheck-valid",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-warnings/epub3_03-resources__type-picture-source-mismatch-warning",
+          "category": "epubcheck-warnings",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-warnings/epub3_07-content-documents__content-xhtml-img-fragment-non-svg-warning",
+          "category": "epubcheck-warnings",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "idpf": {
+          "links-unresolved": 18,
+          "style-lost": 25,
+          "calibre-header-diff": 25,
+          "fixed-layout-unsupported": 4,
+          "images-misreferenced": 1,
+          "spine-non-xhtml": 2,
+          "images-unextractable": 1
+        },
+        "w3c": {
+          "style-lost": 64,
+          "calibre-header-diff": 173,
+          "spine-non-xhtml": 12,
+          "images-unextractable": 4,
+          "fixed-layout-unsupported": 48,
+          "links-unresolved": 10,
+          "app-error": 1
+        },
+        "epubcheck-invalid": {
+          "calibre-header-diff": 206,
+          "links-unresolved": 6,
+          "style-lost": 12,
+          "fixed-layout-unsupported": 16,
+          "app-clean-error": 3,
+          "images-unextractable": 4,
+          "images-misreferenced": 1,
+          "spine-non-xhtml": 8,
+          "toc-labels": 1
+        },
+        "epubcheck-other": {
+          "app-error": 2,
+          "calibre-header-diff": 30,
+          "app-clean-error": 3,
+          "fixed-layout-unsupported": 5,
+          "links-unresolved": 1,
+          "style-lost": 1
+        },
+        "epubcheck-valid": {
+          "calibre-header-diff": 149,
+          "fixed-layout-unsupported": 14,
+          "links-unresolved": 6,
+          "style-lost": 9,
+          "toc-labels": 2,
+          "app-error": 1,
+          "images-misreferenced": 2,
+          "images-unextractable": 5,
+          "spine-non-xhtml": 14
+        },
+        "epubcheck-warnings": {
+          "calibre-header-diff": 41,
+          "links-unresolved": 2,
+          "images-misreferenced": 2,
+          "fixed-layout-unsupported": 1,
+          "spine-non-xhtml": 5
+        },
+        "generated": {
+          "links-unresolved": 2,
+          "style-lost": 8,
+          "calibre-header-diff": 8,
+          "input-repair": 1
+        },
+        "local": {
+          "images-misreferenced": 1,
+          "style-lost": 1,
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "links-unresolved": 78,
+          "style-lost": 100,
+          "calibre-header-diff": 100,
+          "images-unextractable": 1
+        },
+        "se": {
+          "links-unresolved": 100,
+          "style-lost": 100,
+          "calibre-header-diff": 100
+        }
+      },
+      "corpus_category_books": {
+        "idpf": 27,
+        "w3c": 182,
+        "epubcheck-invalid": 222,
+        "epubcheck-other": 35,
+        "epubcheck-valid": 169,
+        "epubcheck-warnings": 42,
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 788,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 485,
+      "books_not_fully_evaluated": 9,
+      "books_fixed_layout": 88,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 12,
+        "images": 12,
+        "toc": 13,
+        "links": 12,
+        "style": 12
+      }
+    }
+  },
+  "before_after": {
+    "formats": {
+      "azw3": {
+        "pairs": 886,
+        "categories": {
+          "app-error": {
+            "before": 6,
+            "after": 4
+          },
+          "app-clean-error": {
+            "before": 0,
+            "after": 6
+          },
+          "gate-mobitool": {
+            "before": 878,
+            "after": 0
+          },
+          "gate-kindleunpack": {
+            "before": 8,
+            "after": 0
+          },
+          "gate-calibre": {
+            "before": 8,
+            "after": 0
+          },
+          "text-loss": {
+            "before": 37,
+            "after": 0
+          },
+          "text-garbled": {
+            "before": 1,
+            "after": 0
+          },
+          "spine-non-xhtml": {
+            "before": 0,
+            "after": 41
+          },
+          "images-missing": {
+            "before": 24,
+            "after": 0
+          },
+          "images-unextractable": {
+            "before": 0,
+            "after": 6
+          },
+          "images-misreferenced": {
+            "before": 131,
+            "after": 5
+          },
+          "toc-flat": {
+            "before": 162,
+            "after": 0
+          },
+          "toc-labels": {
+            "before": 111,
+            "after": 3
+          },
+          "links-unresolved": {
+            "before": 223,
+            "after": 0
+          },
+          "style-lost": {
+            "before": 386,
+            "after": 0
+          },
+          "fixed-layout-unsupported": {
+            "before": 88,
+            "after": 88
+          },
+          "calibre-header-diff": {
+            "before": 830,
+            "after": 833
+          },
+          "input-repair": {
+            "before": 7,
+            "after": 1
+          }
+        },
+        "before": {
+          "books": 886,
+          "converted": 878,
+          "gate_pass": 0,
+          "gate_evaluated": 878,
+          "style_se_pg": 0.0094955,
+          "style_se_pg_n": 200,
+          "links": [
+            0,
+            35046
+          ],
+          "image_refs": [
+            2369,
+            3344
+          ],
+          "images_hash": [
+            3167,
+            3342
+          ],
+          "text": [
+            5586,
+            5646
+          ],
+          "toc": [
+            4889,
+            10529
+          ]
+        },
+        "after": {
+          "books": 886,
+          "converted": 876,
+          "gate_pass": 876,
+          "gate_evaluated": 876,
+          "style_se_pg": 1.0,
+          "style_se_pg_n": 200,
+          "links": [
+            35046,
+            35046
+          ],
+          "image_refs": [
+            3753,
+            3764
+          ],
+          "images_hash": [
+            3309,
+            3341
+          ],
+          "text": [
+            5581,
+            5582
+          ],
+          "toc": [
+            10478,
+            10481
+          ]
+        },
+        "regressions": [
+          {
+            "id": "core/02-w3c-conformance/pub-foreign_bad-fallback",
+            "category": "w3c",
+            "reasons": [
+              [
+                "app error now",
+                "app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…"
+              ],
+              [
+                "new category",
+                "new categories: app-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-valid/epub2__ops-dtbook-valid",
+            "category": "epubcheck-valid",
+            "reasons": [
+              [
+                "app error now",
+                "app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…"
+              ],
+              [
+                "new category",
+                "new categories: app-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/01-idpf-samples/svg-in-spine",
+            "category": "idpf",
+            "reasons": [
+              [
+                "text items matching",
+                "text items matching 6 -> 0"
+              ]
+            ]
+          },
+          {
+            "id": "core/01-idpf-samples/indexing-for-eds-and-auths-3f",
+            "category": "idpf",
+            "reasons": [
+              [
+                "TOC entries matched",
+                "TOC entries matched 19 -> 18"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-other/ocf-zip-unreadable-image-with-epub-extension-fatal",
+            "category": "epubcheck-other",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/02-w3c-conformance/lay-pp-svg-icb_multi",
+            "category": "w3c",
+            "reasons": [
+              [
+                "text items matching",
+                "text items matching 3 -> 1"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-other/cli__20-severity-tester",
+            "category": "epubcheck-other",
+            "reasons": [
+              [
+                "app error now",
+                "app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…"
+              ],
+              [
+                "new category",
+                "new categories: app-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-valid/epub3_03-resources__foreign-xhtml-picture-source-with-type-valid",
+            "category": "epubcheck-valid",
+            "reasons": [
+              [
+                "new category",
+                "new categories: images-misreferenced"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-valid/epub3_E-obsolete-features__outdated-manifest-fallback-xhtml-video-poster-valid",
+            "category": "epubcheck-valid",
+            "reasons": [
+              [
+                "new category",
+                "new categories: images-misreferenced"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-other/ocf-zip-unreadable-no-end-header-fatal",
+            "category": "epubcheck-other",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/02-w3c-conformance/lay-fxl-svg-icb_multi",
+            "category": "w3c",
+            "reasons": [
+              [
+                "text items matching",
+                "text items matching 3 -> 1"
+              ]
+            ]
+          },
+          {
+            "id": "core/01-idpf-samples/indexing-for-eds-and-auths-3md",
+            "category": "idpf",
+            "reasons": [
+              [
+                "TOC entries matched",
+                "TOC entries matched 19 -> 18"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-invalid/epub2__ocf-opf-missing-fatal",
+            "category": "epubcheck-invalid",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-warnings/epub3_03-resources__type-picture-source-mismatch-warning",
+            "category": "epubcheck-warnings",
+            "reasons": [
+              [
+                "new category",
+                "new categories: images-misreferenced"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-other/ocf-container-not-ocf-error",
+            "category": "epubcheck-other",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-invalid/epub3_04-ocf__ocf-package-document-missing-fatal",
+            "category": "epubcheck-invalid",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-invalid/epub2__opf-spine-missing-error",
+            "category": "epubcheck-invalid",
+            "reasons": [
+              [
+                "app error now",
+                "app error now: Error: No readable chapters found in the EPUB spine (0 spine items, none could …"
+              ],
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-invalid/epub3_03-resources__foreign-xhtml-picture-source-no-type-error",
+            "category": "epubcheck-invalid",
+            "reasons": [
+              [
+                "new category",
+                "new categories: images-misreferenced"
+              ]
+            ]
+          }
+        ]
+      },
+      "mobi": {
+        "pairs": 886,
+        "categories": {
+          "app-error": {
+            "before": 6,
+            "after": 4
+          },
+          "app-clean-error": {
+            "before": 0,
+            "after": 6
+          },
+          "gate-mobitool": {
+            "before": 127,
+            "after": 0
+          },
+          "text-loss": {
+            "before": 38,
+            "after": 0
+          },
+          "text-garbled": {
+            "before": 1,
+            "after": 0
+          },
+          "spine-non-xhtml": {
+            "before": 0,
+            "after": 41
+          },
+          "images-missing": {
+            "before": 24,
+            "after": 0
+          },
+          "images-unextractable": {
+            "before": 0,
+            "after": 15
+          },
+          "images-misreferenced": {
+            "before": 271,
+            "after": 7
+          },
+          "toc-missing": {
+            "before": 7,
+            "after": 0
+          },
+          "toc-flat": {
+            "before": 162,
+            "after": 0
+          },
+          "toc-labels": {
+            "before": 111,
+            "after": 3
+          },
+          "links-unresolved": {
+            "before": 223,
+            "after": 223
+          },
+          "style-lost": {
+            "before": 329,
+            "after": 320
+          },
+          "fixed-layout-unsupported": {
+            "before": 88,
+            "after": 88
+          },
+          "calibre-header-diff": {
+            "before": 831,
+            "after": 833
+          },
+          "input-repair": {
+            "before": 8,
+            "after": 1
+          }
+        },
+        "before": {
+          "books": 886,
+          "converted": 878,
+          "gate_pass": 751,
+          "gate_evaluated": 878,
+          "style_se_pg": 0.00936,
+          "style_se_pg_n": 200,
+          "links": [
+            0,
+            35046
+          ],
+          "image_refs": [
+            0,
+            3344
+          ],
+          "images_hash": [
+            3167,
+            3342
+          ],
+          "text": [
+            5586,
+            5648
+          ],
+          "toc": [
+            4889,
+            10537
+          ]
+        },
+        "after": {
+          "books": 886,
+          "converted": 876,
+          "gate_pass": 876,
+          "gate_evaluated": 876,
+          "style_se_pg": 0.009378,
+          "style_se_pg_n": 200,
+          "links": [
+            0,
+            35046
+          ],
+          "image_refs": [
+            3618,
+            3749
+          ],
+          "images_hash": [
+            3170,
+            3341
+          ],
+          "text": [
+            5581,
+            5582
+          ],
+          "toc": [
+            10478,
+            10481
+          ]
+        },
+        "regressions": [
+          {
+            "id": "core/02-w3c-conformance/pub-foreign_bad-fallback",
+            "category": "w3c",
+            "reasons": [
+              [
+                "app error now",
+                "app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…"
+              ],
+              [
+                "new category",
+                "new categories: app-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-valid/epub2__ops-dtbook-valid",
+            "category": "epubcheck-valid",
+            "reasons": [
+              [
+                "app error now",
+                "app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…"
+              ],
+              [
+                "new category",
+                "new categories: app-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/01-idpf-samples/svg-in-spine",
+            "category": "idpf",
+            "reasons": [
+              [
+                "text items matching",
+                "text items matching 6 -> 0"
+              ]
+            ]
+          },
+          {
+            "id": "core/01-idpf-samples/indexing-for-eds-and-auths-3f",
+            "category": "idpf",
+            "reasons": [
+              [
+                "TOC entries matched",
+                "TOC entries matched 19 -> 18"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-other/ocf-zip-unreadable-image-with-epub-extension-fatal",
+            "category": "epubcheck-other",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/02-w3c-conformance/lay-pp-svg-icb_multi",
+            "category": "w3c",
+            "reasons": [
+              [
+                "text items matching",
+                "text items matching 3 -> 1"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-other/cli__20-severity-tester",
+            "category": "epubcheck-other",
+            "reasons": [
+              [
+                "app error now",
+                "app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…"
+              ],
+              [
+                "new category",
+                "new categories: app-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-valid/epub3_E-obsolete-features__outdated-manifest-fallback-xhtml-video-poster-valid",
+            "category": "epubcheck-valid",
+            "reasons": [
+              [
+                "new category",
+                "new categories: images-misreferenced"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-other/ocf-zip-unreadable-no-end-header-fatal",
+            "category": "epubcheck-other",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/02-w3c-conformance/lay-fxl-svg-icb_multi",
+            "category": "w3c",
+            "reasons": [
+              [
+                "text items matching",
+                "text items matching 3 -> 1"
+              ]
+            ]
+          },
+          {
+            "id": "core/01-idpf-samples/indexing-for-eds-and-auths-3md",
+            "category": "idpf",
+            "reasons": [
+              [
+                "TOC entries matched",
+                "TOC entries matched 19 -> 18"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-invalid/epub2__ocf-opf-missing-fatal",
+            "category": "epubcheck-invalid",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-other/ocf-container-not-ocf-error",
+            "category": "epubcheck-other",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-invalid/epub3_04-ocf__ocf-package-document-missing-fatal",
+            "category": "epubcheck-invalid",
+            "reasons": [
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          },
+          {
+            "id": "core/03-epubcheck-invalid/epub2__opf-spine-missing-error",
+            "category": "epubcheck-invalid",
+            "reasons": [
+              [
+                "app error now",
+                "app error now: Error: No readable chapters found in the EPUB spine (0 spine items, none could …"
+              ],
+              [
+                "new category",
+                "new categories: app-clean-error"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    "unpaired_before": 0,
+    "unpaired_after": 0
+  }
+}

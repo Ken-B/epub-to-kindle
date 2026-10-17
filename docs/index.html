@@ -107,7 +107,7 @@
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.10 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.11 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -115,7 +115,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.10';
+const APP_VERSION = 'v1.0.11';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -356,9 +356,10 @@ function serializeEntry(key, tags, tagTypes) {
  * Build all INDX records for one index.
  * entries: [{key, tags}]
  * tagTypes: [{num, vpe, mask}]
- * cncxRecord: Uint8Array | null
+ * cncxRecord: Uint8Array | Uint8Array[] | null  (CNCX record(s), appended after the data records)
  */
 function buildIndxRecords(entries, tagTypes, cncxRecord) {
+  const cncx = !cncxRecord ? [] : Array.isArray(cncxRecord) ? cncxRecord : [cncxRecord];
   const HDR = 192;
   const LIMIT = 0x10000 - HDR - 1048;
 
@@ -431,11 +432,11 @@ function buildIndxRecords(entries, tagTypes, cncxRecord) {
   hv2.setUint32(28, 65001, false);
   hv2.setUint32(32, 0xffffffff, false);
   hv2.setUint32(36, entries.length, false);
-  hv2.setUint32(52, cncxRecord ? 1 : 0, false);
+  hv2.setUint32(52, cncx.length, false);  // number of CNCX records
   hv2.setUint32(180, HDR, false); // tagx_offset = 192
 
   const headerRec = concat(hh, tagx, geom, hIdxt);
-  return [headerRec, ...dataRecs, ...(cncxRecord ? [cncxRecord] : [])];
+  return [headerRec, ...dataRecs, ...cncx];
 }
 
 // ─── Skeleton index ───────────────────────────────────────────────────────────
@@ -519,18 +520,26 @@ function buildChunkIndex(parts) {
 
 // ─── NCX index (Table of Contents) ───────────────────────────────────────────
 //
-// Tag defs from Calibre NCXIndex (flat ToC, depth=0, no parent/children):
+// Reference: Calibre writer8/main.py create_indices + writer8/index.py NCXIndex.
+// Tag defs (name, number, values per entry, mask), in the order values are written:
 //   offset(1,1,1), length(2,1,2), label(3,1,4), depth(4,1,8),
 //   parent(21,1,16), first_child(22,1,32), last_child(23,1,64), pos_fid(6,2,128)
 //
 // Each entry:
-//   key     = hex index (e.g. '00', '01', '0A')
-//   offset  = byte offset of chapter content in full text
-//   length  = byte length of chapter content
-//   label   = CNCX offset for the title string
-//   depth   = 0 (flat)
-//   parent/first_child/last_child = 0xffffffff (none)
-//   pos_fid = [file_number, 0]  (which skeleton/chunk entry)
+//   key     = upper-case hex of its index, at least 2 digits ('00', '0A', '1F4')
+//   offset  = byte offset of the target in the text (KF8: flow 0 as the reader rebuilds
+//             it, chunk inserted = chunk insert position + offset in chunk; MOBI 6: the
+//             flat document)
+//   length  = up to the next entry at the same or a shallower depth (else the text end)
+//   label   = CNCX offset of the title string
+//   depth   = 0 for top-level entries
+//   parent / first_child / last_child = entry indices, ONLY when they exist (writing
+//             0xffffffff for "none" makes Calibre's reader do entries[0xffffffff])
+//   pos_fid = [chunk sequence number, byte offset in chunk] (KF8 only), the fid:off
+//             pair of kindle:pos links
+// Entries are ordered by (depth, play order): all top-level entries first, then all
+// depth-1 entries, … (the Kindle requires this; a parent's children are contiguous).
+// MOBI 6 (Calibre writer2) uses the same table without pos_fid.
 
 const NCX_TAGS = [
   {num:1,  vpe:1, mask:1},    // offset
@@ -540,49 +549,82 @@ const NCX_TAGS = [
   {num:21, vpe:1, mask:16},   // parent
   {num:22, vpe:1, mask:32},   // first_child
   {num:23, vpe:1, mask:64},   // last_child
-  {num:6,  vpe:2, mask:128},  // pos_fid [file_num, frag_offset]
+  {num:6,  vpe:2, mask:128},  // pos_fid [chunk sequence number, offset in chunk]
 ];
+const NCX_TAGS_MOBI6 = NCX_TAGS.filter(t => t.num !== 6);
 
 /**
- * Build NCX index for Kindle Table of Contents.
- * @param {Array} parts - same idxParts array used by skeleton/chunk
- * @param {Array} titles - chapter title strings (one per part)
+ * CNCX records for index labels (Calibre mobi/utils.py CNCX): each string is
+ * <encint(byte length)><UTF-8>, truncated to 500 characters, identical strings stored
+ * once; a record holds at most 0x10000 - 1024 bytes and a string's offset is
+ * record number * 0x10000 + offset in that record.
+ * @returns {{records: Uint8Array[], offsetOf: Map<string, number>}}
  */
-function buildNcxIndex(parts, titles) {
-  if (!parts.length) return null;
-
-  // CNCX record: VLQ-length-prefixed title strings
-  const cncxParts = []; const cncxOffsets = []; let cncxOff = 0;
-  for (const title of titles) {
-    const tb = enc.encode(title || 'Chapter');
-    cncxOffsets.push(cncxOff);
-    const lv = encint(tb.length);
-    cncxParts.push(lv, tb);
-    cncxOff += lv.length + tb.length;
+function buildCncxRecords(strings) {
+  const records = [], offsetOf = new Map();
+  const LIMIT = 0x10000 - 1024;
+  let buf = [], used = 0;
+  for (const s of strings) {
+    if (offsetOf.has(s)) continue;
+    const cps = [...s];
+    const b = enc.encode(cps.length > 500 ? cps.slice(0, 500).join('') : s);
+    const raw = concat(encint(b.length), b);
+    if (used + raw.length > LIMIT && used) {
+      records.push(align4(concat(...buf))); buf = []; used = 0;
+    }
+    offsetOf.set(s, records.length * 0x10000 + used);
+    buf.push(raw); used += raw.length;
   }
-  const cncxRecord = align4(concat(...cncxParts));
+  if (used) records.push(align4(concat(...buf)));
+  return {records, offsetOf};
+}
 
-  const largest = parts.length - 1;
-  const hexLen = Math.max(2, largest.toString(16).length);
+/**
+ * Build the NCX index (Kindle Table of Contents).
+ * @param {Array} toc - [{label, depth, parent, children, offset, posFid}] in TOC
+ *                      (document) order; parent/children are indices in this array
+ * @param {number} textEnd - end of the text the offsets point into (last length)
+ * @param {boolean} mobi6 - MOBI 6 tag table (no pos_fid)
+ */
+function buildNcxIndex(toc, textEnd, mobi6) {
+  if (!toc?.length) return null;
+  // (depth, play order); stable sort keeps the play order within a depth
+  const order = toc.map((_, i) => i).sort((a, b) => toc[a].depth - toc[b].depth);
+  const indexOf = new Array(toc.length);
+  order.forEach((ti, i) => { indexOf[ti] = i; });
 
-  const entries = parts.map((p, i) => {
-    const contentStart = p.flowStart + p.skelHeadByteLen + p.skelTailByteLen;
-    return {
-      key: i.toString(16).toUpperCase().padStart(hexLen, '0'),
-      tags: {
-        1: [contentStart],       // offset in text
-        2: [p.contentByteLen],   // length
-        3: [cncxOffsets[i]],     // label → CNCX offset
-        4: [0],                  // depth = 0 (flat — no hierarchy)
-        6: [p.chapterIndex, 0],  // pos_fid = [file_number, fragment_offset]
-        // Omit parent(21), first_child(22), last_child(23) for flat ToC.
-        // Setting them to 0xffffffff causes Calibre to throw KeyError when
-        // it tries entries[0xffffffff]. Absent = correct for a flat list.
-      }
+  // length: up to the nearest later offset among entries at the same or a shallower depth
+  const nextStart = new Array(toc.length).fill(textEnd);
+  const maxDepth = Math.max(...toc.map(e => e.depth));
+  for (let d = 0; d <= maxDepth; d++) {
+    const offs = toc.filter(e => e.depth <= d).map(e => e.offset).sort((a, b) => a - b);
+    toc.forEach((e, i) => {
+      if (e.depth !== d) return;
+      let lo = 0, hi = offs.length;  // first offset > e.offset
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (offs[mid] > e.offset) hi = mid; else lo = mid + 1; }
+      if (lo < offs.length) nextStart[i] = offs[lo];
+    });
+  }
+
+  const {records: cncxRecords, offsetOf} = buildCncxRecords(toc.map(e => e.label));
+  const hexLen = Math.max(2, (toc.length - 1).toString(16).length);
+  const entries = order.map((ti, i) => {
+    const e = toc[ti];
+    const tags = {
+      1: [e.offset],
+      2: [Math.max(0, nextStart[ti] - e.offset)],
+      3: [offsetOf.get(e.label)],
+      4: [e.depth],
     };
+    if (e.parent >= 0) tags[21] = [indexOf[e.parent]];
+    if (e.children.length) {
+      tags[22] = [indexOf[e.children[0]]];
+      tags[23] = [indexOf[e.children[e.children.length - 1]]];
+    }
+    if (!mobi6) tags[6] = e.posFid;
+    return {key: i.toString(16).toUpperCase().padStart(hexLen, '0'), tags};
   });
-
-  return buildIndxRecords(entries, NCX_TAGS, cncxRecord);
+  return buildIndxRecords(entries, mobi6 ? NCX_TAGS_MOBI6 : NCX_TAGS, cncxRecords);
 }
 
 // ─── MOBI header (record 0) ───────────────────────────────────────────────────
@@ -707,6 +749,7 @@ function kindleEmbed(n) { return toBase32(n, 4); }
 
 /** kindle:flow URI of KF8 flow n (flow 0 is the HTML, stylesheets are 1, 2, …). */
 function kindleFlowCss(n) { return `kindle:flow:${toBase32(n, 4)}?mime=text/css`; }
+function kindleFlowSvg(n) { return `kindle:flow:${toBase32(n, 4)}?mime=image/svg+xml`; }
 
 // ─── Paths and strings ───────────────────────────────────────────────────────
 
@@ -724,6 +767,9 @@ function normPath(p) {
   return out.join('/');
 }
 function dirOf(p) { const i = p.lastIndexOf('/'); return i >= 0 ? p.slice(0, i + 1) : ''; }
+/** Normalised zip path of a relative URL used in a file in directory dir (a
+ *  path-absolute URL, "/x/y", is relative to the container root). */
+function joinPath(dir, url) { return normPath(url.startsWith('/') ? url : dir + url); }
 
 function escAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -766,8 +812,10 @@ const CSS_IMPORT_RE = new RegExp(String.raw`@import\s+(?:${CSS_URL}|"([^"]*)"|'(
 /**
  * @param {Map<string,string>} cssFiles - normalised zip path → stylesheet text
  * @param {Map<string,{idx:number,mt:string}>} imageByPath - normalised zip path → image resource
- * @returns {{flows: string[], sheet(path): number|null, inline(css, baseDir): number|null}}
- *          flows[k] is KF8 flow k+1; sheet()/inline() return the flow number to link
+ * @returns {{flows: string[], sheet(path): number|null, inline(css, baseDir): number|null,
+ *            svg(path, text): number|null}}
+ *          flows[k] is KF8 flow k+1 (stylesheets and SVG images); sheet()/inline()/svg()
+ *          return the flow number to link
  */
 function makeCssFlows(cssFiles, imageByPath) {
   const flows = [];
@@ -778,11 +826,11 @@ function makeCssFlows(cssFiles, imageByPath) {
   const rewrite = (css, baseDir) => css
     .replace(/@font-face\s*\{[^}]*\}/gi, rule => /url\(\s*(?!['"]?data:)/i.test(rule) ? '' : rule)
     .replace(CSS_IMPORT_RE, (m, a, b, c, d, e, media) => {
-      const n = sheet(normPath(baseDir + strip(a ?? b ?? c ?? d ?? e ?? '')));
+      const n = sheet(joinPath(baseDir, strip(a ?? b ?? c ?? d ?? e ?? '')));
       return n ? `@import url(${kindleFlowCss(n)})${media};` : m;
     })
     .replace(CSS_URL_RE, (m, a, b, c) => {
-      const img = imageByPath.get(normPath(baseDir + strip(a ?? b ?? c ?? '')));
+      const img = imageByPath.get(joinPath(baseDir, strip(a ?? b ?? c ?? '')));
       return img ? `url(kindle:embed:${kindleEmbed(img.idx + 1)}?mime=${img.mt})` : m;
     });
 
@@ -803,24 +851,140 @@ function makeCssFlows(cssFiles, imageByPath) {
     return n;
   }
 
-  return { flows, sheet, inline: add };
+  // SVG images (Calibre writer8/main.py extract_svg_into_flows): KF8 has no SVG
+  // resource records, so an <img> of an .svg file links a flow holding the SVG
+  // markup, kindle:flow:NNNN?mime=image/svg+xml. The file is kept as is (Calibre
+  // re-serialises the <svg> element; an XML declaration / DOCTYPE is valid in an
+  // SVG file and keeps it byte-identical), except that <image> hrefs become
+  // kindle:embed. TODO: inline <svg> in XHTML stays inline (Calibre moves it into
+  // a flow too).
+  const svgByPath = new Map();
+  function svg(path, text) {
+    if (svgByPath.has(path)) return svgByPath.get(path);
+    let n = null;
+    if (/<(?:[\w-]+:)?svg\b/.test(text)) {
+      const markup = text.replace(/(<(?:[\w-]+:)?image\b[^>]*?\s(?:[\w-]+:)?href\s*=\s*)(["'])([^"']*)\2/g,
+        (m, pre, q, url) => {
+          const img = imageByPath.get(joinPath(dirOf(path), strip(url.trim())));
+          return img ? `${pre}${q}kindle:embed:${kindleEmbed(img.idx + 1)}?mime=${img.mt}${q}` : m;
+        });
+      n = byText.get(markup);
+      if (n === undefined) { flows.push(markup); n = flows.length; byText.set(markup, n); }
+    }
+    svgByPath.set(path, n);
+    return n;
+  }
+
+  return { flows, sheet, inline: add, svg };
+}
+
+// ─── Text decoding ───────────────────────────────────────────────────────────
+//
+// Text files are read as bytes and decoded by their declared charset (JSZip's
+// async('string') always assumes UTF-8). Order (as browsers and Calibre's
+// xml_to_unicode): BOM (UTF-8, UTF-16LE/BE), else the XML declaration's encoding,
+// else @charset (CSS), else <meta charset> / http-equiv content charset in the
+// first 1024 bytes, else UTF-8. A label TextDecoder does not know means UTF-8.
+// Undeclared or mis-declared Latin-1: when the UTF-8 result contains U+FFFD that
+// the bytes do not (no EF BF BD sequence) and the bytes are valid windows-1252
+// (none of its five undefined bytes), windows-1252 is used instead. No other
+// guessing (no statistical charset detection).
+
+function sniffCharset(b) {
+  if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) return 'utf-8';
+  if (b[0] === 0xff && b[1] === 0xfe) return 'utf-16le';
+  if (b[0] === 0xfe && b[1] === 0xff) return 'utf-16be';
+  if (b[0] === 0x3c && b[1] === 0 && b[2] === 0x3f && b[3] === 0) return 'utf-16le';  // "<?" no BOM
+  if (b[0] === 0 && b[1] === 0x3c && b[2] === 0 && b[3] === 0x3f) return 'utf-16be';
+  let head = '';  // first 1024 bytes as Latin-1 (ASCII-compatible charsets only from here on)
+  for (let i = 0, n = Math.min(b.length, 1024); i < n; i++) head += String.fromCharCode(b[i]);
+  const m = /^\s*<\?xml\b[^>]*?\bencoding\s*=\s*["']([^"']+)["']/.exec(head) ||
+            /^@charset\s+"([^"]+)"\s*;/.exec(head) ||
+            /<meta\b[^>]*?\bcharset\s*=\s*["']?\s*([A-Za-z0-9._:-]+)/i.exec(head);
+  const label = m ? m[1].trim().toLowerCase() : 'utf-8';
+  return /^(?:utf-?16|ucs-?2|unicode)/.test(label) ? 'utf-8' : label;  // readable as ASCII: not UTF-16
+}
+
+function decodeText(bytes) {
+  let td;
+  try { td = new TextDecoder(sniffCharset(bytes)); } catch(e) { td = new TextDecoder('utf-8'); }
+  const text = td.decode(bytes);
+  if (td.encoding !== 'utf-8' || !text.includes('�')) return text;
+  for (let i = 0; i < bytes.length; i++) {
+    const c = bytes[i];
+    if (c === 0x81 || c === 0x8d || c === 0x8f || c === 0x90 || c === 0x9d) return text;
+    if (c === 0xef && bytes[i + 1] === 0xbf && bytes[i + 2] === 0xbd) return text;  // real U+FFFD
+  }
+  return new TextDecoder('windows-1252').decode(bytes);
+}
+
+/** Decoded text of a JSZip entry (see decodeText). */
+async function readText(file) { return decodeText(await file.async('uint8array')); }
+
+// ZIP entry names without the UTF-8 flag (bit 11) are CP437 per the ZIP spec
+// (APPNOTE 4.4.4); JSZip only calls this for those. Many tools write UTF-8
+// without setting the flag, so valid UTF-8 wins; otherwise CP437, as Python's
+// zipfile (and so Calibre) reads them. JSZip's default would give U+FFFD and the
+// manifest href ("content_é.xhtml") would not be found.
+const CP437_HIGH = 'ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐' +
+  '└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ ';
+function decodeZipName(bytes) {
+  try { return new TextDecoder('utf-8', {fatal: true}).decode(new Uint8Array(bytes)); }
+  catch(e) { return Array.from(bytes, c => c < 0x80 ? String.fromCharCode(c) : CP437_HIGH[c - 0x80]).join(''); }
 }
 
 // ─── EPUB Parser ─────────────────────────────────────────────────────────────
 
+const RASTER_MT = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp']);
+
+/** How a spine item is converted: 'xhtml' (a chapter; also an .xhtml/.html file
+ *  with a wrong non-image media-type), 'image' (raster: an image page), 'svg' (an
+ *  SVG page) or 'other' (skipped: binary, json, dtbook, …). */
+function spineKind(item) {
+  const mt = item.mt.toLowerCase().split(';')[0].trim();
+  if (mt === 'application/xhtml+xml' || mt === 'text/html') return 'xhtml';
+  if (mt === 'image/svg+xml') return 'svg';
+  if (RASTER_MT.has(mt)) return 'image';
+  if (!mt.startsWith('image/') && /\.x?html?$/i.test(item.href.split(/[?#]/)[0])) return 'xhtml';
+  return 'other';
+}
+
 async function parseEpub(buf) {
-  const zip = await JSZip.loadAsync(buf);
+  const zip = await JSZip.loadAsync(buf, {decodeFileName: decodeZipName});
 
-  // Find OPF
-  const containerXml = await zip.file('META-INF/container.xml').async('string');
-  const cDoc = new DOMParser().parseFromString(containerXml, 'text/xml');
-  const opfPath = cDoc.querySelector('rootfile')?.getAttribute('full-path');
-  if (!opfPath) throw new Error('Cannot find rootfile in container.xml');
+  // Zip entries by normalised name (normPath, Unicode NFC): hrefs are matched
+  // %-decoded, with ./ and ../ folded and regardless of NFC/NFD composition
+  // (macOS zips names decomposed, OPFs are usually composed).
+  const zipByName = new Map();
+  for (const [name, entry] of Object.entries(zip.files)) {
+    const key = normPath(name).normalize('NFC');
+    if (!entry.dir && !zipByName.has(key)) zipByName.set(key, entry);
+  }
+  const zipFile = p => zip.file(p) || zipByName.get(normPath(p).normalize('NFC')) || null;
 
-  const opfXml = await zip.file(opfPath).async('string');
+  // Find OPF: container.xml's rootfile; when that is missing, empty or names a file
+  // that is not there, the zip's only *.opf (Calibre does the same). Errors are
+  // specific messages, never a TypeError on null.
+  const containerFile = zip.file('META-INF/container.xml');
+  let opfPath = null;
+  if (containerFile) {
+    const cDoc = new DOMParser().parseFromString(await readText(containerFile), 'text/xml');
+    opfPath = cDoc.querySelector('rootfile')?.getAttribute('full-path')?.trim() || null;
+  }
+  let opfFile = opfPath && zipFile(opfPath);
+  if (!opfFile) {
+    const opfs = [...zipByName.keys()].filter(n => /\.opf$/i.test(n));
+    if (opfs.length === 1) { opfPath = opfs[0]; opfFile = zipByName.get(opfPath); }
+    else if (!containerFile) throw new Error('Not an EPUB: META-INF/container.xml is missing');
+    else if (!opfPath) throw new Error('Cannot find rootfile in container.xml');
+    else throw new Error(`Package document (OPF) not found: ${opfPath}`);
+  }
+  const opfXml = await readText(opfFile);
   const opf = new DOMParser().parseFromString(opfXml, 'application/xhtml+xml');
-  const opfDir = opfPath.includes('/') ? opfPath.split('/').slice(0,-1).join('/')+'/' : '';
-  const resolve = h => opfDir + h.split('#')[0];
+  opfPath = normPath(opfPath);
+  const opfDir = dirOf(opfPath);
+  // Manifest href → normalised zip path (a leading '/' is relative to the zip root)
+  const resolve = h => joinPath(opfDir, h.split('#')[0]);
 
   // Metadata
   const dc = 'http://purl.org/dc/elements/1.1/';
@@ -836,13 +1000,15 @@ async function parseEpub(buf) {
     coverImage: null,  // filled below: {bytes: Uint8Array, mt: string}
   };
 
-  // Manifest
+  // Manifest (ids, idrefs and fallbacks are XML IDs: surrounding whitespace is not
+  // part of them)
   const manifest = {};
   for (const item of opf.querySelectorAll('manifest item'))
-    manifest[item.getAttribute('id')] = {
-      href: item.getAttribute('href'),
-      mt: item.getAttribute('media-type')||'',
+    manifest[(item.getAttribute('id') || '').trim()] = {
+      href: (item.getAttribute('href') || '').trim(),
+      mt: (item.getAttribute('media-type')||'').trim(),
       properties: item.getAttribute('properties')||'',
+      fallback: (item.getAttribute('fallback') || '').trim(),
     };
 
   // Cover image — EPUB2: <meta name="cover" content="item-id">
@@ -850,7 +1016,7 @@ async function parseEpub(buf) {
   {
     let coverId = null;
     for (const meta of opf.querySelectorAll('meta')) {
-      if (meta.getAttribute('name') === 'cover') { coverId = meta.getAttribute('content'); break; }
+      if (meta.getAttribute('name') === 'cover') { coverId = meta.getAttribute('content')?.trim(); break; }
     }
     // EPUB3 fallback
     if (!coverId) {
@@ -860,7 +1026,7 @@ async function parseEpub(buf) {
     }
     if (coverId && manifest[coverId]) {
       const coverPath = resolve(manifest[coverId].href);
-      const coverFile = zip.file(coverPath) || zip.file(decodeURIComponent(coverPath));
+      const coverFile = zipFile(coverPath);
       if (coverFile) {
         try {
           const bytes = await coverFile.async('uint8array');
@@ -870,10 +1036,22 @@ async function parseEpub(buf) {
     }
   }
 
-  // Spine
-  const spineHrefs = [...opf.querySelectorAll('spine itemref')]
-    .map(ir => manifest[ir.getAttribute('idref')]?.href)
-    .filter(Boolean);
+  // Spine. A spine item that is not XHTML is replaced by the first XHTML item of
+  // its manifest fallback chain; without one it stays as is and becomes an image
+  // page, an SVG page or is skipped (see the chapter loop).
+  const spineItems = [];
+  for (const ir of opf.querySelectorAll('spine itemref')) {
+    const first = manifest[(ir.getAttribute('idref') || '').trim()];
+    let item = first;
+    for (const seen = new Set(); item && spineKind(item) !== 'xhtml'; ) {
+      seen.add(item);
+      item = manifest[item.fallback];
+      if (seen.has(item)) item = null;  // circular chain
+    }
+    // tocHref: the NCX/nav entry names the spine item itself, not its fallback
+    if (item || first) spineItems.push({...(item || first), tocHref: first.href});
+  }
+  const spineHrefs = spineItems.map(it => it.href).filter(Boolean);
 
   // CSS. KF8: every stylesheet is read in full and written as its own flow
   // (makeCssFlows, below). MOBI v6 has no flows and no real CSS support, so for it
@@ -883,10 +1061,10 @@ async function parseEpub(buf) {
   const cssFiles = new Map();  // normalised zip path → stylesheet text (KF8 flows)
   for (const item of Object.values(manifest)) {
     if (item.mt === 'text/css') {
-      const f = zip.file(resolve(item.href)) || zip.file(decodeURIComponent(resolve(item.href)));
+      const f = zipFile(resolve(item.href));
       if (f) try {
-        const sheet = await f.async('string');
-        cssFiles.set(normPath(opfDir + item.href), sheet);
+        const sheet = await readText(f);
+        cssFiles.set(resolve(item.href), sheet);
         // Extract rules that contain display:none or visibility:hidden
         // These prevent publisher watermarks from showing as gibberish
         const criticalRules = [];
@@ -902,6 +1080,13 @@ async function parseEpub(buf) {
       } catch(e){}
     }
   }
+  // A chapter may <link> a sheet the manifest omits or lists with another
+  // media-type (e.g. text/html); readers load it anyway, so every other *.css in
+  // the zip is read too (KF8 flows only; makeCssFlows writes only linked sheets).
+  for (const [name, entry] of zipByName) {
+    if (!/\.css$/i.test(name) || cssFiles.has(name)) continue;
+    try { cssFiles.set(name, await readText(entry)); } catch(e) {}
+  }
 
   // Images — extract as raw bytes for binary PDB resource records.
   // KF8 stores images as binary PDB records referenced via kindle:embed:XXXX URIs
@@ -914,7 +1099,7 @@ async function parseEpub(buf) {
   // Detect cover image ID first (EPUB2 meta or EPUB3 properties)
   let coverId = null;
   for (const meta of opf.querySelectorAll('meta')) {
-    if (meta.getAttribute('name') === 'cover') { coverId = meta.getAttribute('content'); break; }
+    if (meta.getAttribute('name') === 'cover') { coverId = meta.getAttribute('content')?.trim(); break; }
   }
   if (!coverId) {
     for (const [id, item] of Object.entries(manifest)) {
@@ -924,12 +1109,11 @@ async function parseEpub(buf) {
 
   for (const item of Object.values(manifest)) {
     if (!item.mt.startsWith('image/')) continue;
-    const fullPath = resolve(item.href);
-    const f = zip.file(fullPath) || zip.file(decodeURIComponent(fullPath));
+    const f = zipFile(resolve(item.href));
     if (!f) continue;
     try {
       const bytes = await f.async('uint8array');
-      const res = { bytes, mt: item.mt, href: item.href };
+      const res = { bytes, mt: item.mt, href: item.href, path: resolve(item.href) };
       // Cover goes first (EXTH CoverOffset = 0). The resource order is decided
       // HERE, once: convertToAzw3 writes records in exactly this order, so the
       // kindle:embed:XXXX / recindex numbers assigned below stay correct.
@@ -938,83 +1122,209 @@ async function parseEpub(buf) {
       } else imageResources.push(res);
     } catch(e) { console.warn('Could not load image:', item.href, e); }
   }
-  const imageByPath = new Map();  // normalised zip path → {idx, mt} (CSS url() lookup)
+  // normalised zip path → {idx, mt}: CSS url() and (first choice) <img src> lookup
+  const imageByPath = new Map();
   imageResources.forEach((r, idx) => {
     imageIndex[r.href] = idx;
     imageIndex[r.href.split('/').pop()] = idx;
-    imageByPath.set(normPath(opfDir + r.href), {idx, mt: r.mt});
+    imageByPath.set(resolve(r.href), {idx, mt: r.mt});
   });
+  // A foreign resource (e.g. image/vnd.xyz, or poster.abc) is shown through its
+  // manifest fallback chain: references to it resolve to the first JPEG/PNG/GIF/
+  // BMP/SVG item of the chain.
+  const shownAs = it => RASTER_MT.has(it.mt) || it.mt === 'image/svg+xml';
+  for (const item of Object.values(manifest)) {
+    if (!item.fallback || shownAs(item) || spineKind(item) === 'xhtml') continue;
+    let fb = manifest[item.fallback];
+    for (const seen = new Set([item]); fb && !shownAs(fb); fb = manifest[fb.fallback]) {
+      if (seen.has(fb)) { fb = null; break; }
+      seen.add(fb);
+    }
+    const hit = fb && imageByPath.get(resolve(fb.href));
+    if (!hit) continue;
+    imageByPath.set(resolve(item.href), hit);
+    imageIndex[item.href] = imageIndex[item.href.split('/').pop()] = hit.idx;
+  }
   // Keep coverImage on metadata for backwards compat (now points into imageResources)
   metadata.coverImage = null;  // no longer needed separately
   metadata.coverResourceIdx = coverResourceIdx;
 
-  // Chapters
-  // Read NCX (toc.ncx) or EPUB3 nav document to get proper chapter titles.
-  // Maps spine href (filename without fragment) → human-readable title.
-  const ncxTitles = {};
-  for (const item of Object.values(manifest)) {
-    const isNcx  = item.mt === 'application/x-dtbncx+xml';
-    const isNav  = item.mt === 'application/xhtml+xml' && item.properties === 'nav';
-    if (!isNcx && !isNav) continue;
-    const f = zip.file(resolve(item.href)) || zip.file(decodeURIComponent(resolve(item.href)));
-    if (!f) continue;
-    try {
-      const src = await f.async('string');
-      const doc = new DOMParser().parseFromString(src, 'application/xhtml+xml');
-      if (isNcx) {
-        // EPUB2 NCX: <navPoint><navLabel><text>Title</text></navLabel><content src="..."/></navPoint>
-        const ns = 'http://www.daisy.org/z3986/2005/ncx/';
-        for (const np of doc.getElementsByTagNameNS(ns, 'navPoint')) {
-          const text = np.getElementsByTagNameNS(ns, 'text')[0]?.textContent?.trim();
-          const src  = np.getElementsByTagNameNS(ns, 'content')[0]?.getAttribute('src');
-          if (text && src) {
-            const hrefBase = src.split('#')[0].split('/').pop();
-            if (!ncxTitles[hrefBase]) ncxTitles[hrefBase] = text;
-          }
-        }
-      } else {
-        // EPUB3 nav: <nav epub:type="toc"><ol><li><a href="...">Title</a></li></ol></nav>
-        for (const a of doc.querySelectorAll('nav a[href]')) {
-          const text = a.textContent.trim();
-          const href = a.getAttribute('href').split('#')[0].split('/').pop();
-          if (text && href && !ncxTitles[href]) ncxTitles[href] = text;
-        }
-      }
-    } catch(e) {}
+  // Table of contents: the full tree (order, nesting, labels, href#fragment targets)
+  // from the EPUB3 nav, or the NCX when it has more entries (some navs are truncated).
+  // Resolved to chapters after the spine is read (resolveToc, below).
+  const tocNodes = {nav: [], ncx: []};
+  {
+    const ncxId = (opf.querySelector('spine')?.getAttribute('toc') || '').trim();
+    const tocItems = [
+      ['ncx', manifest[ncxId]?.mt === 'application/x-dtbncx+xml' ? manifest[ncxId] :
+        Object.values(manifest).find(it => it.mt === 'application/x-dtbncx+xml')],
+      ['nav', Object.values(manifest).find(it => it.properties.split(/\s+/).includes('nav'))],
+    ];
+    for (const [kind, item] of tocItems) {
+      if (!item) continue;
+      const tocPath = resolve(item.href);
+      const f = zipFile(tocPath);
+      if (!f) continue;
+      try {
+        const src = await readText(f);
+        let doc = new DOMParser().parseFromString(src, kind === 'ncx' ? 'application/xml' : 'application/xhtml+xml');
+        if (doc.querySelector('parsererror')) doc = new DOMParser().parseFromString(src, 'text/html');
+        tocNodes[kind] = kind === 'ncx' ? parseNcxToc(doc, tocPath) : parseNavToc(doc, tocPath);
+      } catch(e) { console.warn('Could not read TOC:', item.href, e); }
+    }
   }
+  const countToc = nodes => nodes.reduce((n, t) => n + 1 + countToc(t.children), 0);
+  const [tocTree, tocAlt] = countToc(tocNodes.ncx) > countToc(tocNodes.nav)
+    ? [tocNodes.ncx, tocNodes.nav] : [tocNodes.nav, tocNodes.ncx];
 
   // KF8 context shared by all chapters: stylesheet flows, and internal links
   // (placeholder → {path, frag, href}; resolved to kindle:pos in convertToAzw3).
   const cssFlows = makeCssFlows(cssFiles, imageByPath);
   const links = new Map();
-  const spinePaths = new Set(spineHrefs.map(h => normPath(resolve(h))));
+  const spinePaths = new Set(spineHrefs.map(h => resolve(h)));
 
   const chapters = [];
-  for (const href of spineHrefs) {
+  for (const item of spineItems) {
+    const href = item.href;
     const path = resolve(href);
     const chapterDir = href.includes('/') ? href.split('/').slice(0,-1).join('/') + '/' : '';
-    const chapterPath = normPath(path);
-    const hrefBase = href.split('/').pop().split('#')[0];
-    const ncxTitle = ncxTitles[hrefBase] || null;
-    const f = zip.file(path) || zip.file(decodeURIComponent(path));
+    const kind = spineKind(item);
+    // Never decode a binary or foreign spine item as a chapter
+    if (kind === 'other') {
+      console.warn('Skip chapter:', path, `(unsupported spine media-type ${item.mt || '?'})`);
+      continue;
+    }
+    const f = zipFile(path);
     if (!f) continue;
     try {
-      const xhtml = await f.async('string');
+      // An image or SVG spine item (no XHTML fallback) becomes a page holding just
+      // that picture: an <img> to the resource, resolved like any other <img>
+      // (raster: kindle:embed; SVG: a KF8 flow, see makeCssFlows.svg). MOBI v6
+      // cannot show SVG, so an SVG page is left empty there (svgPage).
+      const xhtml = kind === 'xhtml' ? await readText(f) :
+        '<html xmlns="http://www.w3.org/1999/xhtml"><head><title></title></head><body>' +
+        `<div><img src="${escAttr(encodeURIComponent(path.split('/').pop()))}" alt=""/></div></body></html>`;
       const doc = new DOMParser().parseFromString(xhtml, 'application/xhtml+xml');
       const parsed = doc.querySelector('parsererror')
         ? new DOMParser().parseFromString(xhtml, 'text/html')
         : doc;
       const ch = extractContent(parsed, imageIndex, chapterDir,
-        {path: chapterPath, cssFlows, links, spinePaths});
-      // Prefer NCX title over auto-detected heading (more authoritative)
-      if (ncxTitle) ch.title = ncxTitle;
+        {path, cssFlows, links, spinePaths, imageResources, imageByPath});
+      if (kind === 'svg') ch.svgPage = true;
+      // TOC entries name the spine item itself; when it was replaced by its
+      // fallback (or became an image/SVG page) they still map here (resolveToc)
+      ch.tocPath = resolve(item.tocHref);
       chapters.push(ch);
     } catch(e) { console.warn('Skip chapter:', path, e); }
+  }
+  // Nothing to convert (no <spine>, idrefs not in the manifest, files missing from
+  // the zip): refuse instead of writing a book without text.
+  if (!chapters.length) {
+    const n = opf.querySelectorAll('spine itemref').length;
+    throw new Error(`No readable chapters found in the EPUB spine (${n} spine item${n === 1 ? '' : 's'}, none could be opened)`);
   }
   // Link targets → chapter index (-1: spine item was skipped; the link keeps its href)
   const chapterOf = new Map(chapters.map((ch, i) => [ch.path, i]));
   for (const l of links.values()) l.chapter = chapterOf.get(l.path) ?? -1;
-  return {metadata, chapters, css, stylesheets: cssFlows.flows, links, imageResources};
+  // TOC targets → chapter: by the chapter's path or by the ORIGINAL spine item's path
+  // (tocPath: an item replaced by its fallback), matched NFC-normalised.
+  const tocChapterOf = new Map();
+  chapters.forEach((ch, i) => {
+    for (const p of [ch.path, ch.tocPath]) {
+      const k = p?.normalize('NFC');
+      if (k != null && !tocChapterOf.has(k)) tocChapterOf.set(k, i);
+    }
+  });
+  const toc = resolveToc(tocTree, chapters, tocChapterOf) || resolveToc(tocAlt, chapters, tocChapterOf);
+  return {metadata, chapters, css, stylesheets: cssFlows.flows, links, imageResources, toc};
+}
+
+// ─── Table of contents ───────────────────────────────────────────────────────
+//
+// parseEpub reads the TOC tree ({label, path, frag, children}); resolveToc flattens it
+// to the entries the NCX index is built from (convertToAzw3 → tocEntries/buildNcxIndex).
+
+// Whitespace collapsed, except U+FEFF (JS \s includes it; books use it as a word joiner).
+// A label that is only an image (nav <a><img alt="…"/></a>) uses its alt text.
+const tocLabel = el => {
+  const norm = s => (s || '').replace(/[^\S﻿]+/g, ' ').replace(/^ | $/g, '');
+  const img = el && [...el.getElementsByTagName('*')].find(e => e.localName.toLowerCase() === 'img');
+  return norm(el?.textContent) || norm(img?.getAttribute('alt'));
+};
+const tocKids = (el, name) => [...el.children].filter(c => c.localName.toLowerCase() === name);
+
+/** Target of a TOC href, relative to the TOC document: {path, frag} (path normalised). */
+function tocTarget(href, tocPath) {
+  href = (href || '').trim();
+  if (!href || /^[a-z][a-z0-9+.-]*:/i.test(href)) return {path: null, frag: ''};
+  const hash = href.indexOf('#');
+  const file = (hash < 0 ? href : href.slice(0, hash)).split('?')[0];
+  return {path: file ? joinPath(dirOf(tocPath), file) : tocPath,
+          frag: hash < 0 ? '' : safeDecode(href.slice(hash + 1))};
+}
+
+/** EPUB3 nav: <nav epub:type="toc"> (else the first <nav>) → its first <ol>, nested <li>s.
+ *  The label is the <li>'s <a> or <span> (a <span> heading has no target). */
+function parseNavToc(doc, tocPath) {
+  const navs = [...doc.getElementsByTagName('*')].filter(e => e.localName.toLowerCase() === 'nav');
+  const nav = navs.find(n => (n.getAttribute('epub:type') ||
+      n.getAttributeNS('http://www.idpf.org/2007/ops', 'type') || '').split(/\s+/).includes('toc')) || navs[0];
+  const ol = nav && [...nav.getElementsByTagName('*')].find(e => e.localName.toLowerCase() === 'ol');
+  const walk = list => tocKids(list, 'li').map(li => {
+    const lab = [...li.children].find(c => /^(a|span)$/i.test(c.localName));
+    return {label: tocLabel(lab), ...tocTarget(lab?.getAttribute('href'), tocPath),
+            children: tocKids(li, 'ol').flatMap(walk)};
+  });
+  return ol ? walk(ol) : [];
+}
+
+/** EPUB2 NCX: navMap → nested navPoint (navLabel/text, content@src). */
+function parseNcxToc(doc, tocPath) {
+  const navMap = [...doc.getElementsByTagName('*')].find(e => e.localName.toLowerCase() === 'navmap');
+  const walk = el => tocKids(el, 'navpoint').map(np => ({
+    label: tocLabel(tocKids(np, 'navlabel')[0] && tocKids(tocKids(np, 'navlabel')[0], 'text')[0]),
+    ...tocTarget(tocKids(np, 'content')[0]?.getAttribute('src'), tocPath),
+    children: walk(np),
+  }));
+  return navMap ? walk(navMap) : [];
+}
+
+/**
+ * Flatten the TOC tree in document (pre-)order: [{label, chapter, aid, depth, parent,
+ * children}] (parent/children are indices in this list; depth 0 = top level). The
+ * fragment becomes the aid extractContent gave the target element (null: chapter start).
+ * An entry whose target is not a converted spine document (no href, a <span> heading,
+ * a non-spine file, a skipped chapter) keeps its label and place in the tree but points
+ * where the nearest FOLLOWING resolved entry points (its first child, typically), or
+ * the nearest preceding one at the end of the list. Returns null when no entry
+ * resolves (then convertToAzw3 falls back to one entry per chapter).
+ */
+function resolveToc(tree, chapters, chapterOf) {
+  const out = [];
+  const walk = (nodes, depth, parent) => {
+    for (const n of nodes) {
+      const i = out.length;
+      const key = n.path != null ? n.path.normalize('NFC') : null;
+      const chapter = key != null && chapterOf.has(key) ? chapterOf.get(key) : -1;
+      const aid = chapter >= 0 && n.frag ? chapters[chapter].ids?.get(n.frag) || null : null;
+      out.push({label: n.label, chapter, aid, depth, parent, children: []});
+      if (parent >= 0) out[parent].children.push(i);
+      walk(n.children, depth + 1, i);
+    }
+  };
+  walk(tree, 0, -1);
+  if (!out.some(e => e.chapter >= 0)) return null;
+  let next = null;
+  for (let i = out.length - 1; i >= 0; i--) {
+    if (out[i].chapter >= 0) next = out[i];
+    else if (next) Object.assign(out[i], {chapter: next.chapter, aid: next.aid});
+  }
+  let prev = null;
+  for (const e of out) {
+    if (e.chapter >= 0) prev = e;
+    else Object.assign(e, {chapter: prev.chapter, aid: prev.aid});
+  }
+  return out;
 }
 
 let _aid = 1;
@@ -1038,7 +1348,8 @@ function skelAttrs(el, names = SKEL_ATTRS) {
  * @param {string} chapterDir - chapter's directory prefix for resolving relative img src
  * @param {Object} ctx - {path: normalised zip path of this chapter, cssFlows: makeCssFlows()
  *                        result, links: Map placeholder → link target (filled here),
- *                        spinePaths: Set of normalised spine document paths}
+ *                        spinePaths: Set of normalised spine document paths,
+ *                        imageResources: parseEpub's [{bytes, mt, href}] (mime of svg refs)}
  * @returns {{skelHead, skelTail, content, firstAid, title, path, ids: Map<id, aid>}}
  */
 function extractContent(doc, imageIndex, chapterDir, ctx) {
@@ -1071,7 +1382,7 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
     if (el.localName.toLowerCase() === 'link') {
       const rel = (el.getAttribute('rel') || '').toLowerCase().split(/\s+/);
       if (!rel.includes('stylesheet') || rel.includes('alternate')) continue;
-      n = ctx.cssFlows.sheet(normPath(dir + (el.getAttribute('href') || '').split(/[?#]/)[0]));
+      n = ctx.cssFlows.sheet(joinPath(dir, (el.getAttribute('href') || '').trim().split(/[?#]/)[0]));
     } else {
       // CDATA / HTML-comment wrappers are no-ops in CSS, but readers turn a flow
       // containing "[CDATA[" into an inline <style> instead of a .css file
@@ -1102,22 +1413,73 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
     // Replace image src with kindle:embed:XXXX references (1-indexed base-32).
     // Images are stored as binary PDB records; Kindle resolves kindle:embed: URLs
     // to the resource record at first_resource_record + (N - 1).
-    for (const img of body.querySelectorAll('img[src]')) {
+    // Image URL → resource index: first the normalised path (joinPath: ./, ../ and
+    // path-absolute URLs), then the legacy raw-href / file-name keys of imageIndex.
+    const imageIdx = url => {
+      const src = url.trim().split(/[?#]/)[0];
+      if (!src || /^[a-z][a-z0-9+.-]*:/i.test(src)) return undefined;  // data:, http:, kindle:
+      const hit = ctx.imageByPath?.get(joinPath(dir, src));
+      if (hit) return hit.idx;
+      for (const key of [chapterDir + src, src, src.split('/').pop()])
+        if (imageIndex[key] !== undefined) return imageIndex[key];
+    };
+    // Reference to write for an image URL, or null: a raster resource is
+    // kindle:embed:XXXX (?mime=… with mime), an SVG file a KF8 flow (makeCssFlows.svg).
+    const imageRef = (url, mime = false) => {
+      const idx = imageIdx(url);
+      if (idx === undefined) return null;
+      const r = ctx.imageResources[idx];
+      if (r.mt === 'image/svg+xml') {
+        const n = ctx.cssFlows.svg(r.path ?? '', decodeText(r.bytes));
+        return n ? kindleFlowSvg(n) : null;
+      }
+      return `kindle:embed:${kindleEmbed(idx + 1)}` + (mime ? `?mime=${r.mt}` : '');
+    };
+    // <picture>: the <img> inside is what Kindle shows; its <source>s go.
+    for (const pic of body.querySelectorAll('picture'))
+      if (pic.querySelector('img')) for (const s of [...pic.querySelectorAll('source')]) s.remove();
+    for (const img of body.querySelectorAll('img')) {
       const src = img.getAttribute('src');
-      if (src && !src.startsWith('kindle:embed:')) {
+      if (src && !src.startsWith('kindle:')) {
         // Strip data URIs from previous parse attempts too
         const origSrc = src.startsWith('data:') ? img.dataset?.origSrc || '' : src;
-        const candidates = [chapterDir + origSrc, origSrc, origSrc.split('/').pop()];
-        for (const key of candidates) {
-          if (imageIndex[key] !== undefined) {
-            img.setAttribute('src', 'kindle:embed:' + kindleEmbed(imageIndex[key] + 1));
-            break;
+        const ref = imageRef(origSrc);
+        if (ref) img.setAttribute('src', ref);
+        // If not found in index (e.g. inline data URI not from manifest), remove src
+        else if (src.startsWith('data:')) img.removeAttribute('src');
+      }
+      // srcset (Standard Ebooks: "../images/logo-2x.png 2x, ../images/logo.png 1x")
+      // is dropped, not rewritten: KF8 has no srcset rewriting (Calibre leaves the
+      // EPUB paths, which then point nowhere), and a list of kindle:embed URLs in one
+      // attribute is not resolved by readers (KindleUnpack's resolver takes the whole
+      // quoted value as one reference). src is the fallback every reader uses; when
+      // src is missing or unresolvable, the first resolvable candidate becomes src.
+      if (img.hasAttribute('srcset')) {
+        if (!img.getAttribute('src')?.startsWith('kindle:')) {
+          for (const cand of img.getAttribute('srcset').split(',')) {
+            const ref = imageRef(cand.trim().split(/\s+/)[0] || '');
+            if (ref) { img.setAttribute('src', ref); break; }
           }
         }
-        // If not found in index (e.g. inline data URI not from manifest), remove src
-        if (img.getAttribute('src') === src && src.startsWith('data:')) {
-          img.removeAttribute('src');
-        }
+        img.removeAttribute('srcset');
+        img.removeAttribute('sizes');
+      }
+    }
+    // <video poster>: like <img src>; an unresolvable poster is dropped
+    for (const v of body.querySelectorAll('video[poster]')) {
+      const ref = imageRef(v.getAttribute('poster'));
+      if (ref) v.setAttribute('poster', ref); else v.removeAttribute('poster');
+    }
+    // SVG <image xlink:href> (or SVG 2 plain href), e.g. the svg-wrapped covers of
+    // Gutenberg/Calibre books: same lookup, written as Calibre does,
+    // kindle:embed:XXXX?mime=… (writer8/main.py replace_resource_links). The
+    // attribute node is updated in place, so its namespace/prefix is kept.
+    // MOBI v6 turns a bare <svg><image/></svg> into an <img> (convertToAzw3).
+    for (const im of body.querySelectorAll('svg image')) {
+      for (const attr of [...im.attributes]) {
+        if (attr.localName !== 'href' || attr.value.startsWith('kindle:')) continue;
+        const ref = imageRef(attr.value, true);
+        if (ref) attr.value = ref;
       }
     }
 
@@ -1152,7 +1514,7 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
       const file = (hash < 0 ? href : href.slice(0, hash)).split('?')[0];
       const frag = hash < 0 ? '' : safeDecode(href.slice(hash + 1));
       if (!file && !frag) continue;
-      const target = file ? normPath(dir + file) : ctx.path;
+      const target = file ? joinPath(dir, file) : ctx.path;
       if (!ctx.spinePaths.has(target)) continue;
       const ph = LINK_PLACEHOLDER + String(ctx.links.size).padStart(10, '0');
       ctx.links.set(ph, {path: target, frag, href: raw});
@@ -1195,6 +1557,52 @@ function aidOffsets(html, wanted) {
   return res;
 }
 
+/** MOBI 6 drops the aids (toMobi6) but its NCX needs the TOC targets' offsets in the
+ *  final text: mark the start tags carrying the wanted aids with "\0aid\0" (NUL never
+ *  survives parsing into markup), rewrite, then takeAidMarks removes the marks and
+ *  returns where they were: {html, offsets: Map<aid, UTF-8 byte offset>}. */
+function markAids(html, wanted) {
+  if (!wanted?.size) return html;
+  return html.replace(/<[a-zA-Z](?:[^>"]|"[^"]*")*>/g, tag => {
+    const a = /\said="([^"]*)"/.exec(tag);
+    return a && wanted.has(a[1]) ? `\0${a[1]}\0${tag}` : tag;
+  });
+}
+function takeAidMarks(html) {
+  const offsets = new Map();
+  if (!html.includes('\0')) return {html, offsets};
+  const re = /\0([^\0<]*)\0/g;
+  let out = '', last = 0, bytes = 0, m;
+  while ((m = re.exec(html))) {
+    const piece = html.slice(last, m.index);
+    out += piece; bytes += utf8Len(piece);
+    if (!offsets.has(m[1])) offsets.set(m[1], bytes);
+    last = m.index + m[0].length;
+  }
+  return {html: out + html.slice(last), offsets};
+}
+
+/** Labels of the TOC entries; drops internal file ids used as titles
+ *  (e.g. "x9789023479314.html1": no spaces, many digits, ends with .html/.xhtml). */
+const looksLikeFileId = s => /^[^\s]*\d{5,}[^\s]*\.x?html\d*$/i.test(s.trim());
+
+/**
+ * TOC entries for the NCX index: parseEpub's resolved TOC (resolveToc) or, for a book
+ * without a usable TOC, one entry per chapter labelled with its first heading, its
+ * <title> or "Chapter N". A missing or file-id label becomes the chapter's label.
+ */
+function tocEntries(epub) {
+  const chapterLabel = i => {
+    const t = epub.chapters[i]?.title || '';
+    return t && !looksLikeFileId(t) ? t : `Chapter ${i + 1}`;
+  };
+  if (!epub.toc?.length)
+    return epub.chapters.map((_, i) =>
+      ({label: chapterLabel(i), chapter: i, aid: null, depth: 0, parent: -1, children: []}));
+  return epub.toc.map(e => ({...e,
+    label: e.label && !looksLikeFileId(e.label) ? e.label : chapterLabel(e.chapter)}));
+}
+
 /**
  * KF8 internal links. Reference: Calibre writer8/skeleton.py Chunker.set_internal_links.
  * Each placeholder becomes kindle:pos:fid:FFFF:off:OOOOOOOOOO (base 32), where FFFF is
@@ -1226,6 +1634,12 @@ function resolveInternalLinks(chapters, links) {
 
 // ─── EPUB → AZW3 converter ───────────────────────────────────────────────────
 
+// <svg …> + one <image …/> + </svg>, whitespace only in between (serialised
+// markup: attribute values are double-quoted); group 1 = the image's attributes
+const START_TAG_BODY = String.raw`(?:[^>"]|"[^"]*")*`;
+const SVG_IMAGE_ONLY_RE = new RegExp(
+  String.raw`<svg\b${START_TAG_BODY}>\s*<image\b(${START_TAG_BODY})>\s*(?:<\/image>\s*)?<\/svg>`, 'g');
+
 function convertToAzw3(epub, format='azw3') {
   // format: 'azw3' = KF8 (file_version=8), 'mobi' = MOBI v6 (file_version=6)
   // MOBI v6 is needed for old Kindles (Kindle Keyboard etc) — no FDST/skeleton/chunk
@@ -1241,6 +1655,12 @@ function convertToAzw3(epub, format='azw3') {
   // visible text. Fix: one <html> wrapper for the whole book, CSS once in
   // <head>, all chapter content concatenated in <body>.
   let fullText, textLen, idxParts, htmlByteLen, fdstEntries;
+  // Table of contents; per chapter, the aids of the TOC targets in it, and (set below)
+  // their byte offsets in the chapter's final text and where the TOC's text ends
+  const toc = tocEntries(epub);
+  const tocAids = chapters.map(() => new Set());
+  for (const e of toc) if (e.aid) tocAids[e.chapter].add(e.aid);
+  let tocOffsets, tocTextEnd;
 
   if (mobi6) {
     const styleBlock = css ? `<style type="text/css">\n${css}</style>\n` : '';
@@ -1257,14 +1677,29 @@ function convertToAzw3(epub, format='azw3') {
     // index among the image records, 5 digits, resolved from first_image), and
     // the KF8-only aid attributes are dropped. Only start tags are rewritten
     // (innerHTML always double-quotes values, so a '>' inside "..." is skipped).
-    const toMobi6 = html => html.replace(/<[a-zA-Z](?:[^>"]|"[^"]*")*>/g, tag => tag
-      .replace(/\ssrc="kindle:embed:([0-9A-Va-v]+)"/,
-               (_, n) => ` recindex="${String(parseInt(n, 32)).padStart(5, '0')}"`)
+    // Old readers have no SVG: an <svg> whose only content is one <image> (the usual
+    // svg-wrapped cover) becomes <img recindex> with the image's width/height;
+    // any other SVG is left as is.
+    const recindex = n => String(parseInt(n, 32)).padStart(5, '0');
+    const svgImageToImg = html => html.replace(SVG_IMAGE_ONLY_RE, (m, attrs) => {
+      const ref = /\s(?:[\w-]+:)?href="kindle:embed:([0-9A-Va-v]+)[^"]*"/.exec(attrs);
+      if (!ref) return m;
+      const w = /\swidth="([^"]*)"/.exec(attrs), h = /\sheight="([^"]*)"/.exec(attrs);
+      return `<img recindex="${recindex(ref[1])}"` +
+        (w ? ` width="${w[1]}"` : '') + (h ? ` height="${h[1]}"` : '') + '/>';
+    });
+    const toMobi6 = html => svgImageToImg(html).replace(/<[a-zA-Z](?:[^>"]|"[^"]*")*>/g, tag => tag
+      .replace(/\ssrc="kindle:embed:([0-9A-Va-v]+)"/, (_, n) => ` recindex="${recindex(n)}"`)
       .replace(/\said="\d+"/, ''));
     const pagebreak = '<mbp:pagebreak/>';
     const pagebreakB = enc.encode(pagebreak).length;
-    // Internal links keep their original href (no kindle:pos in MOBI v6)
-    const bodies = chapters.map(ch => toMobi6(restoreLinks(ch.content, epub.links)));
+    // Internal links keep their original href (no kindle:pos in MOBI v6). An SVG
+    // spine page (parseEpub svgPage) is left empty: old readers have no SVG; the
+    // chapter itself stays so chapter indices (NCX) match the KF8 ones.
+    const marked = chapters.map((ch, i) => ch.svgPage ? {html: '', offsets: new Map()} :
+      takeAidMarks(toMobi6(markAids(restoreLinks(ch.content, epub.links), tocAids[i]))));
+    const bodies = marked.map(m => m.html);
+    tocOffsets = marked.map(m => m.offsets);
 
     // NCX offsets: position of each chapter's content within the flat stream,
     // computed from the FINAL (rewritten) strings, page breaks included
@@ -1282,6 +1717,7 @@ function convertToAzw3(epub, format='azw3') {
       bodyOffset += contB;
       return part;
     });
+    tocTextEnd = bodyOffset;  // end of the last chapter's content (Calibre: body_end_offset)
 
     fullText = docHead + bodies.join(pagebreak) + docTail;
     htmlByteLen = enc.encode(fullText).length;
@@ -1305,6 +1741,8 @@ function convertToAzw3(epub, format='azw3') {
       return part;
     });
     htmlByteLen = htmlByteOffset;
+    tocOffsets = contents.map((c, i) => tocAids[i].size ? aidOffsets(c, tocAids[i]) : new Map());
+    tocTextEnd = htmlByteLen;  // len(flows[0])
     // Flow 0 = all HTML (skeleton/chunk/NCX offsets index into it); then one flow
     // per stylesheet (kindle:flow:0001, 0002, …), contiguous after it.
     const sheets = epub.stylesheets || [];
@@ -1344,19 +1782,17 @@ function convertToAzw3(epub, format='azw3') {
     for (const r of chunkRecs) recs.push(r);
   }
 
-  // NCX index (Table of Contents)
-  // Priority: NCX/nav title (set by parseEpub) > heading > HTML title > "Chapter N"
-  // Reject internal file IDs (e.g. "x9789023479314.html1") — they look like
-  // hex strings with dots and no spaces.
-  // Detect internal file IDs used as titles (e.g. "x9789023479314.html1").
-  // Pattern: no spaces, contains many digits, ends with .html or .xhtml.
-  const looksLikeFileId = s => /^[^\s]*\d{5,}[^\s]*\.x?html\d*$/i.test(s.trim());
-  const chapterTitles = chapters.map((ch, i) => {
-    const t = ch.title || '';
-    if (t && !looksLikeFileId(t)) return t;
-    return `Chapter ${i + 1}`;
-  });
-  const ncxRecs = buildNcxIndex(idxParts, chapterTitles);
+  // NCX index (Table of Contents): each entry points at its target element (the
+  // chapter start without a fragment). KF8: offset in flow 0 as the reader rebuilds it
+  // (chunk insert position + offset in chunk) and pos_fid = [chunk = chapter, offset in
+  // chunk], as kindle:pos links; MOBI 6: offset in the flat document.
+  for (const e of toc) {
+    const p = idxParts[e.chapter];
+    const off = (e.aid && tocOffsets[e.chapter].get(e.aid)) || 0;
+    e.offset = mobi6 ? p.flowStart + off : p.flowStart + p.skelHeadByteLen - 1 + off;
+    e.posFid = [e.chapter, off];
+  }
+  const ncxRecs = buildNcxIndex(toc, tocTextEnd, mobi6);
   const ncxIdx = ncxRecs ? recs.length : 0xffffffff;
   if (ncxRecs) for (const r of ncxRecs) recs.push(r);
 
@@ -1439,6 +1875,10 @@ function showStatus(msg, type='info') {
 function setProgress(pct) { prog.style.display='block'; progInner.style.width=pct+'%'; }
 function hideProgress() { prog.style.display='none'; progInner.style.width='0%'; }
 
+// iPhone/iPad (iPadOS reports itself as a Mac with touch)
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
 function showICloudError() {
   hideProgress();
   // Multi-line status: show the error + two clear options
@@ -1505,9 +1945,13 @@ async function handleFile(file) {
         if (isZipError && attempt < MAX_RETRIES) {
           continue; // give iCloud more time
         }
-        if (isZipError) {
+        // Not a zip: a tiny file is an iCloud stub that never arrived; a
+        // normal-size one is simply not an EPUB (on iOS it can also be an
+        // undownloaded iCloud file of full size, so there the advice stays).
+        if (isZipError && (couldBeICloudStub || IS_IOS)) {
           showICloudError(); return;
         }
+        if (isZipError) throw new Error('Not a valid EPUB (zip) file');
         throw parseErr;
       }
     }

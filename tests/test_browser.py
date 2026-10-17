@@ -743,7 +743,8 @@ with sync_playwright() as pw:
     err_browser = pw.chromium.launch()
 
     # ── Case A: Normal-size corrupt file (> 500 bytes) ──
-    # Not an iCloud stub → no retries, shows iCloud error + retry button immediately.
+    # Not an iCloud stub → no retries; outside iOS it is reported as not an EPUB
+    # (iOS keeps the iCloud advice: an undownloaded file can have its full size there).
     err_page = err_browser.new_page()
     err_page.goto(base_url)
     err_page.set_input_files('#fileInput', {
@@ -757,12 +758,12 @@ with sync_playwright() as pw:
     )
     test('Corrupt file (>500B): no raw JSZip error in message',
          lambda: 'central directory' not in err_page.inner_text('#status').lower())
-    test('Corrupt file (>500B): mentions iCloud',
-         lambda: 'icloud' in err_page.inner_text('#status').lower())
-    test('Corrupt file (>500B): mentions Settings fix',
-         lambda: 'settings' in err_page.inner_text('#status').lower())
-    test('Corrupt file (>500B): Retry button is visible',
-         lambda: err_page.is_visible('#retryBtn'))
+    test('Corrupt file (>500B): says it is not a valid EPUB (zip) file',
+         lambda: 'not a valid epub (zip) file' in err_page.inner_text('#status').lower())
+    test('Corrupt file (>500B): no iCloud advice (not a stub, not iOS)',
+         lambda: 'icloud' not in err_page.inner_text('#status').lower())
+    test('Corrupt file (>500B): no Retry button',
+         lambda: not err_page.is_visible('#retryBtn'))
     test('Corrupt file (>500B): download button stays hidden',
          lambda: not err_page.is_visible('#dlBtn'))
 
@@ -789,7 +790,11 @@ with sync_playwright() as pw:
     # ── Case C: Retry button works ──
     # Show error, then pick a valid file, click Retry → converts successfully.
     # (Simulates user downloading the file from iCloud, then retrying.)
-    err_page3 = err_browser.new_page()
+    # iPhone user agent: on iOS a normal-size non-zip file still gets the iCloud
+    # advice (an undownloaded iCloud file can report its full size there).
+    err_page3 = err_browser.new_page(user_agent=(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 '
+        '(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'))
     err_page3.goto(base_url)
     # Trigger the iCloud error with a corrupt file
     err_page3.set_input_files('#fileInput', {
@@ -797,6 +802,8 @@ with sync_playwright() as pw:
         'buffer': b'Not a zip at all, more than 500 bytes padding ' * 20,
     })
     err_page3.wait_for_selector('#retryBtn', state='visible', timeout=8000)
+    test('iOS corrupt file (>500B): iCloud advice + Retry button',
+         lambda: 'icloud' in err_page3.inner_text('#status').lower())
     # Swap in a valid EPUB and click Retry
     valid_epub = make_epub('Retry Test', [('Ch1', '<p aid="1">Retry works!</p>')])
     err_page3.set_input_files('#fileInput', {

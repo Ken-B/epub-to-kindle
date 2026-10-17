@@ -1,0 +1,1995 @@
+# Converter quality report: core-real-generated-local (2026-10-17)
+
+1772 results across azw3, mobi. Gap categories and their kinds are defined in `tests/harness/schema.md`; a book can carry several categories.
+
+## Before vs after
+
+Baseline: `tests/corpus/baseline-results` (result files of the original writer). Books are paired by sha256 and format; categories are recomputed with the current taxonomy on both sides. A lower count is better in every category row.
+
+### AZW3: 886 paired books, 18 regressed
+
+| metric | before | after |
+|---|---|---|
+| books with an output file | 878/886 | 876/886 |
+| gate pass (all three parsers) | 0/878 (0.0%) | 876/876 (100.0%) |
+| mean style score, se+pg books | 0.009 (n=200) | 1.000 (n=200) |
+| internal links resolved (pooled) | 0/35046 (0.0%) | 35046/35046 (100.0%) |
+| image refs correct (pooled) | 2369/3344 (70.8%) | 3753/3764 (99.7%) |
+| images present by hash (pooled) | 3167/3342 (94.8%) | 3309/3341 (99.0%) |
+| spine items with matching text (pooled) | 5586/5646 (98.9%) | 5581/5582 (100.0%) |
+| TOC entries matched (pooled) | 4889/10529 (46.4%) | 10478/10481 (100.0%) |
+
+| category | books before | books after | delta |
+|---|---|---|---|
+| `app-error` | 6 | 4 | -2 |
+| `app-clean-error` | 0 | 6 | +6 |
+| `gate-mobitool` | 878 | 0 | -878 |
+| `gate-kindleunpack` | 8 | 0 | -8 |
+| `gate-calibre` | 8 | 0 | -8 |
+| `text-loss` | 37 | 0 | -37 |
+| `text-garbled` | 1 | 0 | -1 |
+| `spine-non-xhtml` | 0 | 41 | +41 |
+| `images-missing` | 24 | 0 | -24 |
+| `images-unextractable` | 0 | 6 | +6 |
+| `images-misreferenced` | 131 | 5 | -126 |
+| `toc-flat` | 162 | 0 | -162 |
+| `toc-labels` | 111 | 3 | -108 |
+| `links-unresolved` | 223 | 0 | -223 |
+| `style-lost` | 386 | 0 | -386 |
+| `fixed-layout-unsupported` | 88 | 88 | 0 |
+| `calibre-header-diff` | 830 | 833 | +3 |
+| `input-repair` | 7 | 1 | -6 |
+
+#### AZW3 regressions (18)
+
+Reason counts (a book can have several): new category 13; app error now 4; text items matching 3; TOC entries matched 2
+
+| book | corpus category | why |
+|---|---|---|
+| `core/02-w3c-conformance/pub-foreign_bad-fallback` | w3c | app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…; new categories: app-error |
+| `core/03-epubcheck-valid/epub2__ops-dtbook-valid` | epubcheck-valid | app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…; new categories: app-error |
+| `core/01-idpf-samples/svg-in-spine` | idpf | text items matching 6 -> 0 |
+| `core/01-idpf-samples/indexing-for-eds-and-auths-3f` | idpf | TOC entries matched 19 -> 18 |
+| `core/…zip-unreadable-image-with-epub-extension-fatal` | epubcheck-other | new categories: app-clean-error |
+| `core/02-w3c-conformance/lay-pp-svg-icb_multi` | w3c | text items matching 3 -> 1 |
+| `core/03-epubcheck-other/cli__20-severity-tester` | epubcheck-other | app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…; new categories: app-error |
+| `core/…__foreign-xhtml-picture-source-with-type-valid` | epubcheck-valid | new categories: images-misreferenced |
+| `core/…ted-manifest-fallback-xhtml-video-poster-valid` | epubcheck-valid | new categories: images-misreferenced |
+| `core/…k-other/ocf-zip-unreadable-no-end-header-fatal` | epubcheck-other | new categories: app-clean-error |
+| `core/02-w3c-conformance/lay-fxl-svg-icb_multi` | w3c | text items matching 3 -> 1 |
+| `core/01-idpf-samples/indexing-for-eds-and-auths-3md` | idpf | TOC entries matched 19 -> 18 |
+| `core/…epubcheck-invalid/epub2__ocf-opf-missing-fatal` | epubcheck-invalid | new categories: app-clean-error |
+| `core/…esources__type-picture-source-mismatch-warning` | epubcheck-warnings | new categories: images-misreferenced |
+| `core/03-epubcheck-other/ocf-container-not-ocf-error` | epubcheck-other | new categories: app-clean-error |
+| `core/…ub3_04-ocf__ocf-package-document-missing-fatal` | epubcheck-invalid | new categories: app-clean-error |
+| `core/…ubcheck-invalid/epub2__opf-spine-missing-error` | epubcheck-invalid | app error now: Error: No readable chapters found in the EPUB spine (0 spine items, none could …; new categories: app-clean-error |
+| `core/…es__foreign-xhtml-picture-source-no-type-error` | epubcheck-invalid | new categories: images-misreferenced |
+
+### MOBI: 886 paired books, 15 regressed
+
+| metric | before | after |
+|---|---|---|
+| books with an output file | 878/886 | 876/886 |
+| gate pass (all three parsers) | 751/878 (85.5%) | 876/876 (100.0%) |
+| mean style score, se+pg books | 0.009 (n=200) | 0.009 (n=200) |
+| internal links resolved (pooled) | 0/35046 (0.0%) | 0/35046 (0.0%) |
+| image refs correct (pooled) | 0/3344 (0.0%) | 3618/3749 (96.5%) |
+| images present by hash (pooled) | 3167/3342 (94.8%) | 3170/3341 (94.9%) |
+| spine items with matching text (pooled) | 5586/5648 (98.9%) | 5581/5582 (100.0%) |
+| TOC entries matched (pooled) | 4889/10537 (46.4%) | 10478/10481 (100.0%) |
+
+| category | books before | books after | delta |
+|---|---|---|---|
+| `app-error` | 6 | 4 | -2 |
+| `app-clean-error` | 0 | 6 | +6 |
+| `gate-mobitool` | 127 | 0 | -127 |
+| `text-loss` | 38 | 0 | -38 |
+| `text-garbled` | 1 | 0 | -1 |
+| `spine-non-xhtml` | 0 | 41 | +41 |
+| `images-missing` | 24 | 0 | -24 |
+| `images-unextractable` | 0 | 15 | +15 |
+| `images-misreferenced` | 271 | 7 | -264 |
+| `toc-missing` | 7 | 0 | -7 |
+| `toc-flat` | 162 | 0 | -162 |
+| `toc-labels` | 111 | 3 | -108 |
+| `links-unresolved` | 223 | 223 | 0 |
+| `style-lost` | 329 | 320 | -9 |
+| `fixed-layout-unsupported` | 88 | 88 | 0 |
+| `calibre-header-diff` | 831 | 833 | +2 |
+| `input-repair` | 8 | 1 | -7 |
+
+#### MOBI regressions (15)
+
+Reason counts (a book can have several): new category 10; app error now 4; text items matching 3; TOC entries matched 2
+
+| book | corpus category | why |
+|---|---|---|
+| `core/02-w3c-conformance/pub-foreign_bad-fallback` | w3c | app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…; new categories: app-error |
+| `core/03-epubcheck-valid/epub2__ops-dtbook-valid` | epubcheck-valid | app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…; new categories: app-error |
+| `core/01-idpf-samples/svg-in-spine` | idpf | text items matching 6 -> 0 |
+| `core/01-idpf-samples/indexing-for-eds-and-auths-3f` | idpf | TOC entries matched 19 -> 18 |
+| `core/…zip-unreadable-image-with-epub-extension-fatal` | epubcheck-other | new categories: app-clean-error |
+| `core/02-w3c-conformance/lay-pp-svg-icb_multi` | w3c | text items matching 3 -> 1 |
+| `core/03-epubcheck-other/cli__20-severity-tester` | epubcheck-other | app error now: Error: No readable chapters found in the EPUB spine (1 spine item, none could b…; new categories: app-error |
+| `core/…ted-manifest-fallback-xhtml-video-poster-valid` | epubcheck-valid | new categories: images-misreferenced |
+| `core/…k-other/ocf-zip-unreadable-no-end-header-fatal` | epubcheck-other | new categories: app-clean-error |
+| `core/02-w3c-conformance/lay-fxl-svg-icb_multi` | w3c | text items matching 3 -> 1 |
+| `core/01-idpf-samples/indexing-for-eds-and-auths-3md` | idpf | TOC entries matched 19 -> 18 |
+| `core/…epubcheck-invalid/epub2__ocf-opf-missing-fatal` | epubcheck-invalid | new categories: app-clean-error |
+| `core/03-epubcheck-other/ocf-container-not-ocf-error` | epubcheck-other | new categories: app-clean-error |
+| `core/…ub3_04-ocf__ocf-package-document-missing-fatal` | epubcheck-invalid | new categories: app-clean-error |
+| `core/…ubcheck-invalid/epub2__opf-spine-missing-error` | epubcheck-invalid | app error now: Error: No readable chapters found in the EPUB spine (0 spine items, none could …; new categories: app-clean-error |
+
+## Format: azw3
+
+### 1. Summary
+
+886 books were run for AZW3; 876 (99%) produced an output file and 10 did not. Calibre itself converted 834 of 886. 876 of 876 (100%) converted books pass all three parser gates (mobitool, KindleUnpack, Calibre reader). 13 books carry at least one actionable gap (a book can carry several kinds): 0 have unported Calibre transform gaps (0%), 1 have input repair gaps (8%), 12 have writer bug gaps (92%); 13 category findings in total. Verdict: writer bug gaps affect the most books (92%), so the next effort should fix the KF8/MOBI writer defects, starting with `images-misreferenced`. 776 of 886 books have no actionable gap and were fully evaluated; 9 more books with no gap found were not fully evaluated (harness error, clean refusal or missing invariants); 88 fixed-layout books are out of scope and not counted. Invariants not evaluated (books): text 12, images 12, toc 13, links 12, style 12. Not counted above (category findings): 6 acceptable, 880 informational, 88 out of scope.
+
+### 2. Top gap categories by affected books
+
+| # | category | books | % of books | description | kind |
+|---|---|---|---|---|---|
+| 1 | `images-misreferenced` | 5 | 1% | Image references in the text point at the wrong image or at none | writer bug |
+| 2 | `app-error` | 4 | 0% | App produced no file and the input is not expected to fail | writer bug |
+| 3 | `toc-labels` | 3 | 0% | TOC entries whose labels/targets do not match the input | writer bug |
+| 4 | `input-repair` | 1 | 0% | App failed or lost text on a malformed input Calibre converted anyway | input repair |
+
+Informational, acceptable, harness and out-of-scope categories are not ranked here (`calibre-header-diff`, `images-resized`, `images-unextractable`, `spine-non-xhtml`, `app-clean-error`, `harness-error`, `fixed-layout-unsupported`), and nothing on a fixed-layout book is; they appear in the per-category breakdown and the per-book table. `text-loss` counts as `input repair` on books whose verdict is error/warning, otherwise as `writer bug`.
+
+### 3. Books most needing a manual look in Kindle Previewer
+
+Ranked: gate failure, then misreferenced images, then lowest style score, then text-loss, then unresolved links. Only books with an output file are eligible; fixed-layout books are not.
+
+| # | book | corpus category | why |
+|---|---|---|---|
+| 1 | `core/…tures__outdated-manifest-fallback-xhtml-video-poster-valid` | epubcheck-valid | image refs 0/1 correct (0 wrong, 1 missing) |
+| 2 | `core/…3_03-resources__foreign-xhtml-picture-source-no-type-error` | epubcheck-invalid | image refs 1/2 correct (0 wrong, 1 missing) |
+| 3 | `core/…03-resources__foreign-xhtml-picture-source-with-type-valid` | epubcheck-valid | image refs 1/2 correct (0 wrong, 1 missing) |
+| 4 | `core/…b3_07-content-documents__content-xhtml-svg-reference-valid` | epubcheck-valid | image refs 1/2 correct (0 wrong, 1 missing) |
+| 5 | `core/…s/epub3_03-resources__type-picture-source-mismatch-warning` | epubcheck-warnings | image refs 1/2 correct (0 wrong, 1 missing) |
+
+### 4. Gap categories by corpus category
+
+| corpus category | books | `app-error` | `app-clean-error` | `spine-non-xhtml` | `images-unextractable` | `images-misreferenced` | `toc-labels` | `fixed-layout-unsupported` | `calibre-header-diff` | `input-repair` |
+|---|---|---|---|---|---|---|---|---|---|---|
+| epubcheck-invalid | 222 |  | 3 | 8 | 3 | 1 | 1 | 16 | 206 |  |
+| epubcheck-other | 35 | 2 | 3 |  |  |  |  | 5 | 30 |  |
+| epubcheck-valid | 169 | 1 |  | 14 | 1 | 3 | 2 | 14 | 149 |  |
+| epubcheck-warnings | 42 |  |  | 5 |  | 1 |  | 1 | 41 |  |
+| generated | 8 |  |  |  |  |  |  |  | 8 | 1 |
+| idpf | 27 |  |  | 2 |  |  |  | 4 | 25 |  |
+| local | 1 |  |  |  |  |  |  |  | 1 |  |
+| pg | 100 |  |  |  |  |  |  |  | 100 |  |
+| se | 100 |  |  |  |  |  |  |  | 100 |  |
+| w3c | 182 | 1 |  | 12 | 2 |  |  | 48 | 173 |  |
+| **total** | 886 | 4 | 6 | 41 | 6 | 5 | 3 | 88 | 833 | 1 |
+
+### 5. All books
+
+| id | category | verdict | app ok | calibre ok | gate pass | text match/spine | images matched/referenced | image refs ok/total | toc matched/input | links resolved/total | style | css rules out/in | categories |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `core/01-idpf-samples/childrens-literature` | idpf | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 31/31 | 119/119 | 1.00 | 26/26 | calibre-header-diff |
+| `core/01-idpf-samples/childrens-media-query` | idpf | valid | yes | yes | yes | 1/1 | 2/2 | 2/2 | 1/1 | 0/0 | 1.00 | 13/13 | calibre-header-diff |
+| `core/01-idpf-samples/cole-voyage-of-life` | idpf | valid | yes | yes | yes | 10/10 | 9/9 | 9/9 | 7/7 | 0/0 | 1.00 | 11/11 | calibre-header-diff |
+| `core/01-idpf-samples/cole-voyage-of-life-tol` | idpf | valid | yes | yes | yes | 5/5 | 9/9 | 9/9 | 6/6 | 0/0 | 1.00 | 27/27 | fixed-layout-unsupported, calibre-header-diff |
+| `core/01-idpf-samples/epub30-spec` | idpf | valid | yes | yes | yes | 11/11 | 2/2 | 10/10 | 316/316 | 2575/2575 | 1.00 | 97/97 | calibre-header-diff |
+| `core/01-idpf-samples/figure-gallery-bindings` | idpf | valid | yes | yes | yes | 1/1 | 9/9 | 8/8 | 1/1 | 0/0 | 1.00 | 12/12 | calibre-header-diff |
+| `core/01-idpf-samples/georgia-cfi` | idpf | valid | yes | yes | yes | 2/2 | 2/2 | 2/2 | 10/10 | 25/25 | 1.00 | 7/7 | calibre-header-diff |
+| `core/01-idpf-samples/georgia-pls-ssml` | idpf | valid | yes | yes | yes | 2/2 | 2/2 | 2/2 | 10/10 | 25/25 | 1.00 | 7/7 | calibre-header-diff |
+| `core/01-idpf-samples/hefty-water` | idpf | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 4/4 | 2/2 | 1.00 | 3/3 | calibre-header-diff |
+| `core/01-idpf-samples/indexing-for-eds-and-auths-3f` | idpf | valid | yes | yes | yes | 22/22 | 12/12 | 33/33 | 18/18 | 1058/1058 | 1.00 | 210/210 | calibre-header-diff |
+| `core/01-idpf-samples/indexing-for-eds-and-auths-3md` | idpf | valid | yes | yes | yes | 23/23 | 12/12 | 33/33 | 18/18 | 1058/1058 | 1.00 | 213/213 | calibre-header-diff |
+| `core/01-idpf-samples/internallinks` | idpf | valid | yes | yes | yes | 7/7 | 8/8 | 8/8 | 18/18 | 31/31 | 1.00 | 142/142 | calibre-header-diff |
+| `core/01-idpf-samples/israelsailing` | idpf | valid | yes | yes | yes | 12/12 | 7/7 | 7/7 | 12/12 | 0/0 | 1.00 | 36/36 | calibre-header-diff |
+| `core/01-idpf-samples/linear-algebra` | idpf | valid | yes | yes | yes | 94/94 | 0/0 | 0/0 | 94/94 | 436/436 | 1.00 | 99/99 | calibre-header-diff |
+| `core/01-idpf-samples/moby-dick` | idpf | valid | yes | yes | yes | 144/144 | 2/2 | 2/2 | 141/141 | 153/153 | 1.00 | 57/57 | calibre-header-diff |
+| `core/01-idpf-samples/mymedia_lite` | idpf | valid | yes | yes | yes | 7/7 | 7/7 | 7/7 | 5/5 | 4/4 | 1.00 | 81/81 | calibre-header-diff |
+| `core/01-idpf-samples/quiz-bindings` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 1/1 | 0/0 | 1.00 | 12/12 | calibre-header-diff |
+| `core/01-idpf-samples/regime-anticancer-arabic` | idpf | valid | yes | yes | yes | 3/3 | 2/2 | 2/2 | 3/3 | 2/2 | 1.00 | 9/9 | calibre-header-diff |
+| `core/01-idpf-samples/sous-le-vent` | idpf | valid | yes | yes | yes | 13/13 | 3/3 | 2/2 | 1/1 | 0/0 | 1.00 | 144/144 | fixed-layout-unsupported, calibre-header-diff |
+| `core/01-idpf-samples/sous-le-vent_svg-in-spine` | idpf | valid | yes | no | yes | 0/0 | 1/1 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/01-idpf-samples/svg-in-spine` | idpf | valid | yes | no | yes | 0/0 | 1/1 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/01-idpf-samples/trees` | idpf | valid | yes | yes | yes | 3/3 | 1/1 | 0/0 | 2/2 | 2/2 | 1.00 | 10/10 | calibre-header-diff |
+| `core/01-idpf-samples/wasteland` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 100/100 | 1.00 | 10/14 | calibre-header-diff |
+| `core/01-idpf-samples/wasteland-otf` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 100/100 | 1.00 | 10/14 | calibre-header-diff |
+| `core/01-idpf-samples/wasteland-otf-obf` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 100/100 | 1.00 | 10/14 | calibre-header-diff |
+| `core/01-idpf-samples/wasteland-woff` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 100/100 | 1.00 | 10/14 | calibre-header-diff |
+| `core/01-idpf-samples/wasteland-woff-obf` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 100/100 | 1.00 | 10/14 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-css-fonts_ot` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-css-fonts_tt` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-css-fonts_woff` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-css-fonts_woff2` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-mathml-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-svg-css` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/cnt-svg-css-inclusion` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-svg-css-reference` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-svg-embedded` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-svg-support` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/cnt-xhtml-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-hyphens` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-line-break` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 5/5 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-text-align-last` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…c-conformance/css-epub-text-combine-horizontal` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 5/5 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-text-emphasis` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 19/19 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-text-orientation` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 5/5 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-text-transform` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…c-conformance/css-epub-text-underline-position` | w3c | valid | yes | yes | yes | 5/5 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 9/9 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-word-break` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-writing-mode` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/fxl-layout-duplication` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/fxl-page-spread-break` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/fxl-page-spread-center` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…nformance/fxl-spine-overrides_behave-as-global` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 2/2 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…mance/fxl-spine-overrides_behave-as-global-bis` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 3/3 | calibre-header-diff |
+| `core/…-w3c-conformance/fxl-spine-overrides_duplicate` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 2/2 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-layout-default` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-layout-pre-paginated` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…nformance/lay-fxl-layout-pre-paginated-spreads` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-orientation-default` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…-w3c-conformance/lay-fxl-orientation-landscape` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-page-spread-combined` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-page-spread-left` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-page-spread-right` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-auto` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-both` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-default` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-landscape` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-none` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-svg-icb_multi` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 2/2 | spine-non-xhtml, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-xhtml-icb` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…w3c-conformance/lay-fxl-xhtml-icb_device_sizes` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…w3c-conformance/lay-fxl-xhtml-icb_invalid_meta` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-xhtml-icb_multi` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…nformance/lay-fxl-xhtml-icb_multi_declarations` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…conformance/lay-fxl-xhtml-icb_repeated-in-meta` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-xhtml-icb_units` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-page-layout-both` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 12/12 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-page-layout-both-spread` | w3c | valid | yes | yes | yes | 5/5 | 0/0 | 0/0 | 5/5 | 0/0 | 1.00 | 12/12 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pkg-flow-paginated` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…c-conformance/lay-pkg-flow-scrolled-continuous` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-pkg-flow-scrolled-doc` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-layout-default` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-layout-duplication` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-layout-pre-paginated` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…onformance/lay-pp-layout-pre-paginated-spreads` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-page-spread-combined` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-page-spread-left` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-page-spread-right` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…rmance/lay-pp-spine-overrides_behave-as-global` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 2/2 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ce/lay-pp-spine-overrides_behave-as-global-bis` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 3/3 | calibre-header-diff |
+| `core/…nformance/lay-pp-spine-overrides_image-only-pp` | w3c | valid | yes | yes | yes | 2/2 | 1/1 | 1/1 | 2/2 | 0/0 | 1.00 | 2/2 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…mance/lay-pp-spine-overrides_image-only-reflow` | w3c | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 1.00 | 3/3 | calibre-header-diff |
+| `core/…formance/lay-pp-spine-overrides_image-spine-pp` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 2/0 | spine-non-xhtml, fixed-layout-unsupported, calibre-header-diff |
+| `core/…ance/lay-pp-spine-overrides_image-spine-reflow` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 3/0 | spine-non-xhtml, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-spread-none` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-svg-icb_multi` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 2/2 | spine-non-xhtml, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-xhtml-icb` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…-w3c-conformance/lay-pp-xhtml-icb_invalid_meta` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-xhtml-icb_multi` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…onformance/lay-pp-xhtml-icb_multi_declarations` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…-conformance/lay-pp-xhtml-icb_repeated-in-meta` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-xhtml-icb_units` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 4/4 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-reflow-align-x-center` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/3 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-rendition-flow-pre-pag` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 4/4 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-viewport-meta-prop` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/mol-navigation` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/02-w3c-conformance/mol-tts_multi` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/02-w3c-conformance/mol-tts_single` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-access` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-activation` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-non-text_img` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-non-text_img_title` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-spine_in-spine` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-conformance/nav-spine_in-spine-hidden-toc-css` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…conformance/nav-spine_in-spine-hidden-toc-html` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…c-conformance/nav-spine_in-spine-no-list-style` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-spine_not-in-spine` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-font_obfuscation` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-font_obfuscation_bis` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-metainf-inc` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-metainf-manifest` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-package_arbitrary` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-package_multiple` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-w3c-conformance/ocf-url_link-leaking-relative` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_link-path-absolute` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_link-relative` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_manifest` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_origin` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/ocf-url_parse-leaking-relative` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_parse-path-absolute` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_relative` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-zip-comp` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-zip-mult` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-collections-unknown` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-creator-order` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir-auto_root-rtl` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir-auto_root-unset` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_but_not_content` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_creator-rtl` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_rtl-root-ltr` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_rtl-root-unset` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_unset-root-rtl` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_unset-root-unset` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-lang_but_not_content` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-linked-records` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-manifest-unknown` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/pkg-manifest-unlisted-resource` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-meta-unknown` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-meta-whitespace` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…conformance/pkg-spine-duplicate-item-hyperlink` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 2/2 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…conformance/pkg-spine-duplicate-item-rendering` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-duplicate-item-ui` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/pkg-spine-nonlinear-activation` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-order` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-order-svg` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…-w3c-conformance/pkg-spine-progression-default` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…onformance/pkg-spine-progression-pre-paginated` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-progression_ltr` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-progression_rtl` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-unknown` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-title-order` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-unique-id` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-unique-id_duplicate` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-version-backward` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pss-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pss-support_ignore-title` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-avif` | w3c | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-gif` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-jpeg` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-jxl` | w3c | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-mp3` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-mp4` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-opus` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-png` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-svg` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-webp` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/pub-data-urls_browsing-context` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…3c-conformance/pub-data-urls_top-level-content` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 7/7 | fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/pub-external-links` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-external-links_consent` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-file-urls` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-foreign_bad-fallback` | w3c | valid | no | no | - | - | - | - | - | - | - | - | app-error |
+| `core/02-w3c-conformance/pub-foreign_image` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-foreign_json-spine` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/pub-foreign_xml-spine` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/pub-foreign_xml-suffix-spine` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/pub-xml-external-id` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-xml-names` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/pub-xml-non-validating_comment` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3c-conformance/pub-xml-non-validating_unclosed` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nformance/scr-not-support_ccscript-modify-host` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nformance/scr-not-support_ccscript-modify-size` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-readingsystem-features` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-readingsystem-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…c-conformance/scr-readingsystem-support_iframe` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nformance/scr-readingsystem-support_iframe_svg` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-w3c-conformance/scr-readingsystem-support_svg` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/scr-storage-delete` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support-fallback` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_iframe` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_origin` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_origin_unique` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3c-conformance/scr-support_scrolled-continuous` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_scrolled-doc` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_svg` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…-w3c-conformance/sec-untrusted-consent_network` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3c-conformance/sec-untrusted-consent_scripting` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/xx-epub-template` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/xx-lay-pp-template` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 6/6 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…b-dictionaries__dictionary-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…dictionaries__dictionary-dc-type-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ionaries__dictionary-multiple-no-content-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…aries__dictionary-search-key-map-content-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ies__dictionary-search-key-map-extension-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ries__dictionary-search-key-map-link-css-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__dictionary-search-key-map-link-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ctionaries__dictionary-single-no-content-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sary-single-package-property-not-defined-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…enditions-dctype-missing-for-publication-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-renditions-dctype-missing-for-rendition-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub-edupub__edupub-pagelist-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub-edupub__edupub-pagelist-no-source-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-indexes__index-collection-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…/epub-indexes__index-collection-no-index-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…indexes__index-single-file-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub-indexes__index-single-file-no-index-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b-indexes__index-whole-pub-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub-indexes__index-whole-pub-no-index-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…itions__renditions-mapping-multiple-docs-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tions__renditions-mapping-no-resourcemap-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…enditions__renditions-mapping-no-version-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…renditions__renditions-mapping-non-xhtml-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nditions__renditions-mapping-untyped-nav-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…enditions-metadata-identifier-incomplete-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__renditions-selection-attribute-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__renditions-selection-attribute-unknown-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__renditions-selection-mediaquery-syntax-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub-previews__preview-embedded-link-cfi-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ws__preview-embedded-no-content-doc-link-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub-previews__preview-embedded-no-links-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b-previews__preview-embedded-no-manifest-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub-previews__preview-pub-dc-type-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub-previews__preview-pub-self-as-source-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub-region-nav__data-nav-missing-type-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…valid/epub-region-nav__data-nav-multiple-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…alid/epub-region-nav__data-nav-not-xhtml-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…gion-nav__region-based-nav-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…pub-region-nav__region-based-nav-not-fxl-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…gion-nav__region-based-nav-wrong-element-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…pubcheck-invalid/epub2__ncx-id-duplicate-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…eck-invalid/epub2__ncx-id-syntax-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-invalid/epub2__ncx-link-to-non-ops-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…heck-invalid/epub2__ncx-missing-resource-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-invalid/epub2__ncx-pagetarget-type-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pubcheck-invalid/epub2__ncx-uid-mismatch-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_ocf-metainf-container-mediatype-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub2__ocf-metainf-container-multiple-opf-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tainf-container-rootfile-full-path-empty-error` | epubcheck-invalid | error | yes | yes | yes | - | - | - | - | - | - | - | calibre-header-diff |
+| `core/…inf-container-rootfile-full-path-missing-error` | epubcheck-invalid | error | yes | yes | yes | - | - | - | - | - | - | - | calibre-header-diff |
+| `core/…heck-invalid/epub2__ocf-mimetype-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-invalid/epub2__ocf-mimetype-with-spaces-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epubcheck-invalid/epub2__ocf-opf-missing-fatal` | epubcheck-invalid | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/…nvalid/epub2__opf-fallback-non-resolving-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 1/1 | images-unextractable, calibre-header-diff |
+| `core/…alid/epub2__opf-guide-reference-to-image-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…id/epub2__opf-guide-reference-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…bcheck-invalid/epub2__opf-legacy-oebps12-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…invalid/epub2__opf-manifest-item-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub2__opf-manifest-item-resource-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-invalid/epub2__opf-pagemap-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…alid/epub2__opf-remote-object-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nvalid/epub2__opf-spine-itemref-repeated-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ubcheck-invalid/epub2__opf-spine-missing-error` | epubcheck-invalid | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/…d/epub2__opf-spine-toc-attribute-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub2__opf-spine-toc-attribute-to-non-ncx-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | - |
+| `core/…d/epub2__opf-unique-identifier-not-found-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-invalid/epub2__opf-version-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_ops-xhtml-hyperlink-to-missing-fragment-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b2__ops-xhtml-link-to-missing-stylesheet-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…data-url-in-html-img-foreign-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__fallback-chain-circular-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…alid/epub3_03-resources__file-url-in-css-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…xempt-xhtml-script-module-not-javascript-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…empt-xhtml-script-no-type-not-javascript-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-exempt-xhtml-script-type-not-javascript-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…urces__foreign-exempt-xhtml-video-in-img-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…foreign-xhtml-audio-in-video-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sources__foreign-xhtml-audio-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…html-audio-no-fallback-with-flow-content-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__foreign-xhtml-audio-source-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sources__foreign-xhtml-embed-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…reign-xhtml-img-src-no-manifest-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…b3_03-resources__foreign-xhtml-img-video-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__foreign-xhtml-input-image-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__foreign-xhtml-math-altimg-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ources__foreign-xhtml-object-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources__foreign-xhtml-picture-img-src-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…ources__foreign-xhtml-picture-img-srcset-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…es__foreign-xhtml-picture-source-no-type-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…__foreign-xhtml-video-poster-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources__resources-cmt-audio-mp4-other-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…urces__resources-cmt-audio-opus-mimetype-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-cmt-image-corrupt-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources-cmt-image-jpeg-declared-as-gif-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sources-remote-font-svg-also-used-as-img-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-remote-iframe-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…rces__resources-remote-iframe-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub3_03-resources__resources-remote-img-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…esources__resources-remote-img-in-script-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sources__resources-remote-img-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…rces__resources-remote-object-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-remote-script-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-remote-spine-item-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-remote-stylesheet-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__resources-remote-stylesheet-svg-import-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…s__resources-remote-stylesheet-svg-xmlpi-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…sources__resources-remote-svg-contentdoc-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_04-ocf__ocf-container-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ncryption-compression-attributes-invalid-error` | epubcheck-invalid | error | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…ub3_04-ocf__ocf-encryption-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_04-ocf__ocf-encryption-duplicate-ids-error` | epubcheck-invalid | error | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…__ocf-meta-inf-with-publication-resource-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…4-ocf__ocf-mimetype-file-incorrect-value-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…04-ocf__ocf-mimetype-file-leading-spaces-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-ocf__ocf-mimetype-file-trailing-newline-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…4-ocf__ocf-mimetype-file-trailing-spaces-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_04-ocf__ocf-package-document-missing-fatal` | epubcheck-invalid | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/…ub3_04-ocf__ocf-signatures-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub3_04-ocf__ocf-url-leaking-in-opf-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | - | 0/0 | 1.00 | 0/0 | - |
+| `core/…alid/epub3_04-ocf__ocf-url-path-absolute-error` | epubcheck-invalid | error | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…d/epub3_04-ocf__url-missing-resource-css-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/…-resource-css-preceded-by-invalid-syntax-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…_04-ocf__url-missing-resource-svg-a-href-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…04-ocf__url-missing-resource-svg-a-xlink-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…issing-resource-svg-a-xlink-same-as-href-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…issing-resource-svg-a-xlink-with-href-ok-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocf__url-missing-resource-svg-image-href-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…cf__url-missing-resource-svg-image-xlink-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ng-resource-svg-image-xlink-same-as-href-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ng-resource-svg-image-xlink-with-href-ok-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_04-ocf__url-missing-resource-xhtml-cite-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…cf__url-missing-resource-xhtml-hyperlink-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…4-ocf__url-missing-resource-xhtml-iframe-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_04-ocf__url-missing-resource-xhtml-img-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…url-missing-resource-xhtml-mathml-altimg-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…04-ocf__url-missing-resource-xhtml-track-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…kage-document__manifest-self-referencing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t__package-link-media-type-missing-local-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ent__package-manifest-duplicate-resource-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…document__package-manifest-fonts-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…-document__package-manifest-item-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…remote-resource-declared-but-unnecessary-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…manifest-prop-remote-resource-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t-prop-scripted-declared-but-unnecessary-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…e-manifest-prop-scripted-undeclared-form-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…fest-prop-scripted-undeclared-javascript-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nifest-prop-svg-declared-but-unnecessary-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nt__package-manifest-prop-svg-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…age-manifest-prop-svg-undeclared-partial-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ackage-manifest-prop-switch-not-declared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-document__package-manifest-prop-unknown-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…emote-audio-in-overlays-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t__package-remote-audio-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_package-remote-audio-sources-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocument__package-remote-audio-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…kage-remote-font-in-css-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…mote-font-in-inline-css-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…kage-remote-font-in-svg-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ge-remote-font-in-xhtml-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…document__package-remote-font-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…age-document__package-remote-img-in-link-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-document__spine-nonlinear-not-reachable-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ment__spine-not-listing-hyperlink-target-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…e-not-listing-navigation-document-target-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…layout-pre-paginated-content-invalid-fxl-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…_layout-pre-paginated-content-reflowable-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…layout-pre-paginated-fallback-reflowable-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…e-paginated-override-content-invalid-fxl-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…re-paginated-override-content-reflowable-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-layouts__layout-roll-content-reflowable-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…layouts__layout-roll-fallback-reflowable-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…t-documents__content-css-encoding-latin1-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…t-documents__content-css-font-face-empty-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…cuments__content-css-font-face-url-empty-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t-documents__content-css-font-size-value-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 3/3 | calibre-header-diff |
+| `core/…cuments__content-css-import-not-declared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/…ocuments__content-css-import-not-present-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…ocuments__content-css-property-direction-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…ments__content-css-property-unicode-bidi-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…07-content-documents__content-css-syntax-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 3/3 | calibre-header-diff |
+| `core/…nt-documents__content-fxl-svg-no-viewbox-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…-fxl-svg-no-viewbox-width-height-percent-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…nt-fxl-svg-no-viewbox-width-height-units-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…xl-xhtml-viewport-duplicate-width-height-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…_content-fxl-xhtml-viewport-height-empty-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ontent-fxl-xhtml-viewport-height-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…xhtml-viewport-icb-missing-in-first-meta-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ents__content-fxl-xhtml-viewport-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ontent-fxl-xhtml-viewport-syntax-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…content-fxl-xhtml-viewport-units-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…content-fxl-xhtml-viewport-width-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…tent-xhtml-base-url-remote-relative-path-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__content-xhtml-data-attr-removal-markup-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nts__content-xhtml-img-srcset-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ts__content-xhtml-lang-xml-lang-mismatch-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…uments__content-xhtml-link-to-missing-id-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tent-xhtml-link-to-missing-id-in-nav-doc-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__content-xhtml-link-to-missing-id-xref-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…content-documents__content-xhtml-relaxng-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tent-documents__content-xhtml-schematron-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-xhtml-xml-base-url-remote-relative-path-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…igation-document__nav-links-out-of-spine-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…08-navigation-document__nav-links-remote-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__nav-links-to-non-content-document-type-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_08-navigation-document__nav-toc-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…diaoverlays-active-class-style-not-found-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…verlays-active-class-svg-style-not-found-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…ia-overlays__mediaoverlays-audio-non-cmt-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ays__mediaoverlays-incorrect-overlay-ref-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-overlays__mediaoverlays-missing-mo-attr-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lays__mediaoverlays-multiple-overlay-ref-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…a-overlays__mediaoverlays-no-overlay-ref-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ys-playback-active-class-style-not-found-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…erlays__mediaoverlays-text-reading-order-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ediaoverlays-textref-fragment-unresolved-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__xml-external-identifier-bad-mediatype-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…iers__xml-external-identifier-disallowed-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/1 | 0/0 | 1.00 | 0/0 | toc-labels, calibre-header-diff |
+| `core/…atures__outdated-ocf-obfuscation-not-cmt-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tures__outdated-ocf-obfuscation-not-font-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…e-features__outdated-package-ncx-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-invalid/localization__css-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/03-epubcheck-invalid/localization__schema-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/cli__20-severity-tester` | epubcheck-other | unknown | no | no | - | - | - | - | - | - | - | - | app-error |
+| `core/03-epubcheck-other/cli__30-mimetype-invalid` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/epub2__minimal` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/epub3_00-minimal__minimal` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-documents__content-xhtml-invalid-duplicate-id` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-container-not-ocf-error` | epubcheck-other | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/03-epubcheck-other/ocf-directory-empty-warning` | epubcheck-other | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…k-other/ocf-filename-character-forbidden-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…acter-forbidden-non-publication-resource-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-duplicate-after-canonical-normalization-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…name-duplicate-after-common-case-folding-error` | epubcheck-other | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…licate-after-compatibility-normalization-valid` | epubcheck-other | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lename-duplicate-after-full-case-folding-error` | epubcheck-other | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…k-other/ocf-filename-duplicate-zip-entry-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-filename-not-utf8-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-filename-utf8-valid` | epubcheck-other | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-filepath-not-utf8-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-filepath-utf8-valid` | epubcheck-other | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pubcheck-other/ocf-mimetype-file-missing-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-minimal-valid` | epubcheck-other | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…other/ocf-zip-mimetype-entry-extra-field-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epubcheck-other/ocf-zip-unreadable-empty-fatal` | epubcheck-other | error | no | no | - | - | - | - | - | - | - | - | app-error |
+| `core/…zip-unreadable-image-with-epub-extension-fatal` | epubcheck-other | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/…k-other/ocf-zip-unreadable-no-end-header-fatal` | epubcheck-other | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/03-epubcheck-other/ocf-zip-valid` | epubcheck-other | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/reporting__fonts-embedded` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-epubcheck-other/reporting__layout-orientation` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…check-other/reporting__layout-orientation-item` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ubcheck-other/reporting__layout-paginated-item` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…bcheck-other/reporting__layout-reflowable-item` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/03-epubcheck-other/reporting__layout-spread` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…-epubcheck-other/reporting__layout-spread-item` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/03-epubcheck-other/reporting__messages-maxcount` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/stress__stress` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 1/1 | 1.00 | 1/1 | calibre-header-diff |
+| `core/03-epubcheck-other/valid` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-valid/cli__30-valid-test` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub-dictionaries__dictionary-multiple-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub-dictionaries__dictionary-single-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…valid/epub-dictionaries__glossary-single-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pubcheck-valid/epub-edupub__edupub-basic-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-epubcheck-valid/epub-edupub__edupub-fxl-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…/epub-edupub__edupub-multiple-renditions-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…eck-valid/epub-edupub__edupub-non-linear-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-valid/epub-edupub__edupub-pagelist-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…eck-valid/epub-indexes__index-collection-valid` | epubcheck-valid | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ck-valid/epub-indexes__index-single-file-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…heck-valid/epub-indexes__index-whole-pub-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 2/2 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub-multiple-renditions__renditions-basic-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ditions__renditions-mapping-multiple-nav-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ck-valid/epub-previews__preview-embedded-valid` | epubcheck-valid | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ubcheck-valid/epub-previews__preview-pub-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pubcheck-valid/epub-region-nav__data-nav-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub-region-nav__region-based-nav-comics-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…-valid/epub-region-nav__region-based-nav-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | fixed-layout-unsupported, calibre-header-diff |
+| `core/03-epubcheck-valid/epub2__ncx-label-empty-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/1 | 0/0 | 1.00 | 0/0 | toc-labels, calibre-header-diff |
+| `core/03-epubcheck-valid/epub2__ncx-uid-spaces-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub2__ocf-metainf-container-alternative-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ck-valid/epub2__ocf-metainf-file-unknown-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…alid/epub2__opf-manifest-os-files-ignore-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub2__opf-metadata-creator-role-clr-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-valid/epub2__opf-package-id-spaces-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/03-epubcheck-valid/epub2__ops-dtbook-valid` | epubcheck-valid | valid | no | no | - | - | - | - | - | - | - | - | app-error |
+| `core/…-epubcheck-valid/epub2__ops-xhtml-script-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…valid/epub2__ops-xhtml-unusual-extension-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nformance-xml-id-leading-trailing-spaces-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…3_03-resources__data-url-in-html-img-cmt-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…l-in-html-img-foreign-intrinsic-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__data-url-in-html-link-exempt-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources__data-url-with-unescaped-query-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_03-resources__fallback-chain-n-to-1-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_03-resources__fallback-chain-waterfall-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…/epub3_03-resources__foreign-exempt-font-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…pub3_03-resources__foreign-exempt-unused-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_03-resources__foreign-exempt-xhtml-link-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…exempt-xhtml-link-xpgt-manifest-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…reign-exempt-xhtml-link-xpgt-no-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…rces__foreign-exempt-xhtml-script-module-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…n-exempt-xhtml-script-no-type-javascript-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…eign-exempt-xhtml-script-type-javascript-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__foreign-exempt-xhtml-script-using-wasm-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…03-resources__foreign-exempt-xhtml-track-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…exempt-xhtml-video-mediatype-application-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…urces__foreign-exempt-xhtml-video-source-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…03-resources__foreign-exempt-xhtml-video-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ces__foreign-xhtml-audio-source-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…reign-xhtml-audio-source-remote-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ces__foreign-xhtml-img-manifest-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…reign-xhtml-img-srcset-manifest-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_foreign-xhtml-object-intrinsic-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__foreign-xhtml-picture-source-with-type-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…esources__foreign-xhtml-script-datablock-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…es__foreign-xhtml-script-importmap-block-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-audio-mp3-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-cmt-audio-mp4-aac-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__resources-cmt-audio-mp4-opus-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-audio-mp4-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_03-resources__resources-cmt-audio-opus-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-cmt-font-opentype-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…ub3_03-resources__resources-cmt-font-svg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-cmt-font-truetype-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_03-resources__resources-cmt-image-avif-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-image-gif-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ces__resources-cmt-image-jpg-not-corrupt-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-image-jpg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-image-jxl-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-image-png-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_03-resources__resources-cmt-image-webp-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources__resources-remote-audio-object-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…esources__resources-remote-audio-sources-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_03-resources__resources-remote-audio-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__resources-remote-font-in-css-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__resources-remote-font-in-svg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_03-resources__resources-remote-font-svg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_03-resources__resources-remote-font-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources-remote-resource-for-script-cmt-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…urces-remote-resource-for-script-foreign-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_03-resources__resources-remote-video-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__type-audio-source-mp3-codecs-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ources__url-absolute-not-resource-mailto-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…es__url-absolute-not-resource-xhtml-cite-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…container-filename-character-composition-valid` | epubcheck-valid | valid | yes | no | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | - |
+| `core/…f__ocf-container-filename-character-plus-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub3_04-ocf__ocf-encryption-unknown-valid` | epubcheck-valid | valid | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…cf-filename-character-emoji-tag-sequence-valid` | epubcheck-valid | valid | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…-valid/epub3_04-ocf__url-percent-encoded-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…kage-document__link-to-embedded-resource-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…document__package-file-extension-unusual-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__package-link-media-type-missing-remote-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ipted-not-required-for-script-data-block-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_05-package-document__package-mathml-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__package-remote-resource-and-inline-css-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…_spine-nonlinear-reachable-via-hyperlink-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ument__spine-nonlinear-reachable-via-nav-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nt__spine-nonlinear-reachable-via-script-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ayout-page-spread-pre-paginated-override-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ayouts__layout-page-spread-pre-paginated-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…6-layouts__layout-pre-paginated-fallback-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…__layout-pre-paginated-override-fallback-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…6-layouts__layout-pre-paginated-override-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub3_06-layouts__layout-pre-paginated-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…3_06-layouts__layout-reflowable-override-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…alid/epub3_06-layouts__layout-reflowable-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub3_06-layouts__layout-roll-fallback-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…heck-valid/epub3_06-layouts__layout-roll-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ents__content-css-encoding-utf8-declared-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…content-documents__content-css-font-size-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/…7-content-documents__content-css-minimal-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…__content-css-namespace-uri-not-resource-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…07-content-documents__content-css-syntax-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 12/12 | calibre-header-diff |
+| `core/…tent-documents__content-css-url-fragment-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…_content-fxl-svg-no-viewbox-on-inner-svg-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…b3_07-content-documents__content-fxl-svg-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…uments__content-fxl-xhtml-viewport-float-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…nts__content-fxl-xhtml-viewport-keywords-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ontent-fxl-xhtml-viewport-multiple-usage-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…nt-documents__content-fxl-xhtml-viewport-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…s__content-fxl-xhtml-viewport-whitespace-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ent-reflow-xhtml-viewport-height-missing-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ents__content-svg-file-extension-unusual-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…-content-documents__content-svg-in-spine-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…ocuments__content-svg-no-viewbox-not-fxl-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ontent-documents__content-xhtml-base-url-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ontent-xhtml-data-attr-removal-fragments-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ts__content-xhtml-file-extension-unusual-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nt-documents__content-xhtml-iframe-basic-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocuments__content-xhtml-img-fragment-svg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…documents__content-xhtml-link-href-empty-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…cuments__content-xhtml-link-rel-path-dot-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…content-xhtml-link-to-local-file-escaped-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t-documents__content-xhtml-mathml-altimg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nts__content-xhtml-meta-viewport-non-fxl-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ents__content-xhtml-svg-fragment-svgview-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t-documents__content-xhtml-svg-reference-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…tent-documents__content-xhtml-svg-switch-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…id/epub3_07-content-documents__dc-source-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…7-content-documents__object-pdf-fragment-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…id/epub3_08-navigation-document__nav-cfi-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/1 | 0/0 | 1.00 | 0/0 | toc-labels, calibre-header-diff |
+| `core/…on-document__nav-page-list-reading-order-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ent__nav-toc-missing-references-to-spine-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…vigation-document__nav-toc-reading-order-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 5/5 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…rlays__mediaoverlays-active-class-inline-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/…rlays-active-class-stylesheet-undeclared-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/…s__mediaoverlays-active-class-stylesheet-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `core/…iaoverlays-active-class-svg-inline-style-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…rlays-active-class-svg-stylesheet-import-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…verlays-active-class-svg-stylesheet-link-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…rlays-active-class-svg-stylesheet-xml-pi-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…ys__mediaoverlays-file-extension-unusual-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…09-media-overlays__mediaoverlays-minimal-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_09-media-overlays__mediaoverlays-svg-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…rlays__mediaoverlays-textref-no-fragment-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…diaoverlays-textref-svg-fragment-viewbox-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…tifiers__xml-external-identifier-allowed-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…atures__outdated-css-prefixed-properties-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…__outdated-manifest-fallback-xhtml-audio-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__outdated-manifest-fallback-xhtml-embed-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ted-manifest-fallback-xhtml-video-poster-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…ures__outdated-ocf-obfuscation-duplicate-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…olete-features__outdated-ocf-obfuscation-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-obsolete-features__outdated-package-ncx-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ntent-page-list-valid__content-page-list-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d_ocf-compression-valid__ocf-compression-valid` | epubcheck-valid | valid | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…ect-valid__resources-remote-video-object-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…bcheck-valid/localization__nav-page-list-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-warnings/cli__20-warning-tester` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_dictionary-no-profile-dc-type-missing-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…warnings/epub-edupub__edupub-microdata-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ions__renditions-metadata-file-missing-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…le-renditions__renditions-unmanifested-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b-previews__preview-pub-source-missing-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ngs/epub-region-nav__data-nav-in-spine-warning` | epubcheck-warnings | warning | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…arnings/epub2__ocf-filename-with-space-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub2__opf-legacy-oebps12-mediatype-css-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub2__opf-legacy-oebps12-mediatype-html-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…opf-manifest-item-xhtml-mediatype-html-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…/epub2__opf-manifest-resource-undeclared-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nings/epub2__opf-pagemap-ref-not-found-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__resources-cmt-image-wrong-extension-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__resources-remote-not-https-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__type-audio-source-mismatch-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_03-resources__type-embed-mismatch-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_03-resources__type-object-mismatch-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…esources__type-picture-source-mismatch-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 1/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…04-ocf__ocf-filename-character-non-ascii-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_04-ocf__ocf-filename-character-space-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocf__url-missing-resource-package-link-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_manifest-not-listing-container-resource-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__layout-page-spread-reflowable-override-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…6-layouts__layout-page-spread-reflowable-usage` | epubcheck-warnings | warning | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_06-layouts__layout-page-spread-roll-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__content-css-encoding-utf16-declared-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…ontent-css-encoding-utf16-not-declared-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/…ntent-svg-clippath-url-target-unexpected-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…__content-svg-fill-url-target-unexpected-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…content-svg-stroke-url-target-unexpected-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…uments__content-svg-use-href-no-fragment-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…ent-documents__content-xhtml-extension-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ts__content-xhtml-img-fragment-non-svg-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ent-xhtml-link-to-stylesheet-fragment-id-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…uments__content-xhtml-link-to-svg-symbol-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 1/1 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ent__nav-page-list-unordered-fragments-warning` | epubcheck-warnings | warning | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocument__nav-page-list-unordered-spine-warning` | epubcheck-warnings | warning | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-document__nav-toc-unordered-fragments-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tion-document__nav-toc-unordered-spine-warning` | epubcheck-warnings | warning | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…aoverlays-textref-fragment-schemebased-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…aoverlays-textref-svg-fragment-invalid-warning` | epubcheck-warnings | warning | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `generated/gen-duplicate-ids` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 1/1 | 1.00 | 2/2 | calibre-header-diff |
+| `generated/gen-footnotes-ok` | generated | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 2/2 | 1.00 | 2/2 | calibre-header-diff |
+| `generated/gen-item-not-in-manifest` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `generated/gen-latin1-declared` | generated | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `generated/gen-latin1-undeclared` | generated | error | yes | yes | yes | 2/3 | 1/1 | 1/1 | 3/3 | 0/0 | 1.00 | 2/2 | calibre-header-diff, input-repair |
+| `generated/gen-missing-ncx` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 0/0 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `generated/gen-unterminated-tag` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `generated/gen-wrong-media-types` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 1.00 | 2/2 | calibre-header-diff |
+| `local/hertmans` | local | valid | yes | yes | yes | 20/20 | 28/28 | 28/28 | 9/9 | 0/0 | 1.00 | 104/104 | calibre-header-diff |
+| `real/gutenberg/pg10450` | pg | valid | yes | yes | yes | 18/18 | 31/31 | 31/31 | 30/30 | 30/30 | 1.00 | 53/248 | calibre-header-diff |
+| `real/gutenberg/pg11660` | pg | valid | yes | yes | yes | 6/6 | 27/27 | 27/27 | 21/21 | 17/17 | 1.00 | 48/48 | calibre-header-diff |
+| `real/gutenberg/pg11993` | pg | valid | yes | yes | yes | 5/5 | 5/5 | 5/5 | 48/48 | 42/42 | 1.00 | 38/38 | calibre-header-diff |
+| `real/gutenberg/pg12215` | pg | valid | yes | yes | yes | 19/19 | 72/72 | 72/72 | 20/20 | 85/85 | 1.00 | 46/46 | calibre-header-diff |
+| `real/gutenberg/pg14658` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 14/14 | 9/9 | 1.00 | 67/67 | calibre-header-diff |
+| `real/gutenberg/pg15228` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 116/116 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg16113` | pg | valid | yes | yes | yes | 20/20 | 18/18 | 35/35 | 29/29 | 34/34 | 1.00 | 67/288 | calibre-header-diff |
+| `real/gutenberg/pg16578` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 30/30 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg16866` | pg | valid | yes | yes | yes | 7/7 | 1/1 | 1/1 | 5/5 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg17016` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 23/23 | 19/19 | 1.00 | 46/46 | calibre-header-diff |
+| `real/gutenberg/pg1713` | pg | valid | yes | yes | yes | 8/8 | 1/1 | 1/1 | 45/45 | 39/39 | 1.00 | 46/46 | calibre-header-diff |
+| `real/gutenberg/pg17250` | pg | valid | yes | yes | yes | 4/4 | 5/5 | 5/5 | 43/43 | 24/24 | 1.00 | 60/60 | calibre-header-diff |
+| `real/gutenberg/pg17721` | pg | valid | yes | yes | yes | 7/7 | 3/3 | 5/5 | 41/41 | 62/62 | 1.00 | 51/77 | calibre-header-diff |
+| `real/gutenberg/pg1816` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 10/10 | 6/6 | 1.00 | 45/45 | calibre-header-diff |
+| `real/gutenberg/pg18196` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 25/25 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg18214` | pg | valid | yes | yes | yes | 3/3 | 7/7 | 7/7 | 6/6 | 0/0 | 1.00 | 41/41 | calibre-header-diff |
+| `real/gutenberg/pg19246` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 1/1 | 18/18 | 1.00 | 50/50 | calibre-header-diff |
+| `real/gutenberg/pg2037` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 15/15 | 0/0 | 1.00 | 34/34 | calibre-header-diff |
+| `real/gutenberg/pg21005` | pg | valid | yes | yes | yes | 6/6 | 10/10 | 10/10 | 42/42 | 27/27 | 1.00 | 44/44 | calibre-header-diff |
+| `real/gutenberg/pg2175` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 6/6 | 4/4 | 1.00 | 46/46 | calibre-header-diff |
+| `real/gutenberg/pg21853` | pg | valid | yes | yes | yes | 30/30 | 33/33 | 140/140 | 161/161 | 1034/1034 | 1.00 | 74/282 | calibre-header-diff |
+| `real/gutenberg/pg22088` | pg | valid | yes | yes | yes | 8/8 | 1/1 | 1/1 | 55/55 | 73/73 | 1.00 | 46/46 | calibre-header-diff |
+| `real/gutenberg/pg22096` | pg | valid | yes | yes | yes | 4/4 | 92/92 | 93/93 | 55/55 | 43/43 | 1.00 | 47/47 | calibre-header-diff |
+| `real/gutenberg/pg22110` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 2/2 | 0/0 | 1.00 | 37/37 | calibre-header-diff |
+| `real/gutenberg/pg23092` | pg | valid | yes | yes | yes | 4/4 | 3/3 | 3/3 | 21/21 | 34/34 | 1.00 | 72/72 | calibre-header-diff |
+| `real/gutenberg/pg23378` | pg | valid | yes | yes | yes | 5/5 | 7/7 | 7/7 | 34/34 | 22/22 | 1.00 | 83/83 | calibre-header-diff |
+| `real/gutenberg/pg27367` | pg | valid | yes | yes | yes | 8/8 | 226/226 | 342/342 | 90/90 | 174/174 | 1.00 | 81/81 | calibre-header-diff |
+| `real/gutenberg/pg27703` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 16/16 | 34/34 | 1.00 | 116/116 | calibre-header-diff |
+| `real/gutenberg/pg28050` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 18/18 | 4/4 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg29047` | pg | valid | yes | yes | yes | 8/8 | 23/23 | 23/23 | 57/57 | 91/91 | 1.00 | 69/69 | calibre-header-diff |
+| `real/gutenberg/pg29340` | pg | valid | yes | yes | yes | 30/30 | 54/54 | 54/54 | 68/68 | 198/198 | 1.00 | 66/339 | calibre-header-diff |
+| `real/gutenberg/pg29559` | pg | valid | yes | yes | yes | 4/4 | 3/3 | 3/3 | 5/5 | 2/2 | 1.00 | 59/59 | calibre-header-diff |
+| `real/gutenberg/pg29815` | pg | valid | yes | yes | yes | 4/4 | 2/2 | 2/2 | 28/28 | 237/237 | 1.00 | 52/52 | calibre-header-diff |
+| `real/gutenberg/pg30274` | pg | valid | yes | yes | yes | 8/8 | 9/9 | 9/9 | 29/29 | 113/113 | 1.00 | 47/47 | calibre-header-diff |
+| `real/gutenberg/pg3030` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 30/30 | 28/28 | 1.00 | 46/46 | calibre-header-diff |
+| `real/gutenberg/pg30963` | pg | valid | yes | yes | yes | 3/3 | 8/8 | 8/8 | 9/9 | 0/0 | 1.00 | 47/47 | calibre-header-diff |
+| `real/gutenberg/pg31085` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 61/61 | 82/82 | 1.00 | 55/55 | calibre-header-diff |
+| `real/gutenberg/pg31099` | pg | valid | yes | yes | yes | 9/9 | 6/6 | 6/6 | 25/25 | 0/0 | 1.00 | 49/49 | calibre-header-diff |
+| `real/gutenberg/pg3193` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 14/14 | 9/9 | 1.00 | 43/43 | calibre-header-diff |
+| `real/gutenberg/pg34176` | pg | valid | yes | yes | yes | 284/284 | 279/279 | 280/280 | 23/23 | 890/890 | 1.00 | 76/3677 | calibre-header-diff |
+| `real/gutenberg/pg34377` | pg | valid | yes | yes | yes | 5/5 | 4/4 | 4/4 | 22/22 | 31/31 | 1.00 | 59/59 | calibre-header-diff |
+| `real/gutenberg/pg34433` | pg | valid | yes | yes | yes | 4/4 | 125/125 | 125/125 | 12/12 | 6/6 | 1.00 | 61/74 | calibre-header-diff |
+| `real/gutenberg/pg36578` | pg | valid | yes | yes | yes | 6/6 | 8/8 | 8/8 | 26/26 | 13/13 | 1.00 | 48/48 | calibre-header-diff |
+| `real/gutenberg/pg36902` | pg | valid | yes | yes | yes | 3/3 | 9/9 | 9/9 | 7/7 | 154/154 | 1.00 | 58/58 | calibre-header-diff |
+| `real/gutenberg/pg37394` | pg | valid | yes | yes | yes | 5/5 | 40/40 | 40/40 | 169/169 | 88/88 | 1.00 | 59/59 | calibre-header-diff |
+| `real/gutenberg/pg41097` | pg | valid | yes | yes | yes | 4/4 | 11/11 | 11/11 | 33/33 | 39/39 | 1.00 | 54/54 | calibre-header-diff |
+| `real/gutenberg/pg43593` | pg | valid | yes | yes | yes | 13/13 | 24/24 | 24/24 | 25/25 | 399/399 | 1.00 | 74/100 | calibre-header-diff |
+| `real/gutenberg/pg44342` | pg | valid | yes | yes | yes | 3/3 | 23/23 | 47/47 | 6/6 | 17/17 | 1.00 | 69/69 | calibre-header-diff |
+| `real/gutenberg/pg44385` | pg | valid | yes | yes | yes | 17/17 | 1/1 | 1/1 | 30/30 | 14/14 | 1.00 | 50/50 | calibre-header-diff |
+| `real/gutenberg/pg44953` | pg | valid | yes | yes | yes | 19/19 | 33/33 | 33/33 | 28/28 | 32/32 | 1.00 | 108/303 | calibre-header-diff |
+| `real/gutenberg/pg45731` | pg | valid | yes | yes | yes | 6/6 | 41/41 | 43/43 | 270/270 | 182/182 | 1.00 | 56/56 | calibre-header-diff |
+| `real/gutenberg/pg461` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 63/63 | 48/48 | 1.00 | 38/38 | calibre-header-diff |
+| `real/gutenberg/pg47151` | pg | valid | yes | yes | yes | 6/6 | 15/15 | 15/15 | 22/22 | 455/455 | 1.00 | 59/59 | calibre-header-diff |
+| `real/gutenberg/pg48218` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 10/10 | 233/233 | 1.00 | 54/54 | calibre-header-diff |
+| `real/gutenberg/pg48323` | pg | valid | yes | yes | yes | 25/25 | 2/2 | 2/2 | 20/20 | 1484/1484 | 1.00 | 91/91 | calibre-header-diff |
+| `real/gutenberg/pg4865` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 4/4 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg49350` | pg | valid | yes | yes | yes | 5/5 | 9/9 | 9/9 | 36/36 | 40/40 | 1.00 | 52/52 | calibre-header-diff |
+| `real/gutenberg/pg49505` | pg | valid | yes | yes | yes | 38/38 | 51/51 | 51/51 | 28/28 | 676/676 | 1.00 | 96/96 | calibre-header-diff |
+| `real/gutenberg/pg50820` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 8/8 | 4/4 | 1.00 | 58/58 | calibre-header-diff |
+| `real/gutenberg/pg51700` | pg | valid | yes | yes | yes | 20/20 | 35/35 | 50/50 | 3/3 | 55/55 | 1.00 | 62/283 | calibre-header-diff |
+| `real/gutenberg/pg52303` | pg | valid | yes | yes | yes | 35/35 | 177/177 | 185/185 | 42/42 | 4517/4517 | 1.00 | 297/323 | calibre-header-diff |
+| `real/gutenberg/pg52657` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 4/4 | 0/0 | 1.00 | 59/59 | calibre-header-diff |
+| `real/gutenberg/pg53626` | pg | valid | yes | yes | yes | 29/29 | 3/3 | 3/3 | 20/20 | 3956/3956 | 1.00 | 166/166 | calibre-header-diff |
+| `real/gutenberg/pg54611` | pg | valid | yes | yes | yes | 36/36 | 2/2 | 2/2 | 42/42 | 1986/1986 | 1.00 | 156/156 | calibre-header-diff |
+| `real/gutenberg/pg5513` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 6/6 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg5578` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 9/9 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg55919` | pg | valid | yes | yes | yes | 45/45 | 58/58 | 58/58 | 16/16 | 1077/1077 | 1.00 | 133/484 | calibre-header-diff |
+| `real/gutenberg/pg57791` | pg | valid | yes | yes | yes | 22/22 | 14/14 | 14/14 | 21/21 | 37/37 | 1.00 | 113/113 | calibre-header-diff |
+| `real/gutenberg/pg58062` | pg | valid | yes | yes | yes | 22/22 | 1/1 | 1/1 | 598/598 | 2257/2257 | 1.00 | 115/115 | calibre-header-diff |
+| `real/gutenberg/pg58344` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 16/16 | 16/16 | 1.00 | 28/28 | calibre-header-diff |
+| `real/gutenberg/pg59227` | pg | valid | yes | yes | yes | 4/4 | 3/3 | 4/4 | 25/25 | 10/10 | 1.00 | 58/58 | calibre-header-diff |
+| `real/gutenberg/pg60297` | pg | valid | yes | yes | yes | 4/4 | 7/7 | 7/7 | 7/7 | 0/0 | 1.00 | 89/89 | calibre-header-diff |
+| `real/gutenberg/pg6072` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 32/32 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg60903` | pg | valid | yes | yes | yes | 5/5 | 2/2 | 2/2 | 40/40 | 0/0 | 1.00 | 200/200 | calibre-header-diff |
+| `real/gutenberg/pg61267` | pg | valid | yes | yes | yes | 16/16 | 128/128 | 128/128 | 191/191 | 1025/1025 | 1.00 | 282/373 | calibre-header-diff |
+| `real/gutenberg/pg61348` | pg | valid | yes | yes | yes | 22/22 | 10/10 | 10/10 | 15/15 | 20/20 | 1.00 | 97/97 | calibre-header-diff |
+| `real/gutenberg/pg62947` | pg | valid | yes | yes | yes | 22/22 | 57/57 | 57/57 | 22/22 | 86/86 | 1.00 | 69/69 | calibre-header-diff |
+| `real/gutenberg/pg63372` | pg | valid | yes | yes | yes | 26/26 | 104/104 | 128/128 | 129/129 | 1011/1011 | 1.00 | 353/353 | calibre-header-diff |
+| `real/gutenberg/pg64210` | pg | valid | yes | yes | yes | 17/17 | 3/3 | 3/3 | 247/247 | 1201/1201 | 1.00 | 79/79 | calibre-header-diff |
+| `real/gutenberg/pg6466` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 12/12 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg6568` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 53/53 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg66997` | pg | valid | yes | yes | yes | 56/56 | 3/3 | 52/52 | 56/56 | 51/51 | 1.00 | 63/63 | calibre-header-diff |
+| `real/gutenberg/pg67108` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 2/2 | 0/0 | 1.00 | 103/103 | calibre-header-diff |
+| `real/gutenberg/pg67331` | pg | valid | yes | yes | yes | 35/35 | 6/6 | 12/12 | 35/35 | 558/558 | 1.00 | 68/68 | calibre-header-diff |
+| `real/gutenberg/pg6795` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 13/13 | 18/18 | 1.00 | 43/43 | calibre-header-diff |
+| `real/gutenberg/pg69052` | pg | valid | yes | yes | yes | 33/33 | 7/7 | 7/7 | 28/28 | 5/5 | 1.00 | 74/74 | calibre-header-diff |
+| `real/gutenberg/pg69443` | pg | valid | yes | yes | yes | 3/3 | 2/2 | 2/2 | 26/26 | 17/17 | 1.00 | 36/36 | calibre-header-diff |
+| `real/gutenberg/pg70584` | pg | valid | yes | yes | yes | 12/12 | 2/2 | 2/2 | 12/12 | 7/7 | 1.00 | 65/65 | calibre-header-diff |
+| `real/gutenberg/pg7115` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 59/59 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/gutenberg/pg71277` | pg | valid | yes | yes | yes | 18/18 | 1/1 | 1/1 | 90/90 | 13/13 | 1.00 | 152/152 | calibre-header-diff |
+| `real/gutenberg/pg71842` | pg | valid | yes | yes | yes | 17/17 | 254/254 | 254/254 | 35/35 | 1753/1753 | 1.00 | 89/89 | calibre-header-diff |
+| `real/gutenberg/pg7199` | pg | valid | yes | yes | yes | 3/3 | 27/27 | 27/27 | 10/10 | 26/26 | 1.00 | 42/42 | calibre-header-diff |
+| `real/gutenberg/pg72234` | pg | valid | yes | yes | yes | 3/3 | 3/3 | 3/3 | 2/2 | 0/0 | 1.00 | 50/50 | calibre-header-diff |
+| `real/gutenberg/pg7237` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 65/65 | 59/59 | 1.00 | 46/46 | calibre-header-diff |
+| `real/gutenberg/pg72476` | pg | valid | yes | yes | yes | 46/46 | 2/2 | 2/2 | 108/108 | 297/297 | 1.00 | 130/130 | calibre-header-diff |
+| `real/gutenberg/pg74064` | pg | valid | yes | yes | yes | 41/41 | 14/14 | 14/14 | 59/59 | 41/41 | 1.00 | 79/79 | calibre-header-diff |
+| `real/gutenberg/pg74759` | pg | valid | yes | yes | yes | 11/11 | 1/1 | 1/1 | 12/12 | 8/8 | 1.00 | 63/63 | calibre-header-diff |
+| `real/gutenberg/pg77864` | pg | valid | yes | yes | yes | 14/14 | 1/1 | 1/1 | 13/13 | 21/21 | 1.00 | 55/55 | calibre-header-diff |
+| `real/gutenberg/pg7906` | pg | valid | yes | yes | yes | 11/11 | 12/12 | 27/27 | 4/4 | 24/24 | 1.00 | 43/147 | calibre-header-diff |
+| `real/gutenberg/pg8932` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 29/29 | 0/0 | 1.00 | 39/39 | calibre-header-diff |
+| `real/standard-ebooks/a-e-w-mason_the-four-feathers` | se | valid | yes | yes | yes | 42/42 | 3/3 | 6/6 | 42/42 | 3/3 | 1.00 | 81/81 | calibre-header-diff |
+| `real/…dard-ebooks/a-e-w-mason_the-house-of-the-arrow` | se | valid | yes | yes | yes | 30/30 | 3/3 | 6/6 | 30/30 | 1/1 | 1.00 | 86/86 | calibre-header-diff |
+| `real/…ndard-ebooks/agatha-christie_partners-in-crime` | se | valid | yes | yes | yes | 21/21 | 3/3 | 6/6 | 33/33 | 1/1 | 1.00 | 78/78 | calibre-header-diff |
+| `real/standard-ebooks/ameen-rihani_the-book-of-khalid` | se | valid | yes | yes | yes | 41/41 | 3/3 | 6/6 | 41/41 | 11/11 | 1.00 | 87/87 | calibre-header-diff |
+| `real/…dard-ebooks/anna-katharine-green_hand-and-ring` | se | valid | yes | yes | yes | 53/53 | 5/5 | 10/10 | 53/53 | 3/3 | 1.00 | 101/101 | calibre-header-diff |
+| `real/…oks/anna-katharine-green_the-sword-of-damocles` | se | valid | yes | yes | yes | 59/59 | 3/3 | 6/6 | 59/59 | 3/3 | 1.00 | 116/116 | calibre-header-diff |
+| `real/…ard-ebooks/anne-parrish_the-perennial-bachelor` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 1/1 | 1.00 | 81/81 | calibre-header-diff |
+| `real/…dard-ebooks/anthony-trollope_dr-wortles-school` | se | valid | yes | yes | yes | 34/34 | 3/3 | 6/6 | 34/34 | 1/1 | 1.00 | 69/69 | calibre-header-diff |
+| `real/…rd-ebooks/arthur-b-reeve_craig-kennedy-stories` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 1/1 | 1.00 | 78/78 | calibre-header-diff |
+| `real/…ks/arthur-conan-doyle_brigadier-gerard-stories` | se | valid | yes | yes | yes | 21/21 | 3/3 | 6/6 | 23/23 | 1/1 | 1.00 | 66/66 | calibre-header-diff |
+| `real/…d-ebooks/arthur-ransome_racundras-first-cruise` | se | valid | yes | yes | yes | 37/37 | 37/37 | 44/44 | 37/37 | 39/39 | 1.00 | 76/76 | calibre-header-diff |
+| `real/…rd-ebooks/c-h-spurgeon_the-art-of-illustration` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 12/12 | 7/7 | 1.00 | 73/73 | calibre-header-diff |
+| `real/…therine-louisa-pirkis_a-bride-of-a-summers-day` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 1/1 | 1.00 | 75/75 | calibre-header-diff |
+| `real/…d-ebooks/catherine-louisa-pirkis_short-fiction` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 32/32 | 1/1 | 1.00 | 78/78 | calibre-header-diff |
+| `real/…e-experiences-of-loveday-brooke-lady-detective` | se | valid | yes | yes | yes | 11/11 | 3/3 | 6/6 | 11/11 | 1/1 | 1.00 | 71/71 | calibre-header-diff |
+| `real/standard-ebooks/charles-brockden-brown_wieland` | se | valid | yes | yes | yes | 35/35 | 3/3 | 6/6 | 35/35 | 9/9 | 1.00 | 80/80 | calibre-header-diff |
+| `real/standard-ebooks/charles-dickens_barnaby-rudge` | se | valid | yes | yes | yes | 88/88 | 3/3 | 6/6 | 88/88 | 1/1 | 1.00 | 67/67 | calibre-header-diff |
+| `real/…oks/charles-dickens_the-mystery-of-edwin-drood` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 30/30 | 1/1 | 1.00 | 81/81 | calibre-header-diff |
+| `real/standard-ebooks/charles-kingsley_hypatia` | se | valid | yes | yes | yes | 38/38 | 3/3 | 6/6 | 38/38 | 13/13 | 1.00 | 83/83 | calibre-header-diff |
+| `real/…arlotte-m-yonge_the-clever-woman-of-the-family` | se | valid | yes | yes | yes | 34/34 | 3/3 | 6/6 | 34/34 | 1/1 | 1.00 | 83/83 | calibre-header-diff |
+| `real/…s/charlotte-perkins-gilman_moving-the-mountain` | se | valid | yes | yes | yes | 18/18 | 3/3 | 6/6 | 18/18 | 1/1 | 1.00 | 69/69 | calibre-header-diff |
+| `real/standard-ebooks/claude-mckay_banjo` | se | valid | yes | yes | yes | 34/34 | 3/3 | 6/6 | 34/34 | 1/1 | 1.00 | 80/80 | calibre-header-diff |
+| `real/…ks/d-l-moody_the-way-to-god-and-how-to-find-it` | se | valid | yes | yes | yes | 16/16 | 3/3 | 6/6 | 16/16 | 5/5 | 1.00 | 78/78 | calibre-header-diff |
+| `real/…d-ebooks/david-hume_a-treatise-of-human-nature` | se | valid | yes | yes | yes | 113/113 | 3/3 | 6/6 | 113/113 | 187/187 | 1.00 | 80/80 | calibre-header-diff |
+| `real/standard-ebooks/dornford-yates_blind-corner` | se | valid | yes | yes | yes | 15/15 | 3/3 | 6/6 | 15/15 | 1/1 | 1.00 | 76/76 | calibre-header-diff |
+| `real/standard-ebooks/dornford-yates_perishable-goods` | se | valid | yes | yes | yes | 15/15 | 3/3 | 6/6 | 15/15 | 1/1 | 1.00 | 80/80 | calibre-header-diff |
+| `real/…ayers_robert-eustace_the-documents-in-the-case` | se | valid | yes | yes | yes | 61/61 | 3/3 | 6/6 | 61/61 | 5/5 | 1.00 | 90/90 | calibre-header-diff |
+| `real/standard-ebooks/dorothy-m-richardson_deadlock` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 1/1 | 1.00 | 66/66 | calibre-header-diff |
+| `real/standard-ebooks/dorothy-m-richardson_interim` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 1/1 | 1.00 | 72/72 | calibre-header-diff |
+| `real/standard-ebooks/dorothy-m-richardson_oberland` | se | valid | yes | yes | yes | 16/16 | 3/3 | 6/6 | 16/16 | 1/1 | 1.00 | 71/71 | calibre-header-diff |
+| `real/…d-ebooks/dorothy-m-richardson_revolving-lights` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 10/10 | 1/1 | 1.00 | 74/74 | calibre-header-diff |
+| `real/standard-ebooks/dorothy-m-richardson_the-trap` | se | valid | yes | yes | yes | 15/15 | 3/3 | 6/6 | 15/15 | 1/1 | 1.00 | 76/76 | calibre-header-diff |
+| `real/…ks/e-nesbit_beautiful-stories-from-shakespeare` | se | valid | yes | yes | yes | 27/27 | 3/3 | 6/6 | 27/27 | 1/1 | 1.00 | 79/79 | calibre-header-diff |
+| `real/…d-ebooks/edgar-rice-burroughs_pirates-of-venus` | se | valid | yes | yes | yes | 18/18 | 3/3 | 6/6 | 18/18 | 1/1 | 1.00 | 69/69 | calibre-header-diff |
+| `real/standard-ebooks/edgar-saltus_short-fiction` | se | valid | yes | yes | yes | 37/37 | 3/3 | 6/6 | 167/167 | 15/15 | 1.00 | 110/110 | calibre-header-diff |
+| `real/…andard-ebooks/edgar-saltus_the-perfume-of-eros` | se | valid | yes | yes | yes | 26/26 | 3/3 | 6/6 | 26/26 | 1/1 | 1.00 | 66/66 | calibre-header-diff |
+| `real/…-burke_reflections-on-the-revolution-in-france` | se | valid | yes | yes | yes | 8/8 | 3/3 | 6/6 | 8/8 | 123/123 | 1.00 | 80/80 | calibre-header-diff |
+| `real/…ebooks/ford-madox-ford_the-fifth-queen-crowned` | se | valid | yes | yes | yes | 32/32 | 3/3 | 6/6 | 32/32 | 1/1 | 1.00 | 83/83 | calibre-header-diff |
+| `real/…oks/franklin-w-dixon_the-great-airport-mystery` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 1/1 | 1.00 | 66/66 | calibre-header-diff |
+| `real/standard-ebooks/george-eliot_romola` | se | valid | yes | yes | yes | 83/83 | 3/3 | 6/6 | 83/83 | 65/65 | 1.00 | 74/74 | calibre-header-diff |
+| `real/…dard-ebooks/george-macdonald_if-i-had-a-father` | se | valid | yes | yes | yes | 8/8 | 3/3 | 6/6 | 8/8 | 1/1 | 1.00 | 83/83 | calibre-header-diff |
+| `real/…ard-ebooks/george-macdonald_within-and-without` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 78/78 | 1/1 | 1.00 | 109/109 | calibre-header-diff |
+| `real/standard-ebooks/h-c-mcneile_the-black-gang` | se | valid | yes | yes | yes | 22/22 | 3/3 | 6/6 | 22/22 | 1/1 | 1.00 | 71/71 | calibre-header-diff |
+| `real/standard-ebooks/h-c-mcneile_the-final-count` | se | valid | yes | yes | yes | 19/19 | 3/3 | 6/6 | 19/19 | 1/1 | 1.00 | 69/69 | calibre-header-diff |
+| `real/standard-ebooks/h-c-mcneile_the-third-round` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 1/1 | 1.00 | 69/69 | calibre-header-diff |
+| `real/standard-ebooks/h-g-wells_the-wheels-of-chance` | se | valid | yes | yes | yes | 33/33 | 4/4 | 8/8 | 74/74 | 3/3 | 1.00 | 72/72 | calibre-header-diff |
+| `real/standard-ebooks/harry-harrison_short-fiction` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 12/12 | 1/1 | 1.00 | 72/72 | calibre-header-diff |
+| `real/…oks/henry-seton-merriman_barlasch-of-the-guard` | se | valid | yes | yes | yes | 36/36 | 3/3 | 6/6 | 36/36 | 1/1 | 1.00 | 81/81 | calibre-header-diff |
+| `real/standard-ebooks/henry-seton-merriman_the-sowers` | se | valid | yes | yes | yes | 48/48 | 3/3 | 6/6 | 48/48 | 1/1 | 1.00 | 70/70 | calibre-header-diff |
+| `real/…d-ebooks/henry-van-dyke-jr_the-house-of-rimmon` | se | valid | yes | yes | yes | 11/11 | 3/3 | 6/6 | 17/17 | 3/3 | 1.00 | 104/104 | calibre-header-diff |
+| `real/…d-ebooks/herbert-gorman_the-place-called-dagon` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 43/43 | 1/1 | 1.00 | 71/71 | calibre-header-diff |
+| `real/…d-ebooks/hilaire-belloc_the-cruise-of-the-nona` | se | valid | yes | yes | yes | 8/8 | 3/3 | 6/6 | 8/8 | 1/1 | 1.00 | 82/82 | calibre-header-diff |
+| `real/…ooks/j-storer-clouston_the-man-from-the-clouds` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 1/1 | 1.00 | 87/87 | calibre-header-diff |
+| `real/…rd-ebooks/james-branch-cabell_the-line-of-love` | se | valid | yes | yes | yes | 20/20 | 3/3 | 6/6 | 20/20 | 5/5 | 1.00 | 92/92 | calibre-header-diff |
+| `real/standard-ebooks/jane-c-loudon_the-mummy` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 1/1 | 1.00 | 80/80 | calibre-header-diff |
+| `real/standard-ebooks/john-donne_poetry` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 219/219 | 1/1 | 1.00 | 106/106 | calibre-header-diff |
+| `real/standard-ebooks/john-gay_the-beggars-opera` | se | valid | yes | yes | yes | 13/13 | 71/71 | 142/142 | 23/23 | 69/69 | 1.00 | 118/118 | calibre-header-diff |
+| `real/…books/john-meade-falkner_the-lost-stradivarius` | se | valid | yes | yes | yes | 24/24 | 3/3 | 6/6 | 24/24 | 1/1 | 1.00 | 85/85 | calibre-header-diff |
+| `real/…-ebooks/john-newton_william-cowper_olney-hymns` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 383/383 | 67/67 | 1.00 | 80/80 | calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_chance` | se | valid | yes | yes | yes | 23/23 | 3/3 | 6/6 | 23/23 | 1/1 | 1.00 | 80/80 | calibre-header-diff |
+| `real/…h-conrad_ford-madox-ford_the-nature-of-a-crime` | se | valid | yes | yes | yes | 15/15 | 3/3 | 6/6 | 15/15 | 1/1 | 1.00 | 68/68 | calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_suspense` | se | valid | yes | yes | yes | 25/25 | 3/3 | 6/6 | 25/25 | 1/1 | 1.00 | 68/68 | calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_the-arrow-of-gold` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 1/1 | 1.00 | 84/84 | calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_the-rescue` | se | valid | yes | yes | yes | 55/55 | 3/3 | 6/6 | 55/55 | 1/1 | 1.00 | 85/85 | calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_the-rover` | se | valid | yes | yes | yes | 23/23 | 3/3 | 6/6 | 23/23 | 1/1 | 1.00 | 84/84 | calibre-header-diff |
+| `real/…s/joshua-slocum_sailing-alone-around-the-world` | se | valid | yes | yes | yes | 30/30 | 14/14 | 28/28 | 30/30 | 28/28 | 1.00 | 92/92 | calibre-header-diff |
+| `real/…dard-ebooks/kahlil-gibran_jesus-the-son-of-man` | se | valid | yes | yes | yes | 83/83 | 3/3 | 6/6 | 83/83 | 1/1 | 1.00 | 72/72 | calibre-header-diff |
+| `real/…arine-a-carl_with-the-empress-dowager-of-china` | se | valid | yes | yes | yes | 44/44 | 24/24 | 27/27 | 44/44 | 40/40 | 1.00 | 85/85 | calibre-header-diff |
+| `real/standard-ebooks/maria-lowell_poetry` | se | valid | yes | yes | yes | 6/6 | 3/3 | 6/6 | 25/25 | 3/3 | 1.00 | 77/77 | calibre-header-diff |
+| `real/…s/marie-belloc-lowndes_the-chink-in-the-armour` | se | valid | yes | yes | yes | 31/31 | 3/3 | 6/6 | 31/31 | 1/1 | 1.00 | 76/76 | calibre-header-diff |
+| `real/…-ebooks/marmaduke-pickthall_said-the-fisherman` | se | valid | yes | yes | yes | 55/55 | 3/3 | 6/6 | 55/55 | 9/9 | 1.00 | 77/77 | calibre-header-diff |
+| `real/…d-ebooks/mary-augusta-ward_lady-roses-daughter` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 1/1 | 1.00 | 73/73 | calibre-header-diff |
+| `real/…rd-ebooks/mary-p-hamlin_george-arliss_hamilton` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 12/12 | 1/1 | 1.00 | 99/99 | calibre-header-diff |
+| `real/…rd-ebooks/mourning-dove_cogewea-the-half-blood` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 119/119 | 1.00 | 100/100 | calibre-header-diff |
+| `real/standard-ebooks/noel-coward_hay-fever` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 10/10 | 1/1 | 1.00 | 100/100 | calibre-header-diff |
+| `real/…ndard-ebooks/noel-loomis_short-science-fiction` | se | valid | yes | yes | yes | 13/13 | 3/3 | 6/6 | 13/13 | 1/1 | 1.00 | 71/71 | calibre-header-diff |
+| `real/…andard-ebooks/norman-angell_the-great-illusion` | se | valid | yes | yes | yes | 31/31 | 3/3 | 6/6 | 31/31 | 267/267 | 1.00 | 69/69 | calibre-header-diff |
+| `real/…ndard-ebooks/olaf-stapledon_last-and-first-men` | se | valid | yes | yes | yes | 24/24 | 7/7 | 14/14 | 80/80 | 5/5 | 1.00 | 70/70 | calibre-header-diff |
+| `real/…d-ebooks/p-g-wodehouse_the-adventures-of-sally` | se | valid | yes | yes | yes | 22/22 | 3/3 | 6/6 | 59/59 | 1/1 | 1.00 | 75/75 | calibre-header-diff |
+| `real/…ard-ebooks/pauline-e-hopkins_contending-forces` | se | valid | yes | yes | yes | 30/30 | 3/3 | 6/6 | 30/30 | 1/1 | 1.00 | 112/112 | calibre-header-diff |
+| `real/standard-ebooks/pauline-e-hopkins_of-one-blood` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 1/1 | 1.00 | 80/80 | calibre-header-diff |
+| `real/standard-ebooks/ring-lardner_fred-gross-stories` | se | valid | yes | yes | yes | 11/11 | 3/3 | 6/6 | 11/11 | 1/1 | 1.00 | 76/76 | calibre-header-diff |
+| `real/…ebooks/ring-lardner_george-s-kaufman_june-moon` | se | valid | yes | yes | yes | 11/11 | 3/3 | 6/6 | 11/11 | 1/1 | 1.00 | 98/98 | calibre-header-diff |
+| `real/standard-ebooks/ring-lardner_gullibles-travels` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 28/28 | 1/1 | 1.00 | 68/68 | calibre-header-diff |
+| `real/standard-ebooks/ring-lardner_short-fiction` | se | valid | yes | yes | yes | 80/80 | 3/3 | 6/6 | 203/203 | 115/115 | 1.00 | 86/86 | calibre-header-diff |
+| `real/…ard-ebooks/robert-hugh-benson_the-necromancers` | se | valid | yes | yes | yes | 25/25 | 3/3 | 6/6 | 68/68 | 1/1 | 1.00 | 70/70 | calibre-header-diff |
+| `real/standard-ebooks/robert-louis-stevenson_poetry` | se | valid | yes | yes | yes | 7/7 | 13/13 | 26/26 | 385/385 | 99/99 | 1.00 | 93/93 | calibre-header-diff |
+| `real/…ard-ebooks/rudolph-fisher_the-walls-of-jericho` | se | valid | yes | yes | yes | 40/40 | 3/3 | 6/6 | 40/40 | 57/57 | 1.00 | 88/88 | calibre-header-diff |
+| `real/…ard-ebooks/rudyard-kipling_captains-courageous` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 1/1 | 1.00 | 93/93 | calibre-header-diff |
+| `real/…leridge_robert-southey_the-fall-of-robespierre` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 10/10 | 7/7 | 1.00 | 93/93 | calibre-header-diff |
+| `real/…egfried-sassoon_memoirs-of-an-infantry-officer` | se | valid | yes | yes | yes | 14/14 | 3/3 | 6/6 | 50/50 | 1/1 | 1.00 | 72/72 | calibre-header-diff |
+| `real/…e-roosevelt_a-book-lovers-holidays-in-the-open` | se | valid | yes | yes | yes | 23/23 | 5/5 | 9/9 | 23/23 | 10/10 | 1.00 | 113/113 | calibre-header-diff |
+| `real/…s/w-e-b-du-bois_the-quest-of-the-silver-fleece` | se | valid | yes | yes | yes | 45/45 | 3/3 | 6/6 | 45/45 | 1/1 | 1.00 | 84/84 | calibre-header-diff |
+| `real/…/w-h-davies_the-autobiography-of-a-super-tramp` | se | valid | yes | yes | yes | 40/40 | 3/3 | 6/6 | 40/40 | 1/1 | 1.00 | 67/67 | calibre-header-diff |
+| `real/standard-ebooks/walter-white_flight` | se | valid | yes | yes | yes | 30/30 | 3/3 | 6/6 | 30/30 | 1/1 | 1.00 | 79/79 | calibre-header-diff |
+| `real/…dard-ebooks/walter-white_the-fire-in-the-flint` | se | valid | yes | yes | yes | 30/30 | 3/3 | 6/6 | 30/30 | 1/1 | 1.00 | 83/83 | calibre-header-diff |
+| `real/standard-ebooks/wilkie-collins_basil` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 42/42 | 3/3 | 1.00 | 79/79 | calibre-header-diff |
+| `real/…ndard-ebooks/willa-cather_the-professors-house` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 1/1 | 1.00 | 82/82 | calibre-header-diff |
+| `real/…rd-ebooks/winnifred-eaton-reeve_his-royal-nibs` | se | valid | yes | yes | yes | 33/33 | 3/3 | 6/6 | 33/33 | 1/1 | 1.00 | 80/80 | calibre-header-diff |
+| `real/…-ebooks/yung-wing_my-life-in-china-and-america` | se | valid | yes | yes | yes | 31/31 | 3/3 | 6/6 | 36/36 | 3/3 | 1.00 | 77/77 | calibre-header-diff |
+
+## Format: mobi
+
+### 1. Summary
+
+886 books were run for MOBI; 876 (99%) produced an output file and 10 did not. Calibre itself converted 833 of 886. 876 of 876 (100%) converted books pass all three parser gates (mobitool, KindleUnpack, Calibre reader). 304 books carry at least one actionable gap (a book can carry several kinds): 292 have unported Calibre transform gaps (96%), 1 have input repair gaps (0%), 13 have writer bug gaps (4%); 505 category findings in total. Verdict: unported Calibre transform gaps affect the most books (96%), so the next effort should port the missing Calibre transforms, starting with `style-lost`. 485 of 886 books have no actionable gap and were fully evaluated; 9 more books with no gap found were not fully evaluated (harness error, clean refusal or missing invariants); 88 fixed-layout books are out of scope and not counted. Invariants not evaluated (books): text 12, images 12, toc 13, links 12, style 12. Not counted above (category findings): 6 acceptable, 889 informational, 141 out of scope.
+
+### 2. Top gap categories by affected books
+
+| # | category | books | % of books | description | kind |
+|---|---|---|---|---|---|
+| 1 | `style-lost` | 268 | 30% | Style score below 0.5, or the input has CSS rules and the output none | unported Calibre transform |
+| 2 | `links-unresolved` | 223 | 25% | Internal links that no longer resolve | unported Calibre transform |
+| 3 | `images-misreferenced` | 6 | 1% | Image references in the text point at the wrong image or at none | writer bug |
+| 4 | `app-error` | 4 | 0% | App produced no file and the input is not expected to fail | writer bug |
+| 5 | `toc-labels` | 3 | 0% | TOC entries whose labels/targets do not match the input | writer bug |
+
+Informational, acceptable, harness and out-of-scope categories are not ranked here (`calibre-header-diff`, `images-resized`, `images-unextractable`, `spine-non-xhtml`, `app-clean-error`, `harness-error`, `fixed-layout-unsupported`), and nothing on a fixed-layout book is; they appear in the per-category breakdown and the per-book table. `text-loss` counts as `input repair` on books whose verdict is error/warning, otherwise as `writer bug`.
+
+### 3. Books most needing a manual look in Kindle Previewer
+
+Ranked: gate failure, then misreferenced images, then lowest style score, then text-loss, then unresolved links. Only books with an output file are eligible; fixed-layout books are not.
+
+| # | book | corpus category | why |
+|---|---|---|---|
+| 1 | `core/…tures__outdated-manifest-fallback-xhtml-video-poster-valid` | epubcheck-valid | image refs 0/1 correct (0 wrong, 1 missing) |
+| 2 | `core/…3_03-resources__foreign-xhtml-picture-source-no-type-error` | epubcheck-invalid | image refs 1/2 correct (0 wrong, 1 missing) |
+| 3 | `core/…03-resources__foreign-xhtml-picture-source-with-type-valid` | epubcheck-valid | image refs 1/2 correct (0 wrong, 1 missing) |
+| 4 | `core/…s/epub3_03-resources__type-picture-source-mismatch-warning` | epubcheck-warnings | image refs 1/2 correct (0 wrong, 1 missing) |
+| 5 | `core/…tent-documents__content-xhtml-img-fragment-non-svg-warning` | epubcheck-warnings | image refs 1/2 correct (0 wrong, 1 missing) |
+
+### 4. Gap categories by corpus category
+
+| corpus category | books | `app-error` | `app-clean-error` | `spine-non-xhtml` | `images-unextractable` | `images-misreferenced` | `toc-labels` | `links-unresolved` | `style-lost` | `fixed-layout-unsupported` | `calibre-header-diff` | `input-repair` |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| epubcheck-invalid | 222 |  | 3 | 8 | 4 | 1 | 1 | 6 | 12 | 16 | 206 |  |
+| epubcheck-other | 35 | 2 | 3 |  |  |  |  | 1 | 1 | 5 | 30 |  |
+| epubcheck-valid | 169 | 1 |  | 14 | 5 | 2 | 2 | 6 | 9 | 14 | 149 |  |
+| epubcheck-warnings | 42 |  |  | 5 |  | 2 |  | 2 |  | 1 | 41 |  |
+| generated | 8 |  |  |  |  |  |  | 2 | 8 |  | 8 | 1 |
+| idpf | 27 |  |  | 2 | 1 | 1 |  | 18 | 25 | 4 | 25 |  |
+| local | 1 |  |  |  |  | 1 |  |  | 1 |  | 1 |  |
+| pg | 100 |  |  |  | 1 |  |  | 78 | 100 |  | 100 |  |
+| se | 100 |  |  |  |  |  |  | 100 | 100 |  | 100 |  |
+| w3c | 182 | 1 |  | 12 | 4 |  |  | 10 | 64 | 48 | 173 |  |
+| **total** | 886 | 4 | 6 | 41 | 15 | 7 | 3 | 223 | 320 | 88 | 833 | 1 |
+
+### 5. All books
+
+| id | category | verdict | app ok | calibre ok | gate pass | text match/spine | images matched/referenced | image refs ok/total | toc matched/input | links resolved/total | style | css rules out/in | categories |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `core/01-idpf-samples/childrens-literature` | idpf | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 31/31 | 0/119 | 0.00 | 2/26 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/childrens-media-query` | idpf | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/13 | style-lost, calibre-header-diff |
+| `core/01-idpf-samples/cole-voyage-of-life` | idpf | valid | yes | yes | yes | 10/10 | 9/9 | 9/9 | 7/7 | 0/0 | 0.00 | 0/11 | style-lost, calibre-header-diff |
+| `core/01-idpf-samples/cole-voyage-of-life-tol` | idpf | valid | yes | yes | yes | 5/5 | 9/9 | 9/9 | 6/6 | 0/0 | 0.01 | 1/27 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/01-idpf-samples/epub30-spec` | idpf | valid | yes | yes | yes | 11/11 | 2/2 | 10/10 | 316/316 | 0/2575 | 0.00 | 0/97 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/figure-gallery-bindings` | idpf | valid | yes | yes | yes | 1/1 | 9/9 | 8/8 | 1/1 | 0/0 | 0.00 | 0/12 | style-lost, calibre-header-diff |
+| `core/01-idpf-samples/georgia-cfi` | idpf | valid | yes | yes | yes | 2/2 | 2/2 | 2/2 | 10/10 | 0/25 | 0.00 | 1/7 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/georgia-pls-ssml` | idpf | valid | yes | yes | yes | 2/2 | 2/2 | 2/2 | 10/10 | 0/25 | 0.00 | 1/7 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/hefty-water` | idpf | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 4/4 | 0/2 | 0.00 | 0/3 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/indexing-for-eds-and-auths-3f` | idpf | valid | yes | yes | yes | 22/22 | 12/12 | 33/33 | 18/18 | 0/1058 | 0.00 | 0/210 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/indexing-for-eds-and-auths-3md` | idpf | valid | yes | yes | yes | 23/23 | 12/12 | 33/33 | 18/18 | 0/1058 | 0.00 | 0/213 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/internallinks` | idpf | valid | yes | yes | yes | 7/7 | 8/8 | 8/8 | 18/18 | 0/31 | 0.01 | 8/142 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/israelsailing` | idpf | valid | yes | yes | yes | 12/12 | 7/7 | 7/7 | 12/12 | 0/0 | 0.00 | 0/36 | style-lost, calibre-header-diff |
+| `core/01-idpf-samples/linear-algebra` | idpf | valid | yes | yes | yes | 94/94 | 0/0 | 0/0 | 94/94 | 0/436 | 0.00 | 0/99 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/moby-dick` | idpf | valid | yes | yes | yes | 144/144 | 2/2 | 2/2 | 141/141 | 0/153 | 0.00 | 1/57 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/mymedia_lite` | idpf | valid | yes | yes | yes | 7/7 | 7/7 | 7/7 | 5/5 | 0/4 | 0.00 | 0/81 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/quiz-bindings` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 1/1 | 0/0 | 0.00 | 0/12 | style-lost, calibre-header-diff |
+| `core/01-idpf-samples/regime-anticancer-arabic` | idpf | valid | yes | yes | yes | 3/3 | 2/2 | 2/2 | 3/3 | 0/2 | 0.00 | 0/9 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/sous-le-vent` | idpf | valid | yes | yes | yes | 13/13 | 3/3 | 0/2 | 1/1 | 0/0 | 0.21 | 140/144 | images-misreferenced, style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/01-idpf-samples/sous-le-vent_svg-in-spine` | idpf | valid | yes | no | yes | 0/0 | 1/1 | 0/0 | 1/1 | 0/0 | 1.00 | 1/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/01-idpf-samples/svg-in-spine` | idpf | valid | yes | no | yes | 0/0 | 0/1 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, images-unextractable, fixed-layout-unsupported |
+| `core/01-idpf-samples/trees` | idpf | valid | yes | yes | yes | 3/3 | 1/1 | 0/0 | 2/2 | 0/2 | 0.00 | 0/10 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/wasteland` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 0/100 | 0.00 | 0/14 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/wasteland-otf` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 0/100 | 0.00 | 0/14 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/wasteland-otf-obf` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 0/100 | 0.00 | 0/14 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/wasteland-woff` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 0/100 | 0.00 | 0/14 | links-unresolved, style-lost, calibre-header-diff |
+| `core/01-idpf-samples/wasteland-woff-obf` | idpf | valid | yes | yes | yes | 1/1 | 1/1 | 0/0 | 6/6 | 0/100 | 0.00 | 0/14 | links-unresolved, style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/cnt-css-fonts_ot` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/cnt-css-fonts_tt` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/cnt-css-fonts_woff` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/cnt-css-fonts_woff2` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/cnt-mathml-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-svg-css` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/cnt-svg-css-inclusion` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-svg-css-reference` | w3c | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/1 | images-unextractable, calibre-header-diff |
+| `core/02-w3c-conformance/cnt-svg-embedded` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 1/1 | calibre-header-diff |
+| `core/02-w3c-conformance/cnt-svg-support` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/cnt-xhtml-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-hyphens` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-line-break` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/5 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-text-align-last` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…c-conformance/css-epub-text-combine-horizontal` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.50 | 0/5 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-text-emphasis` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 1/1 | 0/0 | 0.41 | 0/19 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-text-orientation` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 0.50 | 0/5 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-text-transform` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.20 | 0/1 | style-lost, calibre-header-diff |
+| `core/…c-conformance/css-epub-text-underline-position` | w3c | valid | yes | yes | yes | 5/5 | 0/0 | 0/0 | 1/1 | 0/0 | 0.25 | 0/9 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-word-break` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/css-epub-writing-mode` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 0.43 | 0/0 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/fxl-layout-duplication` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/fxl-page-spread-break` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/fxl-page-spread-center` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…nformance/fxl-spine-overrides_behave-as-global` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/2 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…mance/fxl-spine-overrides_behave-as-global-bis` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 0.00 | 0/3 | style-lost, calibre-header-diff |
+| `core/…-w3c-conformance/fxl-spine-overrides_duplicate` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/2 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-layout-default` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-layout-pre-paginated` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…nformance/lay-fxl-layout-pre-paginated-spreads` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-orientation-default` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…-w3c-conformance/lay-fxl-orientation-landscape` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-page-spread-combined` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-page-spread-left` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-page-spread-right` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-auto` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-both` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-default` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-landscape` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-spread-none` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-svg-icb_multi` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 3/3 | 0/0 | 0.00 | 0/2 | spine-non-xhtml, style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-xhtml-icb` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…w3c-conformance/lay-fxl-xhtml-icb_device_sizes` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…w3c-conformance/lay-fxl-xhtml-icb_invalid_meta` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-xhtml-icb_multi` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…nformance/lay-fxl-xhtml-icb_multi_declarations` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…conformance/lay-fxl-xhtml-icb_repeated-in-meta` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-fxl-xhtml-icb_units` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-page-layout-both` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/12 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-page-layout-both-spread` | w3c | valid | yes | yes | yes | 5/5 | 0/0 | 0/0 | 5/5 | 0/0 | 0.00 | 0/12 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pkg-flow-paginated` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…c-conformance/lay-pkg-flow-scrolled-continuous` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-pkg-flow-scrolled-doc` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-layout-default` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-layout-duplication` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-layout-pre-paginated` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…onformance/lay-pp-layout-pre-paginated-spreads` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-page-spread-combined` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-page-spread-left` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-page-spread-right` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…rmance/lay-pp-spine-overrides_behave-as-global` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/2 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…ce/lay-pp-spine-overrides_behave-as-global-bis` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 0.00 | 0/3 | style-lost, calibre-header-diff |
+| `core/…nformance/lay-pp-spine-overrides_image-only-pp` | w3c | valid | yes | yes | yes | 2/2 | 1/1 | 1/1 | 2/2 | 0/0 | 1.00 | 0/2 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…mance/lay-pp-spine-overrides_image-only-reflow` | w3c | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 1.00 | 0/3 | calibre-header-diff |
+| `core/…formance/lay-pp-spine-overrides_image-spine-pp` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported, calibre-header-diff |
+| `core/…ance/lay-pp-spine-overrides_image-spine-reflow` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-spread-none` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-svg-icb_multi` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 3/3 | 0/0 | 0.00 | 0/2 | spine-non-xhtml, style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-xhtml-icb` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…-w3c-conformance/lay-pp-xhtml-icb_invalid_meta` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-xhtml-icb_multi` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…onformance/lay-pp-xhtml-icb_multi_declarations` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…-conformance/lay-pp-xhtml-icb_repeated-in-meta` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-pp-xhtml-icb_units` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/4 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/lay-reflow-align-x-center` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/3 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/lay-rendition-flow-pre-pag` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/4 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/lay-viewport-meta-prop` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/mol-navigation` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/2 | calibre-header-diff |
+| `core/02-w3c-conformance/mol-tts_multi` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/2 | calibre-header-diff |
+| `core/02-w3c-conformance/mol-tts_single` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/2 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-access` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-activation` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/02-w3c-conformance/nav-non-text_img` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-non-text_img_title` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/nav-spine_in-spine` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…-conformance/nav-spine_in-spine-hidden-toc-css` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…conformance/nav-spine_in-spine-hidden-toc-html` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…c-conformance/nav-spine_in-spine-no-list-style` | w3c | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 2/2 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/02-w3c-conformance/nav-spine_not-in-spine` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-font_obfuscation` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/ocf-font_obfuscation_bis` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/ocf-metainf-inc` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-metainf-manifest` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-package_arbitrary` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-package_multiple` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-w3c-conformance/ocf-url_link-leaking-relative` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_link-path-absolute` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_link-relative` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_manifest` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_origin` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/ocf-url_parse-leaking-relative` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_parse-path-absolute` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-url_relative` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-zip-comp` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/ocf-zip-mult` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-collections-unknown` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-creator-order` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir-auto_root-rtl` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir-auto_root-unset` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_but_not_content` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_creator-rtl` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_rtl-root-ltr` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_rtl-root-unset` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_unset-root-rtl` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-dir_unset-root-unset` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-lang_but_not_content` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-linked-records` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-manifest-unknown` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/pkg-manifest-unlisted-resource` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-meta-unknown` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-meta-whitespace` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…conformance/pkg-spine-duplicate-item-hyperlink` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 2/2 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…conformance/pkg-spine-duplicate-item-rendering` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-duplicate-item-ui` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/pkg-spine-nonlinear-activation` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-order` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-order-svg` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…-w3c-conformance/pkg-spine-progression-default` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…onformance/pkg-spine-progression-pre-paginated` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-progression_ltr` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-progression_rtl` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-spine-unknown` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-title-order` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-unique-id` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-unique-id_duplicate` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pkg-version-backward` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pss-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/02-w3c-conformance/pss-support_ignore-title` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-avif` | w3c | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-gif` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-jpeg` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-jxl` | w3c | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-mp3` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-mp4` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-opus` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-png` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-svg` | w3c | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/02-w3c-conformance/pub-cmt-webp` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/pub-data-urls_browsing-context` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…3c-conformance/pub-data-urls_top-level-content` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 0.00 | 0/7 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/02-w3c-conformance/pub-external-links` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-external-links_consent` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-file-urls` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-foreign_bad-fallback` | w3c | valid | no | no | - | - | - | - | - | - | - | - | app-error |
+| `core/02-w3c-conformance/pub-foreign_image` | w3c | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-foreign_json-spine` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/pub-foreign_xml-spine` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/pub-foreign_xml-suffix-spine` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/pub-xml-external-id` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/pub-xml-names` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…w3c-conformance/pub-xml-non-validating_comment` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3c-conformance/pub-xml-non-validating_unclosed` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nformance/scr-not-support_ccscript-modify-host` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nformance/scr-not-support_ccscript-modify-size` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-readingsystem-features` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-readingsystem-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…c-conformance/scr-readingsystem-support_iframe` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nformance/scr-readingsystem-support_iframe_svg` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-w3c-conformance/scr-readingsystem-support_svg` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/02-w3c-conformance/scr-storage-delete` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support-fallback` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_iframe` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_origin` | w3c | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_origin_unique` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3c-conformance/scr-support_scrolled-continuous` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_scrolled-doc` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/scr-support_svg` | w3c | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…-w3c-conformance/sec-untrusted-consent_network` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3c-conformance/sec-untrusted-consent_scripting` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/xx-epub-template` | w3c | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/02-w3c-conformance/xx-lay-pp-template` | w3c | valid | yes | yes | yes | 4/4 | 0/0 | 0/0 | 4/4 | 0/0 | 0.00 | 0/6 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…b-dictionaries__dictionary-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…dictionaries__dictionary-dc-type-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ionaries__dictionary-multiple-no-content-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…aries__dictionary-search-key-map-content-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ies__dictionary-search-key-map-extension-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ries__dictionary-search-key-map-link-css-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__dictionary-search-key-map-link-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ctionaries__dictionary-single-no-content-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sary-single-package-property-not-defined-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…enditions-dctype-missing-for-publication-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-renditions-dctype-missing-for-rendition-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub-edupub__edupub-pagelist-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub-edupub__edupub-pagelist-no-source-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-indexes__index-collection-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…/epub-indexes__index-collection-no-index-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…indexes__index-single-file-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub-indexes__index-single-file-no-index-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…b-indexes__index-whole-pub-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…d/epub-indexes__index-whole-pub-no-index-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…itions__renditions-mapping-multiple-docs-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tions__renditions-mapping-no-resourcemap-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…enditions__renditions-mapping-no-version-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…renditions__renditions-mapping-non-xhtml-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nditions__renditions-mapping-untyped-nav-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…enditions-metadata-identifier-incomplete-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__renditions-selection-attribute-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__renditions-selection-attribute-unknown-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__renditions-selection-mediaquery-syntax-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub-previews__preview-embedded-link-cfi-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ws__preview-embedded-no-content-doc-link-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub-previews__preview-embedded-no-links-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b-previews__preview-embedded-no-manifest-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub-previews__preview-pub-dc-type-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub-previews__preview-pub-self-as-source-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub-region-nav__data-nav-missing-type-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…valid/epub-region-nav__data-nav-multiple-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…alid/epub-region-nav__data-nav-not-xhtml-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…gion-nav__region-based-nav-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…pub-region-nav__region-based-nav-not-fxl-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…gion-nav__region-based-nav-wrong-element-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…pubcheck-invalid/epub2__ncx-id-duplicate-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…eck-invalid/epub2__ncx-id-syntax-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-invalid/epub2__ncx-link-to-non-ops-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…heck-invalid/epub2__ncx-missing-resource-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-invalid/epub2__ncx-pagetarget-type-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pubcheck-invalid/epub2__ncx-uid-mismatch-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_ocf-metainf-container-mediatype-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub2__ocf-metainf-container-multiple-opf-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tainf-container-rootfile-full-path-empty-error` | epubcheck-invalid | error | yes | yes | yes | - | - | - | - | - | - | - | calibre-header-diff |
+| `core/…inf-container-rootfile-full-path-missing-error` | epubcheck-invalid | error | yes | yes | yes | - | - | - | - | - | - | - | calibre-header-diff |
+| `core/…heck-invalid/epub2__ocf-mimetype-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-invalid/epub2__ocf-mimetype-with-spaces-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epubcheck-invalid/epub2__ocf-opf-missing-fatal` | epubcheck-invalid | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/…nvalid/epub2__opf-fallback-non-resolving-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 0.00 | 0/1 | images-unextractable, style-lost, calibre-header-diff |
+| `core/…alid/epub2__opf-guide-reference-to-image-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…id/epub2__opf-guide-reference-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…bcheck-invalid/epub2__opf-legacy-oebps12-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…invalid/epub2__opf-manifest-item-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub2__opf-manifest-item-resource-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-invalid/epub2__opf-pagemap-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…alid/epub2__opf-remote-object-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nvalid/epub2__opf-spine-itemref-repeated-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ubcheck-invalid/epub2__opf-spine-missing-error` | epubcheck-invalid | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/…d/epub2__opf-spine-toc-attribute-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub2__opf-spine-toc-attribute-to-non-ncx-error` | epubcheck-invalid | error | yes | no | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | - |
+| `core/…d/epub2__opf-unique-identifier-not-found-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-invalid/epub2__opf-version-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_ops-xhtml-hyperlink-to-missing-fragment-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b2__ops-xhtml-link-to-missing-stylesheet-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…data-url-in-html-img-foreign-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__fallback-chain-circular-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…alid/epub3_03-resources__file-url-in-css-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…xempt-xhtml-script-module-not-javascript-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…empt-xhtml-script-no-type-not-javascript-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-exempt-xhtml-script-type-not-javascript-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…urces__foreign-exempt-xhtml-video-in-img-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…foreign-xhtml-audio-in-video-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sources__foreign-xhtml-audio-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…html-audio-no-fallback-with-flow-content-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__foreign-xhtml-audio-source-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sources__foreign-xhtml-embed-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…reign-xhtml-img-src-no-manifest-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…b3_03-resources__foreign-xhtml-img-video-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__foreign-xhtml-input-image-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__foreign-xhtml-math-altimg-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ources__foreign-xhtml-object-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources__foreign-xhtml-picture-img-src-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…ources__foreign-xhtml-picture-img-srcset-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…es__foreign-xhtml-picture-source-no-type-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…__foreign-xhtml-video-poster-no-fallback-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources__resources-cmt-audio-mp4-other-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…urces__resources-cmt-audio-opus-mimetype-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-cmt-image-corrupt-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources-cmt-image-jpeg-declared-as-gif-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sources-remote-font-svg-also-used-as-img-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-remote-iframe-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…rces__resources-remote-iframe-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub3_03-resources__resources-remote-img-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…esources__resources-remote-img-in-script-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…sources__resources-remote-img-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…rces__resources-remote-object-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-remote-script-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-remote-spine-item-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-remote-stylesheet-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__resources-remote-stylesheet-svg-import-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…s__resources-remote-stylesheet-svg-xmlpi-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…sources__resources-remote-svg-contentdoc-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_04-ocf__ocf-container-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ncryption-compression-attributes-invalid-error` | epubcheck-invalid | error | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…ub3_04-ocf__ocf-encryption-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_04-ocf__ocf-encryption-duplicate-ids-error` | epubcheck-invalid | error | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…__ocf-meta-inf-with-publication-resource-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…4-ocf__ocf-mimetype-file-incorrect-value-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…04-ocf__ocf-mimetype-file-leading-spaces-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-ocf__ocf-mimetype-file-trailing-newline-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…4-ocf__ocf-mimetype-file-trailing-spaces-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_04-ocf__ocf-package-document-missing-fatal` | epubcheck-invalid | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/…ub3_04-ocf__ocf-signatures-content-model-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub3_04-ocf__ocf-url-leaking-in-opf-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | - | 0/0 | 1.00 | 0/0 | - |
+| `core/…alid/epub3_04-ocf__ocf-url-path-absolute-error` | epubcheck-invalid | error | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…d/epub3_04-ocf__url-missing-resource-css-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `core/…-resource-css-preceded-by-invalid-syntax-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…_04-ocf__url-missing-resource-svg-a-href-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…04-ocf__url-missing-resource-svg-a-xlink-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…issing-resource-svg-a-xlink-same-as-href-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…issing-resource-svg-a-xlink-with-href-ok-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…ocf__url-missing-resource-svg-image-href-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…cf__url-missing-resource-svg-image-xlink-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ng-resource-svg-image-xlink-same-as-href-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ng-resource-svg-image-xlink-with-href-ok-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_04-ocf__url-missing-resource-xhtml-cite-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…cf__url-missing-resource-xhtml-hyperlink-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…4-ocf__url-missing-resource-xhtml-iframe-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_04-ocf__url-missing-resource-xhtml-img-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…url-missing-resource-xhtml-mathml-altimg-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/0 | style-lost, calibre-header-diff |
+| `core/…04-ocf__url-missing-resource-xhtml-track-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…kage-document__manifest-self-referencing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t__package-link-media-type-missing-local-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ent__package-manifest-duplicate-resource-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/…document__package-manifest-fonts-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/…-document__package-manifest-item-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…remote-resource-declared-but-unnecessary-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…manifest-prop-remote-resource-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t-prop-scripted-declared-but-unnecessary-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…e-manifest-prop-scripted-undeclared-form-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/0 | style-lost, calibre-header-diff |
+| `core/…fest-prop-scripted-undeclared-javascript-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nifest-prop-svg-declared-but-unnecessary-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nt__package-manifest-prop-svg-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…age-manifest-prop-svg-undeclared-partial-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ackage-manifest-prop-switch-not-declared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-document__package-manifest-prop-unknown-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…emote-audio-in-overlays-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t__package-remote-audio-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_package-remote-audio-sources-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocument__package-remote-audio-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…kage-remote-font-in-css-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…mote-font-in-inline-css-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…kage-remote-font-in-svg-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…ge-remote-font-in-xhtml-missing-property-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…document__package-remote-font-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…age-document__package-remote-img-in-link-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-document__spine-nonlinear-not-reachable-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ment__spine-not-listing-hyperlink-target-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…e-not-listing-navigation-document-target-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…layout-pre-paginated-content-invalid-fxl-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…_layout-pre-paginated-content-reflowable-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…layout-pre-paginated-fallback-reflowable-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…e-paginated-override-content-invalid-fxl-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…re-paginated-override-content-reflowable-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-layouts__layout-roll-content-reflowable-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…layouts__layout-roll-fallback-reflowable-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…t-documents__content-css-encoding-latin1-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/…t-documents__content-css-font-face-empty-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…cuments__content-css-font-face-url-empty-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t-documents__content-css-font-size-value-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/3 | calibre-header-diff |
+| `core/…cuments__content-css-import-not-declared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `core/…ocuments__content-css-import-not-present-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/…ocuments__content-css-property-direction-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…ments__content-css-property-unicode-bidi-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…07-content-documents__content-css-syntax-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/3 | style-lost, calibre-header-diff |
+| `core/…nt-documents__content-fxl-svg-no-viewbox-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…-fxl-svg-no-viewbox-width-height-percent-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…nt-fxl-svg-no-viewbox-width-height-units-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…xl-xhtml-viewport-duplicate-width-height-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…_content-fxl-xhtml-viewport-height-empty-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ontent-fxl-xhtml-viewport-height-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…xhtml-viewport-icb-missing-in-first-meta-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ents__content-fxl-xhtml-viewport-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ontent-fxl-xhtml-viewport-syntax-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…content-fxl-xhtml-viewport-units-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…content-fxl-xhtml-viewport-width-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…tent-xhtml-base-url-remote-relative-path-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__content-xhtml-data-attr-removal-markup-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nts__content-xhtml-img-srcset-undeclared-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ts__content-xhtml-lang-xml-lang-mismatch-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…uments__content-xhtml-link-to-missing-id-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tent-xhtml-link-to-missing-id-in-nav-doc-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__content-xhtml-link-to-missing-id-xref-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…content-documents__content-xhtml-relaxng-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tent-documents__content-xhtml-schematron-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-xhtml-xml-base-url-remote-relative-path-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…igation-document__nav-links-out-of-spine-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…08-navigation-document__nav-links-remote-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__nav-links-to-non-content-document-type-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_08-navigation-document__nav-toc-missing-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…diaoverlays-active-class-style-not-found-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…verlays-active-class-svg-style-not-found-error` | epubcheck-invalid | error | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…ia-overlays__mediaoverlays-audio-non-cmt-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ays__mediaoverlays-incorrect-overlay-ref-error` | epubcheck-invalid | error | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-overlays__mediaoverlays-missing-mo-attr-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lays__mediaoverlays-multiple-overlay-ref-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…a-overlays__mediaoverlays-no-overlay-ref-error` | epubcheck-invalid | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ys-playback-active-class-style-not-found-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…erlays__mediaoverlays-text-reading-order-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ediaoverlays-textref-fragment-unresolved-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__xml-external-identifier-bad-mediatype-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…iers__xml-external-identifier-disallowed-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/1 | 0/0 | 1.00 | 0/0 | toc-labels, calibre-header-diff |
+| `core/…atures__outdated-ocf-obfuscation-not-cmt-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tures__outdated-ocf-obfuscation-not-font-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…e-features__outdated-package-ncx-invalid-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-invalid/localization__css-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/03-epubcheck-invalid/localization__schema-error` | epubcheck-invalid | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/cli__20-severity-tester` | epubcheck-other | unknown | no | no | - | - | - | - | - | - | - | - | app-error |
+| `core/03-epubcheck-other/cli__30-mimetype-invalid` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/epub2__minimal` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/epub3_00-minimal__minimal` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-documents__content-xhtml-invalid-duplicate-id` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-container-not-ocf-error` | epubcheck-other | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/03-epubcheck-other/ocf-directory-empty-warning` | epubcheck-other | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…k-other/ocf-filename-character-forbidden-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…acter-forbidden-non-publication-resource-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-duplicate-after-canonical-normalization-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…name-duplicate-after-common-case-folding-error` | epubcheck-other | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…licate-after-compatibility-normalization-valid` | epubcheck-other | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lename-duplicate-after-full-case-folding-error` | epubcheck-other | error | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…k-other/ocf-filename-duplicate-zip-entry-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-filename-not-utf8-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-filename-utf8-valid` | epubcheck-other | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-filepath-not-utf8-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-filepath-utf8-valid` | epubcheck-other | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pubcheck-other/ocf-mimetype-file-missing-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/ocf-minimal-valid` | epubcheck-other | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…other/ocf-zip-mimetype-entry-extra-field-error` | epubcheck-other | error | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epubcheck-other/ocf-zip-unreadable-empty-fatal` | epubcheck-other | error | no | no | - | - | - | - | - | - | - | - | app-error |
+| `core/…zip-unreadable-image-with-epub-extension-fatal` | epubcheck-other | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/…k-other/ocf-zip-unreadable-no-end-header-fatal` | epubcheck-other | error | no | no | - | - | - | - | - | - | - | - | app-clean-error |
+| `core/03-epubcheck-other/ocf-zip-valid` | epubcheck-other | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/reporting__fonts-embedded` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-epubcheck-other/reporting__layout-orientation` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…check-other/reporting__layout-orientation-item` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ubcheck-other/reporting__layout-paginated-item` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…bcheck-other/reporting__layout-reflowable-item` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/03-epubcheck-other/reporting__layout-spread` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…-epubcheck-other/reporting__layout-spread-item` | epubcheck-other | unknown | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/03-epubcheck-other/reporting__messages-maxcount` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-other/stress__stress` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/1 | 0.00 | 0/1 | links-unresolved, style-lost, calibre-header-diff |
+| `core/03-epubcheck-other/valid` | epubcheck-other | unknown | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-valid/cli__30-valid-test` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub-dictionaries__dictionary-multiple-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub-dictionaries__dictionary-single-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…valid/epub-dictionaries__glossary-single-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pubcheck-valid/epub-edupub__edupub-basic-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-epubcheck-valid/epub-edupub__edupub-fxl-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…/epub-edupub__edupub-multiple-renditions-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…eck-valid/epub-edupub__edupub-non-linear-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-valid/epub-edupub__edupub-pagelist-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…eck-valid/epub-indexes__index-collection-valid` | epubcheck-valid | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…ck-valid/epub-indexes__index-single-file-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…heck-valid/epub-indexes__index-whole-pub-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/2 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…ub-multiple-renditions__renditions-basic-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ditions__renditions-mapping-multiple-nav-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ck-valid/epub-previews__preview-embedded-valid` | epubcheck-valid | valid | yes | yes | yes | 3/3 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ubcheck-valid/epub-previews__preview-pub-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pubcheck-valid/epub-region-nav__data-nav-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub-region-nav__region-based-nav-comics-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/…-valid/epub-region-nav__region-based-nav-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, fixed-layout-unsupported, calibre-header-diff |
+| `core/03-epubcheck-valid/epub2__ncx-label-empty-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/1 | 0/0 | 1.00 | 0/0 | toc-labels, calibre-header-diff |
+| `core/03-epubcheck-valid/epub2__ncx-uid-spaces-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…epub2__ocf-metainf-container-alternative-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ck-valid/epub2__ocf-metainf-file-unknown-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…alid/epub2__opf-manifest-os-files-ignore-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub2__opf-metadata-creator-role-clr-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…check-valid/epub2__opf-package-id-spaces-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/03-epubcheck-valid/epub2__ops-dtbook-valid` | epubcheck-valid | valid | no | no | - | - | - | - | - | - | - | - | app-error |
+| `core/…-epubcheck-valid/epub2__ops-xhtml-script-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…valid/epub2__ops-xhtml-unusual-extension-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nformance-xml-id-leading-trailing-spaces-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…3_03-resources__data-url-in-html-img-cmt-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…l-in-html-img-foreign-intrinsic-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__data-url-in-html-link-exempt-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources__data-url-with-unescaped-query-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_03-resources__fallback-chain-n-to-1-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_03-resources__fallback-chain-waterfall-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…/epub3_03-resources__foreign-exempt-font-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/…pub3_03-resources__foreign-exempt-unused-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_03-resources__foreign-exempt-xhtml-link-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…exempt-xhtml-link-xpgt-manifest-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…reign-exempt-xhtml-link-xpgt-no-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…rces__foreign-exempt-xhtml-script-module-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…n-exempt-xhtml-script-no-type-javascript-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…eign-exempt-xhtml-script-type-javascript-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__foreign-exempt-xhtml-script-using-wasm-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…03-resources__foreign-exempt-xhtml-track-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…exempt-xhtml-video-mediatype-application-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…urces__foreign-exempt-xhtml-video-source-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…03-resources__foreign-exempt-xhtml-video-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ces__foreign-xhtml-audio-source-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…reign-xhtml-audio-source-remote-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ces__foreign-xhtml-img-manifest-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…reign-xhtml-img-srcset-manifest-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 2/2 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_foreign-xhtml-object-intrinsic-fallback-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__foreign-xhtml-picture-source-with-type-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…esources__foreign-xhtml-script-datablock-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…es__foreign-xhtml-script-importmap-block-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-audio-mp3-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-cmt-audio-mp4-aac-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__resources-cmt-audio-mp4-opus-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-audio-mp4-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_03-resources__resources-cmt-audio-opus-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-cmt-font-opentype-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/…ub3_03-resources__resources-cmt-font-svg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3-resources__resources-cmt-font-truetype-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_03-resources__resources-cmt-image-avif-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-image-gif-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ces__resources-cmt-image-jpg-not-corrupt-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-image-jpg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-image-jxl-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b3_03-resources__resources-cmt-image-png-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_03-resources__resources-cmt-image-webp-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources__resources-remote-audio-object-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…esources__resources-remote-audio-sources-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_03-resources__resources-remote-audio-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__resources-remote-font-in-css-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__resources-remote-font-in-svg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…_03-resources__resources-remote-font-svg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_03-resources__resources-remote-font-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…resources-remote-resource-for-script-cmt-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…urces-remote-resource-for-script-foreign-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_03-resources__resources-remote-video-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__type-audio-source-mp3-codecs-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ources__url-absolute-not-resource-mailto-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…es__url-absolute-not-resource-xhtml-cite-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…container-filename-character-composition-valid` | epubcheck-valid | valid | yes | no | yes | 1/1 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | - |
+| `core/…f__ocf-container-filename-character-plus-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 1/1 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…lid/epub3_04-ocf__ocf-encryption-unknown-valid` | epubcheck-valid | valid | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…cf-filename-character-emoji-tag-sequence-valid` | epubcheck-valid | valid | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…-valid/epub3_04-ocf__url-percent-encoded-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…kage-document__link-to-embedded-resource-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…document__package-file-extension-unusual-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__package-link-media-type-missing-remote-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ipted-not-required-for-script-data-block-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_05-package-document__package-mathml-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__package-remote-resource-and-inline-css-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…_spine-nonlinear-reachable-via-hyperlink-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…ument__spine-nonlinear-reachable-via-nav-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nt__spine-nonlinear-reachable-via-script-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ayout-page-spread-pre-paginated-override-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ayouts__layout-page-spread-pre-paginated-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…6-layouts__layout-pre-paginated-fallback-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…__layout-pre-paginated-override-fallback-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…6-layouts__layout-pre-paginated-override-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub3_06-layouts__layout-pre-paginated-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…3_06-layouts__layout-reflowable-override-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…alid/epub3_06-layouts__layout-reflowable-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d/epub3_06-layouts__layout-roll-fallback-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…heck-valid/epub3_06-layouts__layout-roll-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ents__content-css-encoding-utf8-declared-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…content-documents__content-css-font-size-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `core/…7-content-documents__content-css-minimal-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…__content-css-namespace-uri-not-resource-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/1 | style-lost, calibre-header-diff |
+| `core/…07-content-documents__content-css-syntax-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/12 | style-lost, calibre-header-diff |
+| `core/…tent-documents__content-css-url-fragment-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…_content-fxl-svg-no-viewbox-on-inner-svg-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…b3_07-content-documents__content-fxl-svg-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, fixed-layout-unsupported |
+| `core/…uments__content-fxl-xhtml-viewport-float-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…nts__content-fxl-xhtml-viewport-keywords-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ontent-fxl-xhtml-viewport-multiple-usage-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…nt-documents__content-fxl-xhtml-viewport-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…s__content-fxl-xhtml-viewport-whitespace-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…ent-reflow-xhtml-viewport-height-missing-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ents__content-svg-file-extension-unusual-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…-content-documents__content-svg-in-spine-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…ocuments__content-svg-no-viewbox-not-fxl-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ontent-documents__content-xhtml-base-url-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ontent-xhtml-data-attr-removal-fragments-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…ts__content-xhtml-file-extension-unusual-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nt-documents__content-xhtml-iframe-basic-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocuments__content-xhtml-img-fragment-svg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/1 | 0/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…documents__content-xhtml-link-href-empty-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…cuments__content-xhtml-link-rel-path-dot-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…content-xhtml-link-to-local-file-escaped-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…t-documents__content-xhtml-mathml-altimg-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/0 | style-lost, calibre-header-diff |
+| `core/…nts__content-xhtml-meta-viewport-non-fxl-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ents__content-xhtml-svg-fragment-svgview-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…t-documents__content-xhtml-svg-reference-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/1 | 0/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-unextractable, calibre-header-diff |
+| `core/…tent-documents__content-xhtml-svg-switch-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 0.00 | 0/0 | style-lost, calibre-header-diff |
+| `core/…id/epub3_07-content-documents__dc-source-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…7-content-documents__object-pdf-fragment-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…id/epub3_08-navigation-document__nav-cfi-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/1 | 0/0 | 1.00 | 0/0 | toc-labels, calibre-header-diff |
+| `core/…on-document__nav-page-list-reading-order-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ent__nav-toc-missing-references-to-spine-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…vigation-document__nav-toc-reading-order-valid` | epubcheck-valid | valid | yes | yes | yes | 2/2 | 0/0 | 0/0 | 5/5 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…rlays__mediaoverlays-active-class-inline-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/2 | calibre-header-diff |
+| `core/…rlays-active-class-stylesheet-undeclared-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/2 | calibre-header-diff |
+| `core/…s__mediaoverlays-active-class-stylesheet-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/2 | calibre-header-diff |
+| `core/…iaoverlays-active-class-svg-inline-style-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…rlays-active-class-svg-stylesheet-import-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…verlays-active-class-svg-stylesheet-link-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…rlays-active-class-svg-stylesheet-xml-pi-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…ys__mediaoverlays-file-extension-unusual-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…09-media-overlays__mediaoverlays-minimal-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_09-media-overlays__mediaoverlays-svg-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…rlays__mediaoverlays-textref-no-fragment-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…diaoverlays-textref-svg-fragment-viewbox-valid` | epubcheck-valid | valid | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `core/…tifiers__xml-external-identifier-allowed-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…atures__outdated-css-prefixed-properties-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…__outdated-manifest-fallback-xhtml-audio-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__outdated-manifest-fallback-xhtml-embed-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ted-manifest-fallback-xhtml-video-poster-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 1/1 | 0/1 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…ures__outdated-ocf-obfuscation-duplicate-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…olete-features__outdated-ocf-obfuscation-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-obsolete-features__outdated-package-ncx-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ntent-page-list-valid__content-page-list-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…d_ocf-compression-valid__ocf-compression-valid` | epubcheck-valid | valid | yes | no | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | - |
+| `core/…ect-valid__resources-remote-video-object-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…bcheck-valid/localization__nav-page-list-valid` | epubcheck-valid | valid | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/03-epubcheck-warnings/cli__20-warning-tester` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_dictionary-no-profile-dc-type-missing-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…warnings/epub-edupub__edupub-microdata-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ions__renditions-metadata-file-missing-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…le-renditions__renditions-unmanifested-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…b-previews__preview-pub-source-missing-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ngs/epub-region-nav__data-nav-in-spine-warning` | epubcheck-warnings | warning | yes | yes | yes | 2/2 | 0/0 | 0/0 | 2/2 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…arnings/epub2__ocf-filename-with-space-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub2__opf-legacy-oebps12-mediatype-css-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub2__opf-legacy-oebps12-mediatype-html-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 0/0 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…opf-manifest-item-xhtml-mediatype-html-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…/epub2__opf-manifest-resource-undeclared-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…nings/epub2__opf-pagemap-ref-not-found-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__resources-cmt-image-wrong-extension-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__resources-remote-not-https-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-resources__type-audio-source-mismatch-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_03-resources__type-embed-mismatch-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ub3_03-resources__type-object-mismatch-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…esources__type-picture-source-mismatch-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 1/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…04-ocf__ocf-filename-character-non-ascii-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…3_04-ocf__ocf-filename-character-space-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocf__url-missing-resource-package-link-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…_manifest-not-listing-container-resource-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…__layout-page-spread-reflowable-override-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | fixed-layout-unsupported, calibre-header-diff |
+| `core/…6-layouts__layout-page-spread-reflowable-usage` | epubcheck-warnings | warning | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…pub3_06-layouts__layout-page-spread-roll-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…s__content-css-encoding-utf16-declared-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…ontent-css-encoding-utf16-not-declared-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/1 | calibre-header-diff |
+| `core/…ntent-svg-clippath-url-target-unexpected-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…__content-svg-fill-url-target-unexpected-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…content-svg-stroke-url-target-unexpected-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…uments__content-svg-use-href-no-fragment-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml, calibre-header-diff |
+| `core/…ent-documents__content-xhtml-extension-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ts__content-xhtml-img-fragment-non-svg-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 1/1 | 1/2 | 1/1 | 0/0 | 1.00 | 0/0 | images-misreferenced, calibre-header-diff |
+| `core/…ent-xhtml-link-to-stylesheet-fragment-id-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…uments__content-xhtml-link-to-svg-symbol-usage` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/1 | 1.00 | 0/0 | links-unresolved, calibre-header-diff |
+| `core/…ent__nav-page-list-unordered-fragments-warning` | epubcheck-warnings | warning | yes | yes | yes | 2/2 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…ocument__nav-page-list-unordered-spine-warning` | epubcheck-warnings | warning | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…-document__nav-toc-unordered-fragments-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 4/4 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…tion-document__nav-toc-unordered-spine-warning` | epubcheck-warnings | warning | yes | yes | yes | 3/3 | 0/0 | 0/0 | 3/3 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…aoverlays-textref-fragment-schemebased-warning` | epubcheck-warnings | warning | yes | yes | yes | 1/1 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | calibre-header-diff |
+| `core/…aoverlays-textref-svg-fragment-invalid-warning` | epubcheck-warnings | warning | yes | no | yes | 0/0 | 0/0 | 0/0 | 1/1 | 0/0 | 1.00 | 0/0 | spine-non-xhtml |
+| `generated/gen-duplicate-ids` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/1 | 0.00 | 0/2 | links-unresolved, style-lost, calibre-header-diff |
+| `generated/gen-footnotes-ok` | generated | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/2 | 0.00 | 0/2 | links-unresolved, style-lost, calibre-header-diff |
+| `generated/gen-item-not-in-manifest` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `generated/gen-latin1-declared` | generated | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `generated/gen-latin1-undeclared` | generated | error | yes | yes | yes | 2/3 | 1/1 | 1/1 | 3/3 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff, input-repair |
+| `generated/gen-missing-ncx` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 0/0 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `generated/gen-unterminated-tag` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `generated/gen-wrong-media-types` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 0.00 | 0/2 | style-lost, calibre-header-diff |
+| `local/hertmans` | local | valid | yes | yes | yes | 20/20 | 28/28 | 27/28 | 9/9 | 0/0 | 0.00 | 2/104 | images-misreferenced, style-lost, calibre-header-diff |
+| `real/gutenberg/pg10450` | pg | valid | yes | yes | yes | 18/18 | 31/31 | 31/31 | 30/30 | 0/30 | 0.01 | 0/248 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg11660` | pg | valid | yes | yes | yes | 6/6 | 27/27 | 27/27 | 21/21 | 0/17 | 0.00 | 0/48 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg11993` | pg | valid | yes | yes | yes | 5/5 | 5/5 | 5/5 | 48/48 | 0/42 | 0.00 | 0/38 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg12215` | pg | valid | yes | yes | yes | 19/19 | 72/72 | 72/72 | 20/20 | 0/85 | 0.00 | 0/46 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg14658` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 14/14 | 0/9 | 0.00 | 1/67 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg15228` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 116/116 | 0/0 | 0.02 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg16113` | pg | valid | yes | yes | yes | 20/20 | 18/18 | 35/35 | 29/29 | 0/34 | 0.01 | 0/288 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg16578` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 30/30 | 0/0 | 0.00 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg16866` | pg | valid | yes | yes | yes | 7/7 | 1/1 | 1/1 | 5/5 | 0/0 | 0.00 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg17016` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 23/23 | 0/19 | 0.01 | 0/46 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg1713` | pg | valid | yes | yes | yes | 8/8 | 1/1 | 1/1 | 45/45 | 0/39 | 0.00 | 0/46 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg17250` | pg | valid | yes | yes | yes | 4/4 | 5/5 | 5/5 | 43/43 | 0/24 | 0.07 | 2/60 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg17721` | pg | valid | yes | yes | yes | 7/7 | 3/3 | 5/5 | 41/41 | 0/62 | 0.02 | 1/77 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg1816` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 10/10 | 0/6 | 0.00 | 0/45 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg18196` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 25/25 | 0/0 | 0.01 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg18214` | pg | valid | yes | yes | yes | 3/3 | 7/7 | 7/7 | 6/6 | 0/0 | 0.05 | 0/41 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg19246` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 1/1 | 0/18 | 0.00 | 0/50 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg2037` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 15/15 | 0/0 | 0.00 | 0/34 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg21005` | pg | valid | yes | yes | yes | 6/6 | 10/10 | 10/10 | 42/42 | 0/27 | 0.04 | 0/44 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg2175` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 6/6 | 0/4 | 0.00 | 0/46 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg21853` | pg | valid | yes | yes | yes | 30/30 | 33/33 | 140/140 | 161/161 | 0/1034 | 0.05 | 1/282 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg22088` | pg | valid | yes | yes | yes | 8/8 | 1/1 | 1/1 | 55/55 | 0/73 | 0.00 | 1/46 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg22096` | pg | valid | yes | yes | yes | 4/4 | 92/92 | 93/93 | 55/55 | 0/43 | 0.09 | 0/47 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg22110` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 2/2 | 0/0 | 0.00 | 0/37 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg23092` | pg | valid | yes | yes | yes | 4/4 | 3/3 | 3/3 | 21/21 | 0/34 | 0.00 | 1/72 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg23378` | pg | valid | yes | yes | yes | 5/5 | 7/7 | 7/7 | 34/34 | 0/22 | 0.00 | 0/83 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg27367` | pg | valid | yes | yes | yes | 8/8 | 216/216 | 332/332 | 90/90 | 0/174 | 0.07 | 0/81 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg27703` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 16/16 | 0/34 | 0.00 | 0/116 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg28050` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 18/18 | 0/4 | 0.00 | 0/39 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg29047` | pg | valid | yes | yes | yes | 8/8 | 23/23 | 23/23 | 57/57 | 0/91 | 0.11 | 2/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg29340` | pg | valid | yes | yes | yes | 30/30 | 54/54 | 54/54 | 68/68 | 0/198 | 0.01 | 1/339 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg29559` | pg | valid | yes | yes | yes | 4/4 | 3/3 | 3/3 | 5/5 | 0/2 | 0.00 | 1/59 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg29815` | pg | valid | yes | yes | yes | 4/4 | 2/2 | 2/2 | 28/28 | 0/237 | 0.01 | 0/52 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg30274` | pg | valid | yes | yes | yes | 8/8 | 9/9 | 9/9 | 29/29 | 0/113 | 0.01 | 0/47 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg3030` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 30/30 | 0/28 | 0.00 | 0/46 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg30963` | pg | valid | yes | yes | yes | 3/3 | 8/8 | 8/8 | 9/9 | 0/0 | 0.00 | 1/47 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg31085` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 61/61 | 0/82 | 0.02 | 1/55 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg31099` | pg | valid | yes | yes | yes | 9/9 | 6/6 | 6/6 | 25/25 | 0/0 | 0.01 | 0/49 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg3193` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 14/14 | 0/9 | 0.00 | 0/43 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg34176` | pg | valid | yes | yes | yes | 284/284 | 279/279 | 280/280 | 23/23 | 0/890 | 0.05 | 1/3677 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg34377` | pg | valid | yes | yes | yes | 5/5 | 4/4 | 4/4 | 22/22 | 0/31 | 0.03 | 1/59 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg34433` | pg | valid | yes | yes | yes | 4/4 | 125/125 | 125/125 | 12/12 | 0/6 | 0.07 | 0/74 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg36578` | pg | valid | yes | yes | yes | 6/6 | 8/8 | 8/8 | 26/26 | 0/13 | 0.00 | 0/48 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg36902` | pg | valid | yes | yes | yes | 3/3 | 9/9 | 9/9 | 7/7 | 0/154 | 0.00 | 0/58 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg37394` | pg | valid | yes | yes | yes | 5/5 | 40/40 | 40/40 | 169/169 | 0/88 | 0.07 | 1/59 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg41097` | pg | valid | yes | yes | yes | 4/4 | 11/11 | 11/11 | 33/33 | 0/39 | 0.00 | 0/54 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg43593` | pg | valid | yes | yes | yes | 13/13 | 24/24 | 24/24 | 25/25 | 0/399 | 0.05 | 1/100 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg44342` | pg | valid | yes | yes | yes | 3/3 | 23/23 | 47/47 | 6/6 | 0/17 | 0.04 | 6/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg44385` | pg | valid | yes | yes | yes | 17/17 | 1/1 | 1/1 | 30/30 | 0/14 | 0.00 | 0/50 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg44953` | pg | valid | yes | yes | yes | 19/19 | 33/33 | 33/33 | 28/28 | 0/32 | 0.01 | 3/303 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg45731` | pg | valid | yes | yes | yes | 6/6 | 41/41 | 43/43 | 270/270 | 0/182 | 0.00 | 0/56 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg461` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 63/63 | 0/48 | 0.04 | 0/38 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg47151` | pg | valid | yes | yes | yes | 6/6 | 15/15 | 15/15 | 22/22 | 0/455 | 0.01 | 0/59 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg48218` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 10/10 | 0/233 | 0.00 | 0/54 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg48323` | pg | valid | yes | yes | yes | 25/25 | 2/2 | 2/2 | 20/20 | 0/1484 | 0.00 | 2/91 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg4865` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 4/4 | 0/0 | 0.00 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg49350` | pg | valid | yes | yes | yes | 5/5 | 9/9 | 9/9 | 36/36 | 0/40 | 0.00 | 0/52 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg49505` | pg | valid | yes | yes | yes | 38/38 | 51/51 | 51/51 | 28/28 | 0/676 | 0.02 | 0/96 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg50820` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 8/8 | 0/4 | 0.00 | 0/58 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg51700` | pg | valid | yes | yes | yes | 20/20 | 35/35 | 50/50 | 3/3 | 0/55 | 0.02 | 4/283 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg52303` | pg | valid | yes | yes | yes | 35/35 | 177/177 | 185/185 | 42/42 | 0/4517 | 0.00 | 5/323 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg52657` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 4/4 | 0/0 | 0.00 | 2/59 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg53626` | pg | valid | yes | yes | yes | 29/29 | 3/3 | 3/3 | 20/20 | 0/3956 | 0.00 | 2/166 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg54611` | pg | valid | yes | yes | yes | 36/36 | 2/2 | 2/2 | 42/42 | 0/1986 | 0.00 | 0/156 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg5513` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 6/6 | 0/0 | 0.00 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg5578` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 9/9 | 0/0 | 0.00 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg55919` | pg | valid | yes | yes | yes | 45/45 | 58/58 | 58/58 | 16/16 | 0/1077 | 0.00 | 3/484 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg57791` | pg | valid | yes | yes | yes | 22/22 | 14/14 | 14/14 | 21/21 | 0/37 | 0.00 | 2/113 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg58062` | pg | valid | yes | yes | yes | 22/22 | 1/1 | 1/1 | 598/598 | 0/2257 | 0.00 | 1/115 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg58344` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 16/16 | 0/16 | 0.46 | 0/28 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg59227` | pg | valid | yes | yes | yes | 4/4 | 3/3 | 4/4 | 25/25 | 0/10 | 0.16 | 0/58 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg60297` | pg | valid | yes | yes | yes | 4/4 | 7/7 | 7/7 | 7/7 | 0/0 | 0.00 | 3/89 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg6072` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 32/32 | 0/0 | 0.00 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg60903` | pg | valid | yes | yes | yes | 5/5 | 2/2 | 2/2 | 40/40 | 0/0 | 0.00 | 0/200 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg61267` | pg | valid | yes | yes | yes | 16/16 | 128/128 | 128/128 | 191/191 | 0/1025 | 0.00 | 7/373 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg61348` | pg | valid | yes | yes | yes | 22/22 | 10/10 | 10/10 | 15/15 | 0/20 | 0.02 | 3/97 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg62947` | pg | valid | yes | yes | yes | 22/22 | 57/57 | 57/57 | 22/22 | 0/86 | 0.06 | 0/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg63372` | pg | valid | yes | yes | yes | 26/26 | 17/101 | 17/125 | 129/129 | 0/1011 | 0.00 | 4/353 | images-unextractable, links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg64210` | pg | valid | yes | yes | yes | 17/17 | 3/3 | 3/3 | 247/247 | 0/1201 | 0.00 | 4/79 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg6466` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 12/12 | 0/0 | 0.01 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg6568` | pg | valid | yes | yes | yes | 6/6 | 1/1 | 1/1 | 53/53 | 0/0 | 0.02 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg66997` | pg | valid | yes | yes | yes | 56/56 | 3/3 | 52/52 | 56/56 | 0/51 | 0.00 | 0/63 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg67108` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 2/2 | 0/0 | 0.02 | 1/103 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg67331` | pg | valid | yes | yes | yes | 35/35 | 6/6 | 12/12 | 35/35 | 0/558 | 0.00 | 4/68 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg6795` | pg | valid | yes | yes | yes | 3/3 | 1/1 | 1/1 | 13/13 | 0/18 | 0.00 | 0/43 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg69052` | pg | valid | yes | yes | yes | 33/33 | 7/7 | 7/7 | 28/28 | 0/5 | 0.00 | 3/74 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg69443` | pg | valid | yes | yes | yes | 3/3 | 2/2 | 2/2 | 26/26 | 0/17 | 0.00 | 0/36 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg70584` | pg | valid | yes | yes | yes | 12/12 | 2/2 | 2/2 | 12/12 | 0/7 | 0.00 | 2/65 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg7115` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 59/59 | 0/0 | 0.02 | 0/39 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg71277` | pg | valid | yes | yes | yes | 18/18 | 1/1 | 1/1 | 90/90 | 0/13 | 0.00 | 7/152 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg71842` | pg | valid | yes | yes | yes | 17/17 | 254/254 | 254/254 | 35/35 | 0/1753 | 0.00 | 0/89 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg7199` | pg | valid | yes | yes | yes | 3/3 | 27/27 | 27/27 | 10/10 | 0/26 | 0.00 | 0/42 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg72234` | pg | valid | yes | yes | yes | 3/3 | 3/3 | 3/3 | 2/2 | 0/0 | 0.00 | 3/50 | style-lost, calibre-header-diff |
+| `real/gutenberg/pg7237` | pg | valid | yes | yes | yes | 4/4 | 1/1 | 1/1 | 65/65 | 0/59 | 0.00 | 0/46 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg72476` | pg | valid | yes | yes | yes | 46/46 | 2/2 | 2/2 | 108/108 | 0/297 | 0.00 | 2/130 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg74064` | pg | valid | yes | yes | yes | 41/41 | 14/14 | 14/14 | 59/59 | 0/41 | 0.00 | 3/79 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg74759` | pg | valid | yes | yes | yes | 11/11 | 1/1 | 1/1 | 12/12 | 0/8 | 0.00 | 3/63 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg77864` | pg | valid | yes | yes | yes | 14/14 | 1/1 | 1/1 | 13/13 | 0/21 | 0.00 | 2/55 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg7906` | pg | valid | yes | yes | yes | 11/11 | 12/12 | 27/27 | 4/4 | 0/24 | 0.03 | 0/147 | links-unresolved, style-lost, calibre-header-diff |
+| `real/gutenberg/pg8932` | pg | valid | yes | yes | yes | 5/5 | 1/1 | 1/1 | 29/29 | 0/0 | 0.02 | 0/39 | style-lost, calibre-header-diff |
+| `real/standard-ebooks/a-e-w-mason_the-four-feathers` | se | valid | yes | yes | yes | 42/42 | 3/3 | 6/6 | 42/42 | 0/3 | 0.00 | 3/81 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…dard-ebooks/a-e-w-mason_the-house-of-the-arrow` | se | valid | yes | yes | yes | 30/30 | 3/3 | 6/6 | 30/30 | 0/1 | 0.00 | 2/86 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ndard-ebooks/agatha-christie_partners-in-crime` | se | valid | yes | yes | yes | 21/21 | 3/3 | 6/6 | 33/33 | 0/1 | 0.00 | 3/78 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/ameen-rihani_the-book-of-khalid` | se | valid | yes | yes | yes | 41/41 | 3/3 | 6/6 | 41/41 | 0/11 | 0.00 | 3/87 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…dard-ebooks/anna-katharine-green_hand-and-ring` | se | valid | yes | yes | yes | 53/53 | 5/5 | 10/10 | 53/53 | 0/3 | 0.00 | 3/101 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…oks/anna-katharine-green_the-sword-of-damocles` | se | valid | yes | yes | yes | 59/59 | 3/3 | 6/6 | 59/59 | 0/3 | 0.00 | 3/116 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ard-ebooks/anne-parrish_the-perennial-bachelor` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 0/1 | 0.00 | 3/81 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…dard-ebooks/anthony-trollope_dr-wortles-school` | se | valid | yes | yes | yes | 34/34 | 3/3 | 6/6 | 34/34 | 0/1 | 0.00 | 2/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…rd-ebooks/arthur-b-reeve_craig-kennedy-stories` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 0/1 | 0.00 | 2/78 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ks/arthur-conan-doyle_brigadier-gerard-stories` | se | valid | yes | yes | yes | 21/21 | 3/3 | 6/6 | 23/23 | 0/1 | 0.00 | 2/66 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/arthur-ransome_racundras-first-cruise` | se | valid | yes | yes | yes | 37/37 | 37/37 | 44/44 | 37/37 | 0/39 | 0.00 | 2/76 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…rd-ebooks/c-h-spurgeon_the-art-of-illustration` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 12/12 | 0/7 | 0.00 | 3/73 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…therine-louisa-pirkis_a-bride-of-a-summers-day` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 0/1 | 0.00 | 3/75 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/catherine-louisa-pirkis_short-fiction` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 32/32 | 0/1 | 0.00 | 3/78 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…e-experiences-of-loveday-brooke-lady-detective` | se | valid | yes | yes | yes | 11/11 | 3/3 | 6/6 | 11/11 | 0/1 | 0.00 | 2/71 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/charles-brockden-brown_wieland` | se | valid | yes | yes | yes | 35/35 | 3/3 | 6/6 | 35/35 | 0/9 | 0.00 | 3/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/charles-dickens_barnaby-rudge` | se | valid | yes | yes | yes | 88/88 | 3/3 | 6/6 | 88/88 | 0/1 | 0.00 | 2/67 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…oks/charles-dickens_the-mystery-of-edwin-drood` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 30/30 | 0/1 | 0.00 | 3/81 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/charles-kingsley_hypatia` | se | valid | yes | yes | yes | 38/38 | 3/3 | 6/6 | 38/38 | 0/13 | 0.00 | 3/83 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…arlotte-m-yonge_the-clever-woman-of-the-family` | se | valid | yes | yes | yes | 34/34 | 3/3 | 6/6 | 34/34 | 0/1 | 0.00 | 3/83 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…s/charlotte-perkins-gilman_moving-the-mountain` | se | valid | yes | yes | yes | 18/18 | 3/3 | 6/6 | 18/18 | 0/1 | 0.00 | 3/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/claude-mckay_banjo` | se | valid | yes | yes | yes | 34/34 | 3/3 | 6/6 | 34/34 | 0/1 | 0.00 | 3/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ks/d-l-moody_the-way-to-god-and-how-to-find-it` | se | valid | yes | yes | yes | 16/16 | 3/3 | 6/6 | 16/16 | 0/5 | 0.00 | 3/78 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/david-hume_a-treatise-of-human-nature` | se | valid | yes | yes | yes | 113/113 | 3/3 | 6/6 | 113/113 | 0/187 | 0.00 | 3/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/dornford-yates_blind-corner` | se | valid | yes | yes | yes | 15/15 | 3/3 | 6/6 | 15/15 | 0/1 | 0.00 | 2/76 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/dornford-yates_perishable-goods` | se | valid | yes | yes | yes | 15/15 | 3/3 | 6/6 | 15/15 | 0/1 | 0.00 | 2/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ayers_robert-eustace_the-documents-in-the-case` | se | valid | yes | yes | yes | 61/61 | 3/3 | 6/6 | 61/61 | 0/5 | 0.00 | 3/90 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/dorothy-m-richardson_deadlock` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 0/1 | 0.00 | 2/66 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/dorothy-m-richardson_interim` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 0/1 | 0.00 | 2/72 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/dorothy-m-richardson_oberland` | se | valid | yes | yes | yes | 16/16 | 3/3 | 6/6 | 16/16 | 0/1 | 0.00 | 2/71 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/dorothy-m-richardson_revolving-lights` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 10/10 | 0/1 | 0.00 | 3/74 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/dorothy-m-richardson_the-trap` | se | valid | yes | yes | yes | 15/15 | 3/3 | 6/6 | 15/15 | 0/1 | 0.00 | 3/76 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ks/e-nesbit_beautiful-stories-from-shakespeare` | se | valid | yes | yes | yes | 27/27 | 3/3 | 6/6 | 27/27 | 0/1 | 0.00 | 3/79 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/edgar-rice-burroughs_pirates-of-venus` | se | valid | yes | yes | yes | 18/18 | 3/3 | 6/6 | 18/18 | 0/1 | 0.00 | 2/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/edgar-saltus_short-fiction` | se | valid | yes | yes | yes | 37/37 | 3/3 | 6/6 | 167/167 | 0/15 | 0.00 | 3/110 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…andard-ebooks/edgar-saltus_the-perfume-of-eros` | se | valid | yes | yes | yes | 26/26 | 3/3 | 6/6 | 26/26 | 0/1 | 0.00 | 2/66 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…-burke_reflections-on-the-revolution-in-france` | se | valid | yes | yes | yes | 8/8 | 3/3 | 6/6 | 8/8 | 0/123 | 0.00 | 3/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ebooks/ford-madox-ford_the-fifth-queen-crowned` | se | valid | yes | yes | yes | 32/32 | 3/3 | 6/6 | 32/32 | 0/1 | 0.00 | 3/83 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…oks/franklin-w-dixon_the-great-airport-mystery` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 0/1 | 0.00 | 2/66 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/george-eliot_romola` | se | valid | yes | yes | yes | 83/83 | 3/3 | 6/6 | 83/83 | 0/65 | 0.00 | 3/74 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…dard-ebooks/george-macdonald_if-i-had-a-father` | se | valid | yes | yes | yes | 8/8 | 3/3 | 6/6 | 8/8 | 0/1 | 0.00 | 2/83 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ard-ebooks/george-macdonald_within-and-without` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 78/78 | 0/1 | 0.00 | 3/109 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/h-c-mcneile_the-black-gang` | se | valid | yes | yes | yes | 22/22 | 3/3 | 6/6 | 22/22 | 0/1 | 0.00 | 3/71 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/h-c-mcneile_the-final-count` | se | valid | yes | yes | yes | 19/19 | 3/3 | 6/6 | 19/19 | 0/1 | 0.00 | 2/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/h-c-mcneile_the-third-round` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 0/1 | 0.00 | 2/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/h-g-wells_the-wheels-of-chance` | se | valid | yes | yes | yes | 33/33 | 4/4 | 8/8 | 74/74 | 0/3 | 0.00 | 2/72 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/harry-harrison_short-fiction` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 12/12 | 0/1 | 0.00 | 3/72 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…oks/henry-seton-merriman_barlasch-of-the-guard` | se | valid | yes | yes | yes | 36/36 | 3/3 | 6/6 | 36/36 | 0/1 | 0.00 | 3/81 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/henry-seton-merriman_the-sowers` | se | valid | yes | yes | yes | 48/48 | 3/3 | 6/6 | 48/48 | 0/1 | 0.00 | 2/70 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/henry-van-dyke-jr_the-house-of-rimmon` | se | valid | yes | yes | yes | 11/11 | 3/3 | 6/6 | 17/17 | 0/3 | 0.00 | 3/104 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/herbert-gorman_the-place-called-dagon` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 43/43 | 0/1 | 0.00 | 2/71 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/hilaire-belloc_the-cruise-of-the-nona` | se | valid | yes | yes | yes | 8/8 | 3/3 | 6/6 | 8/8 | 0/1 | 0.00 | 3/82 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ooks/j-storer-clouston_the-man-from-the-clouds` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 0/1 | 0.00 | 2/87 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…rd-ebooks/james-branch-cabell_the-line-of-love` | se | valid | yes | yes | yes | 20/20 | 3/3 | 6/6 | 20/20 | 0/5 | 0.00 | 3/92 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/jane-c-loudon_the-mummy` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 0/1 | 0.00 | 3/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/john-donne_poetry` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 219/219 | 0/1 | 0.00 | 3/106 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/john-gay_the-beggars-opera` | se | valid | yes | yes | yes | 13/13 | 71/71 | 142/142 | 23/23 | 0/69 | 0.00 | 3/118 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…books/john-meade-falkner_the-lost-stradivarius` | se | valid | yes | yes | yes | 24/24 | 3/3 | 6/6 | 24/24 | 0/1 | 0.00 | 3/85 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…-ebooks/john-newton_william-cowper_olney-hymns` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 383/383 | 0/67 | 0.00 | 3/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_chance` | se | valid | yes | yes | yes | 23/23 | 3/3 | 6/6 | 23/23 | 0/1 | 0.00 | 2/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…h-conrad_ford-madox-ford_the-nature-of-a-crime` | se | valid | yes | yes | yes | 15/15 | 3/3 | 6/6 | 15/15 | 0/1 | 0.00 | 2/68 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_suspense` | se | valid | yes | yes | yes | 25/25 | 3/3 | 6/6 | 25/25 | 0/1 | 0.00 | 2/68 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_the-arrow-of-gold` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 0/1 | 0.00 | 3/84 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_the-rescue` | se | valid | yes | yes | yes | 55/55 | 3/3 | 6/6 | 55/55 | 0/1 | 0.00 | 3/85 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/joseph-conrad_the-rover` | se | valid | yes | yes | yes | 23/23 | 3/3 | 6/6 | 23/23 | 0/1 | 0.00 | 3/84 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…s/joshua-slocum_sailing-alone-around-the-world` | se | valid | yes | yes | yes | 30/30 | 14/14 | 28/28 | 30/30 | 0/28 | 0.00 | 3/92 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…dard-ebooks/kahlil-gibran_jesus-the-son-of-man` | se | valid | yes | yes | yes | 83/83 | 3/3 | 6/6 | 83/83 | 0/1 | 0.00 | 3/72 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…arine-a-carl_with-the-empress-dowager-of-china` | se | valid | yes | yes | yes | 44/44 | 24/24 | 27/27 | 44/44 | 0/40 | 0.00 | 3/85 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/maria-lowell_poetry` | se | valid | yes | yes | yes | 6/6 | 3/3 | 6/6 | 25/25 | 0/3 | 0.00 | 3/77 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…s/marie-belloc-lowndes_the-chink-in-the-armour` | se | valid | yes | yes | yes | 31/31 | 3/3 | 6/6 | 31/31 | 0/1 | 0.00 | 2/76 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…-ebooks/marmaduke-pickthall_said-the-fisherman` | se | valid | yes | yes | yes | 55/55 | 3/3 | 6/6 | 55/55 | 0/9 | 0.00 | 2/77 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/mary-augusta-ward_lady-roses-daughter` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 0/1 | 0.00 | 3/73 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…rd-ebooks/mary-p-hamlin_george-arliss_hamilton` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 12/12 | 0/1 | 0.00 | 2/99 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…rd-ebooks/mourning-dove_cogewea-the-half-blood` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 0/119 | 0.00 | 3/100 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/noel-coward_hay-fever` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 10/10 | 0/1 | 0.00 | 2/100 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ndard-ebooks/noel-loomis_short-science-fiction` | se | valid | yes | yes | yes | 13/13 | 3/3 | 6/6 | 13/13 | 0/1 | 0.00 | 3/71 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…andard-ebooks/norman-angell_the-great-illusion` | se | valid | yes | yes | yes | 31/31 | 3/3 | 6/6 | 31/31 | 0/267 | 0.00 | 2/69 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ndard-ebooks/olaf-stapledon_last-and-first-men` | se | valid | yes | yes | yes | 24/24 | 7/7 | 14/14 | 80/80 | 0/5 | 0.00 | 2/70 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…d-ebooks/p-g-wodehouse_the-adventures-of-sally` | se | valid | yes | yes | yes | 22/22 | 3/3 | 6/6 | 59/59 | 0/1 | 0.00 | 2/75 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ard-ebooks/pauline-e-hopkins_contending-forces` | se | valid | yes | yes | yes | 30/30 | 3/3 | 6/6 | 30/30 | 0/1 | 0.00 | 3/112 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/pauline-e-hopkins_of-one-blood` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 0/1 | 0.00 | 3/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/ring-lardner_fred-gross-stories` | se | valid | yes | yes | yes | 11/11 | 3/3 | 6/6 | 11/11 | 0/1 | 0.00 | 3/76 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ebooks/ring-lardner_george-s-kaufman_june-moon` | se | valid | yes | yes | yes | 11/11 | 3/3 | 6/6 | 11/11 | 0/1 | 0.00 | 3/98 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/ring-lardner_gullibles-travels` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 28/28 | 0/1 | 0.00 | 2/68 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/ring-lardner_short-fiction` | se | valid | yes | yes | yes | 80/80 | 3/3 | 6/6 | 203/203 | 0/115 | 0.00 | 3/86 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ard-ebooks/robert-hugh-benson_the-necromancers` | se | valid | yes | yes | yes | 25/25 | 3/3 | 6/6 | 68/68 | 0/1 | 0.00 | 2/70 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/robert-louis-stevenson_poetry` | se | valid | yes | yes | yes | 7/7 | 13/13 | 26/26 | 385/385 | 0/99 | 0.00 | 3/93 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ard-ebooks/rudolph-fisher_the-walls-of-jericho` | se | valid | yes | yes | yes | 40/40 | 3/3 | 6/6 | 40/40 | 0/57 | 0.00 | 3/88 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ard-ebooks/rudyard-kipling_captains-courageous` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 0/1 | 0.00 | 3/93 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…leridge_robert-southey_the-fall-of-robespierre` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 10/10 | 0/7 | 0.00 | 3/93 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…egfried-sassoon_memoirs-of-an-infantry-officer` | se | valid | yes | yes | yes | 14/14 | 3/3 | 6/6 | 50/50 | 0/1 | 0.00 | 3/72 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…e-roosevelt_a-book-lovers-holidays-in-the-open` | se | valid | yes | yes | yes | 23/23 | 5/5 | 9/9 | 23/23 | 0/10 | 0.00 | 3/113 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…s/w-e-b-du-bois_the-quest-of-the-silver-fleece` | se | valid | yes | yes | yes | 45/45 | 3/3 | 6/6 | 45/45 | 0/1 | 0.00 | 3/84 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…/w-h-davies_the-autobiography-of-a-super-tramp` | se | valid | yes | yes | yes | 40/40 | 3/3 | 6/6 | 40/40 | 0/1 | 0.00 | 2/67 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/walter-white_flight` | se | valid | yes | yes | yes | 30/30 | 3/3 | 6/6 | 30/30 | 0/1 | 0.00 | 3/79 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…dard-ebooks/walter-white_the-fire-in-the-flint` | se | valid | yes | yes | yes | 30/30 | 3/3 | 6/6 | 30/30 | 0/1 | 0.00 | 2/83 | links-unresolved, style-lost, calibre-header-diff |
+| `real/standard-ebooks/wilkie-collins_basil` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 42/42 | 0/3 | 0.00 | 3/79 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…ndard-ebooks/willa-cather_the-professors-house` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 0/1 | 0.00 | 3/82 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…rd-ebooks/winnifred-eaton-reeve_his-royal-nibs` | se | valid | yes | yes | yes | 33/33 | 3/3 | 6/6 | 33/33 | 0/1 | 0.00 | 3/80 | links-unresolved, style-lost, calibre-header-diff |
+| `real/…-ebooks/yung-wing_my-life-in-china-and-america` | se | valid | yes | yes | yes | 31/31 | 3/3 | 6/6 | 36/36 | 0/3 | 0.00 | 2/77 | links-unresolved, style-lost, calibre-header-diff |
+
