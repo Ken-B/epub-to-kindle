@@ -576,7 +576,7 @@ const KP = (() => {
   const consts = ['dict', 'CSS_URL', 'CSS_URL_RE', 'MOBI_SIZE', 'FONT_KW', 'KP_SIDES', 'KP_BAD_VALUE_RE',
     'KP_GLOBAL_RE', 'KP_INHERITED', 'KP_BORDER_STYLE_RE', '_kpSupports', 'kpNum'];
   const fns = ['cssSplit', 'cssWords', 'cssPx', 'safeDecode', 'normPath', 'joinPath', 'toBase32', 'kindleEmbed',
-    'kpSupported', 'kpDecls', 'kpExpand', 'kpBoxText', 'kpSerialize', 'kpFontSize', 'kpLineHeight'];
+    'kpSupported', 'kpDecls', 'kpExpand', 'kpBoxText', 'kpSerialize', 'kpFontSize', 'kpLineHeight', 'kpFontFaceInfo'];
   const src = [...consts, ...fns].map(take).join('\n');
   return new Function(`${src}\nreturn {${fns.join(', ')}};`)();
 })();
@@ -644,6 +644,17 @@ test('kpFontSize: px/pt/rem → em of the parent, computed size returned', () =>
   eq(fs('1.2em', 'p', 10, 16), '1.2em|12');       // em and % stay
   eq(fs('large', 'p', 10, 16), 'large|18');       // keywords stay
   eq(fs(null, 'h1', 16, 16), '|32');              // UA size of a heading
+});
+
+test('kpFontFaceInfo: look of a dropped @font-face from its descriptors, else its src file name', () => {
+  const f = b => { const x = KP.kpFontFaceInfo(b); return [x.family, x.style, x.weight, x.variant, x.generic].join('|'); };
+  eq(f('font-family: "schreefI"; src: url(../wpfonts/ACaslonPro-Italic.otf)'), 'schreefi|italic|||serif');
+  eq(f('font-family: "wpgSCvc"; src: url(../wpfonts/ACaslonPro-SCSemiboldItalic.otf)'), 'wpgscvc|italic|600|small-caps|serif');
+  eq(f('font-family: B; src: url(f/MinionPro-BoldIt.otf) format("opentype")'), 'b|italic|bold||serif');
+  eq(f('font-family: S; src: url(f/OpenSans-SmallCaps.ttf)'), 's|||small-caps|sans-serif');
+  eq(f('font-family: R; font-style: italic; font-weight: 700; src: url(f/x.ttf)'), 'r|italic|700||serif');
+  eq(f('font-family: "schreef"; src: url(../wpfonts/ACaslonPro-Regular.otf)'), 'schreef||||serif');
+  eq(f('font-family: C; src: url(f/Courier-Oblique.ttf)'), 'c|italic|||monospace');
 });
 
 // ── Results ─────────────────────────────────────────────────────────────────

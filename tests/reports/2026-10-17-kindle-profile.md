@@ -52,7 +52,7 @@ Ranked: gate failure, then misreferenced images, then lowest style score, then t
 | `generated/gen-missing-ncx` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 0/0 | 0/0 | 0.10 | 1.00 | 0/0/0/0 | 20/2 | style-lost, calibre-header-diff |
 | `generated/gen-unterminated-tag` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 0.09 | 1.00 | 0/0/0/0 | 20/2 | style-lost, calibre-header-diff |
 | `generated/gen-wrong-media-types` | generated | error | yes | yes | yes | 3/3 | 1/1 | 1/1 | 3/3 | 0/0 | 0.10 | 1.00 | 0/0/0/0 | 20/2 | style-lost, calibre-header-diff |
-| `local/hertmans` | local | valid | yes | yes | yes | 20/20 | 28/28 | 28/28 | 9/9 | 0/0 | 0.83 | 1.00 | 0/0/0/0 | 54/104 | calibre-header-diff |
+| `local/hertmans` | local | valid | yes | yes | yes | 20/20 | 28/28 | 28/28 | 9/9 | 0/0 | 0.81 | 0.96 | 0/0/0/0 | 54/104 | calibre-header-diff |
 | `real/gutenberg/pg10450` | pg | valid | yes | yes | yes | 18/18 | 31/31 | 31/31 | 30/30 | 30/30 | 0.62 | 1.00 | 0/0/0/0 | 61/248 | calibre-header-diff |
 | `real/gutenberg/pg11660` | pg | valid | yes | yes | yes | 6/6 | 27/27 | 27/27 | 21/21 | 17/17 | 0.61 | 1.00 | 0/0/0/0 | 50/48 | calibre-header-diff |
 | `real/gutenberg/pg11993` | pg | valid | yes | yes | yes | 5/5 | 5/5 | 5/5 | 48/48 | 42/42 | 0.65 | 1.00 | 0/0/0/0 | 43/38 | calibre-header-diff |
@@ -208,7 +208,7 @@ Ranked: gate failure, then misreferenced images, then lowest style score, then t
 | `real/…ooks/j-storer-clouston_the-man-from-the-clouds` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 1/1 | 0.77 | 1.00 | 0/0/0/0 | 64/87 | calibre-header-diff |
 | `real/…rd-ebooks/james-branch-cabell_the-line-of-love` | se | valid | yes | yes | yes | 20/20 | 3/3 | 6/6 | 20/20 | 5/5 | 0.81 | 1.00 | 0/0/0/0 | 70/92 | calibre-header-diff |
 | `real/standard-ebooks/jane-c-loudon_the-mummy` | se | valid | yes | yes | yes | 39/39 | 3/3 | 6/6 | 39/39 | 1/1 | 0.76 | 1.00 | 0/0/0/0 | 56/80 | calibre-header-diff |
-| `real/standard-ebooks/john-donne_poetry` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 219/219 | 1/1 | 0.86 | 1.00 | 0/0/0/0 | 84/106 | calibre-header-diff |
+| `real/standard-ebooks/john-donne_poetry` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 219/219 | 1/1 | 0.86 | 1.00 | 0/0/0/0 | 85/106 | calibre-header-diff |
 | `real/standard-ebooks/john-gay_the-beggars-opera` | se | valid | yes | yes | yes | 13/13 | 71/71 | 142/142 | 23/23 | 69/69 | 0.89 | 1.00 | 0/0/0/0 | 90/118 | calibre-header-diff |
 | `real/…books/john-meade-falkner_the-lost-stradivarius` | se | valid | yes | yes | yes | 24/24 | 3/3 | 6/6 | 24/24 | 1/1 | 0.78 | 1.00 | 0/0/0/0 | 54/85 | calibre-header-diff |
 | `real/…-ebooks/john-newton_william-cowper_olney-hymns` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 383/383 | 67/67 | 0.87 | 1.00 | 0/0/0/0 | 68/80 | calibre-header-diff |
@@ -221,7 +221,7 @@ Ranked: gate failure, then misreferenced images, then lowest style score, then t
 | `real/…s/joshua-slocum_sailing-alone-around-the-world` | se | valid | yes | yes | yes | 30/30 | 14/14 | 28/28 | 30/30 | 28/28 | 0.79 | 1.00 | 0/0/0/0 | 71/92 | calibre-header-diff |
 | `real/…dard-ebooks/kahlil-gibran_jesus-the-son-of-man` | se | valid | yes | yes | yes | 83/83 | 3/3 | 6/6 | 83/83 | 1/1 | 0.77 | 1.00 | 0/0/0/0 | 52/72 | calibre-header-diff |
 | `real/…arine-a-carl_with-the-empress-dowager-of-china` | se | valid | yes | yes | yes | 44/44 | 24/24 | 27/27 | 44/44 | 40/40 | 0.79 | 0.99 | 0/0/0/0 | 65/85 | calibre-header-diff |
-| `real/standard-ebooks/maria-lowell_poetry` | se | valid | yes | yes | yes | 6/6 | 3/3 | 6/6 | 25/25 | 3/3 | 0.83 | 1.00 | 0/0/0/0 | 59/77 | calibre-header-diff |
+| `real/standard-ebooks/maria-lowell_poetry` | se | valid | yes | yes | yes | 6/6 | 3/3 | 6/6 | 25/25 | 3/3 | 0.83 | 1.00 | 0/0/0/0 | 60/77 | calibre-header-diff |
 | `real/…s/marie-belloc-lowndes_the-chink-in-the-armour` | se | valid | yes | yes | yes | 31/31 | 3/3 | 6/6 | 31/31 | 1/1 | 0.76 | 1.00 | 0/0/0/0 | 51/76 | calibre-header-diff |
 | `real/…-ebooks/marmaduke-pickthall_said-the-fisherman` | se | valid | yes | yes | yes | 55/55 | 3/3 | 6/6 | 55/55 | 9/9 | 0.76 | 1.00 | 0/0/0/0 | 58/77 | calibre-header-diff |
 | `real/…d-ebooks/mary-augusta-ward_lady-roses-daughter` | se | valid | yes | yes | yes | 28/28 | 3/3 | 6/6 | 28/28 | 1/1 | 0.76 | 1.00 | 0/0/0/0 | 51/73 | calibre-header-diff |
@@ -239,7 +239,7 @@ Ranked: gate failure, then misreferenced images, then lowest style score, then t
 | `real/standard-ebooks/ring-lardner_gullibles-travels` | se | valid | yes | yes | yes | 12/12 | 3/3 | 6/6 | 28/28 | 1/1 | 0.78 | 1.00 | 0/0/0/0 | 46/68 | calibre-header-diff |
 | `real/standard-ebooks/ring-lardner_short-fiction` | se | valid | yes | yes | yes | 80/80 | 3/3 | 6/6 | 203/203 | 115/115 | 0.78 | 1.00 | 0/0/0/0 | 74/86 | calibre-header-diff |
 | `real/…ard-ebooks/robert-hugh-benson_the-necromancers` | se | valid | yes | yes | yes | 25/25 | 3/3 | 6/6 | 68/68 | 1/1 | 0.78 | 1.00 | 0/0/0/0 | 48/70 | calibre-header-diff |
-| `real/standard-ebooks/robert-louis-stevenson_poetry` | se | valid | yes | yes | yes | 7/7 | 13/13 | 26/26 | 385/385 | 99/99 | 0.84 | 1.00 | 0/0/0/0 | 87/93 | calibre-header-diff |
+| `real/standard-ebooks/robert-louis-stevenson_poetry` | se | valid | yes | yes | yes | 7/7 | 13/13 | 26/26 | 385/385 | 99/99 | 0.84 | 1.00 | 0/0/0/0 | 89/93 | calibre-header-diff |
 | `real/…ard-ebooks/rudolph-fisher_the-walls-of-jericho` | se | valid | yes | yes | yes | 40/40 | 3/3 | 6/6 | 40/40 | 57/57 | 0.76 | 1.00 | 0/0/0/0 | 59/88 | calibre-header-diff |
 | `real/…ard-ebooks/rudyard-kipling_captains-courageous` | se | valid | yes | yes | yes | 17/17 | 3/3 | 6/6 | 17/17 | 1/1 | 0.78 | 1.00 | 0/0/0/0 | 65/93 | calibre-header-diff |
 | `real/…leridge_robert-southey_the-fall-of-robespierre` | se | valid | yes | yes | yes | 10/10 | 3/3 | 6/6 | 10/10 | 7/7 | 0.90 | 1.00 | 0/0/0/0 | 72/93 | calibre-header-diff |

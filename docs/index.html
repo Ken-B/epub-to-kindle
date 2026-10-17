@@ -144,7 +144,7 @@
  */
 'use strict';
 
-const APP_VERSION = 'v1.0.14';
+const APP_VERSION = 'v1.0.15';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -1506,8 +1506,18 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
         if (!kp.rules.has(key)) kp.rules.set(key, mobiCssRules(text, base, ctx.cssFiles, new Set([key]), 0, kp.profile));
         return kp.rules.get(key);
       });
-      for (const rules of sheets) for (const r of rules) if (r.fontFace) kp.fontFaces.add(r.fontFace);
+      // dropped (url()) @font-face rules by family; a family whose faces differ is not one look
+      const faces = new Map();
+      for (const rules of sheets) for (const r of rules) {
+        if (r.fontFace) kp.fontFaces.add(r.fontFace);
+        const f = r.droppedFace;
+        if (!f?.family) continue;
+        const cur = faces.get(f.family);
+        if (!cur) faces.set(f.family, {...f});
+        else for (const k of ['style', 'weight', 'variant']) if (cur[k] !== f[k]) cur[k] = null;
+      }
       kpCss = mobiCascade(doc, sheets, st => kpDecls(st, dir, ctx.imageByPath));
+      kpCss.faces = faces;
       kp.rejected += kpCss.rejected;
     } catch(e) { console.warn('Kindle profile skipped:', ctx.path, e); }
   }
@@ -1934,6 +1944,7 @@ function mobiCssRules(css, baseDir, cssFiles, seen = new Set(), depth = 0, prof 
           if (name === 'font-face') {
             if (prof.fontFace && !/url\(\s*(?!['"]?data:)/i.test(body))
               out.push({sels: [], decls: [], fontFace: `@font-face{${body.trim()}}`});
+            else if (prof.fontFace) out.push({sels: [], decls: [], droppedFace: kpFontFaceInfo(body)});
           } else if (name === 'media' ? prof.media(rest) : name === 'supports' ? mobiSupportsOk(rest) : name === 'layer') add(body, level + 1);
         } else if (name === 'import') {
           const im = /^(?:url\(\s*)?["']?([^"')\s]+)["']?\s*\)?\s*(.*)$/.exec(rest);
@@ -2336,6 +2347,12 @@ function mobiMarkup(doc, body, decl) {
 //      by specificity. Presentational attributes the defaults would cancel (<hr size color
 //      noshade align>, <table cellpadding> on its cells) go into the element's class when
 //      the cascade sets nothing for that property (kpPresentational).
+//      UA display rules the pinned defaults would beat are baked: [hidden] → display:none when
+//      the cascade sets no display; the children of a closed <details> but its summary →
+//      display:none (summary's own display is not pinned: list-item in browsers).
+//      A font family whose @font-face is dropped (url(): fonts are not embedded) keeps its
+//      look: the face's italic/bold/small caps (descriptors, else the src file name) go into
+//      the class (kpFaceLook), and a generic family is appended.
 //   3. html/body: margin-left/right and padding-left/right 0 (the device owns the page
 //      side margins); the classes go on the skeleton <html>/<body>.
 //      A winning `all` resets the longhands it beats (kpWinners).
@@ -2388,7 +2405,7 @@ const KP_DEFAULTS =
   'td{display:table-cell;padding:1px}\nth{display:table-cell;font-weight:bold;text-align:center;padding:1px}\n' +
   'pre{display:block;font-family:monospace;white-space:pre-wrap;margin:1em 0}\n' +
   'address{display:block;font-style:italic}\n' +
-  'section,article,aside,nav,header,footer,main,figure,figcaption,hgroup,details,summary{display:block}\n';
+  'section,article,aside,nav,header,footer,main,figure,figcaption,hgroup,details{display:block}\n';
 
 const KP_SIDES = ['top', 'right', 'bottom', 'left'];
 // values Kindle cannot compute: calc() & co (also -webkit-calc()), viewport units
@@ -2591,6 +2608,33 @@ function kpExpand(prop, v, add) {
   add(prop, v);
 }
 
+/** What a dropped @font-face (a url() font: not embedded) looks like, from its descriptors or,
+ *  when those say normal, its src file name ("ACaslonPro-SemiboldItalic.otf"): {family
+ *  (lower-cased), style, weight, variant (null: normal), generic}. */
+function kpFontFaceInfo(body) {
+  const d = new Map();
+  for (const x of cssSplit(body || '', ';')) {
+    const k = x.indexOf(':');
+    if (k > 0) d.set(x.slice(0, k).trim().toLowerCase(), x.slice(k + 1).trim());
+  }
+  const family = (d.get('font-family') || '').replace(/^["']|["']$/g, '').trim();
+  let style = /^(italic|oblique)\b/i.test(d.get('font-style') || '') ? 'italic' : null;
+  const w = (d.get('font-weight') || '').trim().toLowerCase().split(/\s+/)[0];
+  let weight = w === 'bold' || w === 'bolder' ? 'bold' : /^\d+$/.test(w) && +w >= 600 ? w : null;
+  let variant = /small-caps/i.test(d.get('font-variant') || d.get('font-variant-caps') || '') ? 'small-caps' : null;
+  const names = [...(d.get('src') || '').matchAll(/url\(\s*["']?([^"')]*)/gi)].map(m => m[1].split(/[?#]/)[0].split('/').pop());
+  const words = (names[0] || '').replace(/\.[a-z0-9]+$/i, '').split(/[-_.\s]+/)
+    .flatMap(t => t.match(/[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+/g) || []).map(t => t.toLowerCase());
+  const has = (...t) => t.some(x => words.includes(x));
+  if (!style && has('italic', 'it', 'oblique', 'ital')) style = 'italic';
+  if (!weight && has('bold', 'semibold', 'demibold', 'demi', 'black', 'heavy', 'extrabold', 'ultrabold'))
+    weight = has('semi', 'semibold', 'demi', 'demibold') ? '600' : 'bold';
+  if (!variant && (has('sc', 'smallcaps') || words.join(' ').includes('small caps'))) variant = 'small-caps';
+  const all = (family + ' ' + names.join(' ')).toLowerCase();
+  const generic = /sans/.test(all) ? 'sans-serif' : /mono|courier|code/.test(all) ? 'monospace' : 'serif';
+  return {family: family.toLowerCase(), style, weight, variant, generic};
+}
+
 /** a b c d → the shortest box shorthand value */
 function kpBoxText([t, r, b, l]) {
   return l !== r ? `${t} ${r} ${b} ${l}` : b !== t ? `${t} ${r} ${b}` : r !== t ? `${t} ${r}` : t;
@@ -2700,6 +2744,27 @@ function kpPresentational(el, tag, out, cellpadding) {
   }
 }
 
+/** Italic/bold/small caps a book expresses only by a font family whose @font-face is dropped
+ *  (a url() font: "schreefI" = ACaslonPro-Italic.otf): the face's look (kpFontFaceInfo) goes
+ *  into font-style/-weight/-variant where the element sets none (its own family) or says
+ *  normal (one face per family: the glyphs do not change with it), and a generic family is
+ *  appended to a list without one. Returns the element's computed first family (lower-cased). */
+function kpFaceLook(out, inherited, faces) {
+  const v = out.get('font-family');
+  const own = v != null && !/^(inherit|initial|unset)$/i.test(v.trim());
+  const family = own ? cssSplit(v, ',')[0].trim().replace(/^["']|["']$/g, '').trim().toLowerCase() : inherited;
+  const face = family && faces?.get(family);
+  if (!face) return family;
+  for (const [prop, x] of [['font-style', face.style], ['font-weight', face.weight], ['font-variant', face.variant]]) {
+    if (!x) continue;
+    const cur = out.get(prop);
+    if (cur == null ? own : /^(normal|initial)$/i.test(cur.trim())) out.set(prop, x);
+  }
+  if (own && !cssSplit(v, ',').some(f => /^(serif|sans-serif|monospace|cursive|fantasy|system-ui)$/i.test(f.trim())))
+    out.set('font-family', `${v.trim()}, ${face.generic}`);
+  return family;
+}
+
 /** Does a positioned element hide itself (moved ≥ 500px off the page, clip: rect() of at most
  *  1px, clip-path inset(≥ 50%) / circle(0), or width/height ≤ 1px with overflow hidden)? */
 function kpVisuallyHidden(out, size) {
@@ -2765,6 +2830,14 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
     let i;
     if (xhtml) {
       const {out, size} = declsOf(o, tag, p, rs, c === clone);
+      // UA rules the pinned element defaults would override: [hidden] (an author display still
+      // wins), the content of a closed <details> (always hidden in browsers)
+      if (c.hasAttribute('hidden') && !out.has('display')) out.set('display', 'none');
+      const par = c.parentNode;
+      if (par?.nodeType === 1 && par.localName.toLowerCase() === 'details' && isHtml(par) && !par.hasAttribute('open') &&
+          !(tag === 'summary' && [...par.children].find(e => e.localName.toLowerCase() === 'summary') === c))
+        out.set('display', 'none');
+      const family = kpFaceLook(out, p.family, cascade.faces);
       const ws = (out.get('white-space') || '').trim().toLowerCase();
       const pre = KP_PRE_WS_RE.test(ws) ? true : /^(normal|nowrap|initial)$/.test(ws) ? false
         : ws === 'inherit' ? p.pre : p.pre || KP_PRE_TAGS.has(tag);
@@ -2788,14 +2861,15 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
       const cp = tag === 'table' ? (/^\s*(\d+)\s*$/.exec(c.getAttribute('cellpadding') || '')?.[1] ?? null) : p.cellpadding;
       i = {out, ps: pseudoOf(o, size, rs), tag, html: true, block,
            container: block || KP_INLINE_BLOCK_RE.test(disp), pre, size, cellpadding: cp, svgStyled: false,
-           ti: out.has('text-indent') && out.get('text-indent') !== 'inherit' ? out.get('text-indent').trim() : p.ti};
+           ti: out.has('text-indent') && out.get('text-indent') !== 'inherit' ? out.get('text-indent').trim() : p.ti,
+           family};
     } else {
       // an SVG with its own <style>: its rules are not in the cascade, so nothing is baked
       // inside it (a generated class would beat them)
       const svgStyled = p.svgStyled || (tag === 'svg' && c.getElementsByTagNameNS('*', 'style').length > 0);
       const out = svgStyled ? new Map() : kpWinners(cascade.decl.get(o));
       i = {out, ps: null, tag, html: false, block: false, container: false, pre: true, size: p.size,
-           cellpadding: null, svgStyled, ti: p.ti};
+           cellpadding: null, svgStyled, ti: p.ti, family: p.family};
     }
     info.set(c, i);
     if (depth < KP_MAX_DEPTH) {
@@ -2808,7 +2882,9 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
     if (i.container) containers.push(c);
   };
   const tiOf = o => { const v = o.get('text-indent'); return v != null && v !== 'inherit' ? v.trim() : null; };
-  if (clone) visit(body, clone, {size: htmlD.size, pre: false, cellpadding: null, svgStyled: false, ti: tiOf(htmlD.out)}, 0);
+  const htmlFamily = kpFaceLook(htmlD.out, null, cascade.faces);
+  if (clone) visit(body, clone, {size: htmlD.size, pre: false, cellpadding: null, svgStyled: false, ti: tiOf(htmlD.out),
+                                 family: htmlFamily}, 0);
 
   // Pass B (bottom-up): whitespace, nbsp indents, trailing <br>, empty paragraphs
   const removed = new Set();  // elements Pass B took out (no element children: no descendants to track)

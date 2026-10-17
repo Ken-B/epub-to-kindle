@@ -168,11 +168,11 @@
         "style": 0
       },
       "style_score_se_pg": [
-        0.7297855,
+        0.7297925,
         200
       ],
       "device_score_se_pg": [
-        0.9954560000000001,
+        0.9954655,
         200
       ],
       "layout_hygiene_pooled": {
@@ -486,9 +486,9 @@
           "converted": 209,
           "gate_pass": 209,
           "gate_evaluated": 209,
-          "style_se_pg": 0.7297855,
+          "style_se_pg": 0.7297925,
           "style_se_pg_n": 200,
-          "device_se_pg": 0.9954560000000001,
+          "device_se_pg": 0.9954655,
           "device_se_pg_n": 200,
           "hygiene": {
             "empty_blocks": 21,
@@ -1147,7 +1147,7 @@
             "reasons": [
               [
                 "style score",
-                "style score 1.00 -> 0.83"
+                "style score 1.00 -> 0.81"
               ]
             ]
           },

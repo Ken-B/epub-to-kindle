@@ -624,6 +624,9 @@ with sync_playwright() as pw:
                 '<div class="poem2"><p>Indented by the ancestor</p></div>\n'
                 '<p><a href="#hd"><b>I.</b><br/> EARLY LETTERS</a></p>\n'
                 '<p>before</p><div class="inl"></div><p>after</p>\n'
+                '<h2 hidden="hidden">Hidden title</h2><p hidden="">Hidden para</p><p hidden="" class="shown">Shown para</p>\n'
+                '<details><summary>Sum</summary><p>Closed content</p></details>\n'
+                '<p><span class="cur">Désolé, Madame.</span> <span class="sc">Caps</span> <span class="plainff">Plain</span></p>\n'
                 '<p class="m">m1</p><p class="m"></p><p class="m">m2</p><div class="pb"></div><p>end</p>\n'
                 '<div class="st"><div class="mm"></div><div class="mm">first stanza line</div></div>\n<div class="verse"><span class="vl">line one<br class="hb"/></span><span class="vl">line two<br class="hb"/></span></div>\n'
                 '<div><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9">\n  <g>\n    <rect width="9" height="9"/>\n  </g>\n  <text> spaced  text </text>\n</svg></div>'),
@@ -636,7 +639,12 @@ with sync_playwright() as pw:
         ('div', 'display: block; margin-left: 2em'), ('#hd #al', 'all: initial; margin-top: 0'),
         ('.poem2', 'text-indent: -2em; margin-left: 0'),
         ('.m', 'margin: 0 0 1em'), ('.pb', 'page-break-before: always'),
-        ('.vl', 'display: block'), ('.hb', 'display: none'), ('.inl', 'display: inline'), ('.mm', 'margin: 1em 0'),
+        ('.vl', 'display: block'), ('.hb', 'display: none'), ('.inl', 'display: inline'), ('.mm', 'margin: 1em 0'), ('.shown', 'display: block'),
+        ('@font-face', 'font-family: "fI"; src: url(fonts/Book-Italic.otf)'),
+        ('@font-face', 'font-family: fSC; src: url(fonts/Book-SCSemibold.otf)'),
+        ('@font-face', 'font-family: "fR"; src: url(fonts/Book-Regular.otf)'),
+        ('.cur', 'font-family: "fI"'), ('.sc', 'font-family: fSC, Georgia, serif; font-weight: normal'),
+        ('.plainff', 'font-family: "fR"'),
     ])
     page = browser.new_page()
     page.goto(base_url)
@@ -653,7 +661,10 @@ with sync_playwright() as pw:
         return {sheet, ch, sr: decls('<span[^>]*>(?=Chapter 1)'), sr2: decls('<span[^>]*>(?=Skip)'),
             hr: decls('<hr[^>]*>'), td: decls('<td[^>]*>(?=cell)'), sb: decls('<div[^>]*>(?=</div><p[^>]*>b<)'),
             pad: decls('<p[^>]*>(?=</p>)'), rv: decls('<p[^>]*>(?=revert)'), al: decls('<div[^>]*>(?=Authors)'),
-            anc: decls('<p[^>]*>(?=Indented by the ancestor)'), plain: decls('<p[^>]*>(?=<a )')};
+            anc: decls('<p[^>]*>(?=Indented by the ancestor)'), plain: decls('<p[^>]*>(?=<a )'),
+            h2h: decls('<h2[^>]*>(?=Hidden title)'), ph: decls('<p[^>]*>(?=Hidden para)'), shown: decls('<p[^>]*>(?=Shown para)'),
+            closed: decls('<p[^>]*>(?=Closed content)'), summ: decls('<summary[^>]*>(?=Sum)'),
+            cur: decls('<span[^>]*>(?=Désolé)'), sc: decls('<span[^>]*>(?=Caps)'), pff: decls('<span[^>]*>(?=Plain)')};
     }''', base64.b64encode(kp2_epub).decode())
     page.close()
     test('Profile: clip / clip-path screen-reader text stays hidden (display:none), not revealed',
@@ -684,6 +695,15 @@ with sync_playwright() as pw:
          lambda: re.search(r'>m1</p><p[^>]*>m2</p><div[^>]*></div><p[^>]*>end</p>', kp2['ch']) is not None)
     test('Profile: empty first child whose margin collapses into the next sibling\'s dropped',
          lambda: re.search(r'<div[^>]*><div[^>]*>first stanza line</div></div>', kp2['ch']) is not None)
+    test('Profile: [hidden] elements get display:none (author display still wins), closed <details> content hidden',
+         lambda: 'display:none' in kp2['h2h'] and 'display:none' in kp2['ph'] and 'display:block' in kp2['shown']
+                 and 'display:none' not in kp2['shown'] and 'display:none' in kp2['closed'] and 'display:none' not in kp2['summ']
+                 and 'summary{' not in kp2['sheet'] and ',summary' not in kp2['sheet'])
+    test('Profile: dropped @font-face looks baked: italic / semibold small caps from the src name, generic appended',
+         lambda: 'font-style:italic' in kp2['cur'] and 'font-family:"fI", serif' in kp2['cur']
+                 and 'font-variant:small-caps' in kp2['sc'] and 'font-weight:600' in kp2['sc']
+                 and 'font-family:fSC, Georgia, serif' in kp2['sc']
+                 and 'font-style' not in kp2['pff'] and 'font-weight' not in kp2['pff'])
     test('Profile: hidden <br> (display:none, Gutenberg verse br.hidebr) dropped',
          lambda: re.search(r'line one</span><span[^>]*>line two</span>', kp2['ch']) is not None)
     test('Profile: whitespace between SVG elements emptied, kept inside <text>',
