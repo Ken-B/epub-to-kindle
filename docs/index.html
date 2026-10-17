@@ -107,7 +107,7 @@
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.9 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.10 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -115,7 +115,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.9';
+const APP_VERSION = 'v1.0.10';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -285,16 +285,27 @@ const EOF_RECORD = new Uint8Array([0xe9,0x8e,0x0d,0x0a]);
 
 const TEXT_RECORD_SIZE = 4096;
 
+/**
+ * Split text into records of EXACTLY 4096 bytes (last one shorter).
+ * Reference: calibre/ebooks/mobi/utils.py create_text_record + writer8/main.py.
+ * Readers (libmobi) decompress each record into a text_record_size buffer, so a
+ * record must never hold more. If the boundary falls inside a UTF-8 sequence,
+ * the missing bytes ("overlap") are appended AFTER the (compressed) data as the
+ * multibyte trailing entry (extra_data_flags bit 0): overlap bytes + 1 byte
+ * holding len(overlap). The overlap bytes also start the next record (duplicated).
+ * With no overlap the trailing entry is a single 0x00 byte.
+ */
 function buildTextRecords(text, compress) {
   const bytes = enc.encode(text);
   const records = [];
-  let pos = 0;
-  while (pos < bytes.length) {
-    let end = Math.min(pos + TEXT_RECORD_SIZE, bytes.length);
-    while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end++;
-    const chunk = bytes.slice(pos, end);
-    records.push(concat(compress ? palmDocCompress(chunk) : chunk, new Uint8Array([0])));
-    pos = end;
+  for (let pos = 0; pos < bytes.length; pos += TEXT_RECORD_SIZE) {
+    const end = Math.min(pos + TEXT_RECORD_SIZE, bytes.length);
+    let ovEnd = end;  // continuation bytes completing the last (split) character
+    while (ovEnd < bytes.length && ovEnd - end < 3 && (bytes[ovEnd] & 0xc0) === 0x80) ovEnd++;
+    const chunk = bytes.subarray(pos, end);
+    const overlap = bytes.subarray(end, ovEnd);
+    records.push(concat(compress ? palmDocCompress(chunk) : chunk, overlap,
+                        new Uint8Array([overlap.length])));
   }
   if (!records.length) records.push(new Uint8Array([0]));
   return records;
@@ -497,7 +508,8 @@ function buildChunkIndex(parts) {
       tags: {
         2: [offsets[i]],     // cncx_offset → points to selector string
         3: [p.chapterIndex], // file_number (0-indexed chapter)
-        4: [0],              // sequence_number
+        4: [i],              // sequence_number: global chunk number (Calibre), the
+                             // FFFF in kindle:pos:fid:FFFF links (one chunk per chapter)
         6: [contentStart, p.contentByteLen],
       }
     };
@@ -613,8 +625,15 @@ function buildRecord0(o) {
   dv.setUint32(p,0xffffffff,false); p+=4; // drm_offset
   p+=12; // drm fields
   p+=8;  // unknown2
-  dv.setUint32(p,o.fdstRec,false); p+=4;
-  dv.setUint32(p,o.fdstCount,false); p+=4;
+  if (o.mobi6) {
+    // 0xC0: MOBI v6 has no FDST; Calibre (writer2/main.py) writes two u16 fields
+    // here, first and last content record (text..images), then 0x00000001.
+    dv.setUint16(p,1,false); dv.setUint16(p+2,o.lastContentRec,false); p+=4;
+    dv.setUint32(p,1,false); p+=4;
+  } else {
+    dv.setUint32(p,o.fdstRec,false); p+=4;   // 0xC0: FDST record index
+    dv.setUint32(p,o.fdstCount,false); p+=4; // 0xC4: number of FDST sections (flows)
+  }
   dv.setUint32(p,o.fcisRec,false); p+=4;
   dv.setUint32(p,1,false); p+=4; // fcis_count
   dv.setUint32(p,o.flisRec,false); p+=4;
@@ -673,14 +692,118 @@ const LANG = {'af':54,'ar':1,'bg':2,'ca':3,'zh':4,'cs':5,'da':6,'nl':19,
 
 function langCode(tag) { return LANG[(tag||'en').toLowerCase().split('-')[0]] || 9; }
 
-/** Convert 1-based image index to Kindle embed reference (base-32, min 4 digits).
- *  kindleEmbed(1) = "0001", kindleEmbed(32) = "0010", etc. */
-function kindleEmbed(n) {
-  const digits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+/** Base-32 number as used in kindle: URIs (digits 0-9A-V), zero-padded to minDigits.
+ *  toBase32(1, 4) = "0001", toBase32(32, 4) = "0010". */
+function toBase32(n, minDigits) {
+  const digits = '0123456789ABCDEFGHIJKLMNOPQRSTUV';
   let result = '';
   let num = n;
   do { result = digits[num % 32] + result; num = Math.floor(num / 32); } while (num > 0);
-  return result.padStart(4, '0');
+  return result.padStart(minDigits, '0');
+}
+
+/** Convert 1-based image index to Kindle embed reference (base-32, min 4 digits). */
+function kindleEmbed(n) { return toBase32(n, 4); }
+
+/** kindle:flow URI of KF8 flow n (flow 0 is the HTML, stylesheets are 1, 2, …). */
+function kindleFlowCss(n) { return `kindle:flow:${toBase32(n, 4)}?mime=text/css`; }
+
+// ─── Paths and strings ───────────────────────────────────────────────────────
+
+function safeDecode(s) { try { return decodeURIComponent(s); } catch(e) { return s; } }
+
+/** Normalised zip path: %-decoded, "./" and "../" folded ("a/./b/../c" → "a/c").
+ *  Used as the key for spine documents, stylesheets and images, so relative URLs
+ *  from any directory resolve to the same entry: normPath(dirOf(from) + href). */
+function normPath(p) {
+  const out = [];
+  for (const seg of safeDecode(p).split('/')) {
+    if (seg === '..') out.pop();
+    else if (seg && seg !== '.') out.push(seg);
+  }
+  return out.join('/');
+}
+function dirOf(p) { const i = p.lastIndexOf('/'); return i >= 0 ? p.slice(0, i + 1) : ''; }
+
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/** UTF-8 byte length of s[from:to] (same result as enc.encode(...).length, no allocation;
+ *  a lone surrogate counts 3 bytes, as TextEncoder writes U+FFFD for it). */
+function utf8Len(s, from = 0, to = s.length) {
+  let n = 0;
+  for (let i = from; i < to; i++) {
+    const c = s.charCodeAt(i);
+    if (c < 0x80) n += 1;
+    else if (c < 0x800) n += 2;
+    else if (c >= 0xd800 && c < 0xdc00 && i + 1 < to &&
+             (s.charCodeAt(i + 1) & 0xfc00) === 0xdc00) { n += 4; i++; }
+    else n += 3;
+  }
+  return n;
+}
+
+// ─── Stylesheets → KF8 flows ─────────────────────────────────────────────────
+//
+// Reference: Calibre writer8/main.py extract_css_into_flows + replace_resource_links.
+// Every distinct stylesheet (a linked .css file or an inline <style>) becomes its
+// own FDST flow after the HTML (flow 1, 2, …), referenced from the skeleton <head>
+// as <link href="kindle:flow:NNNN?mime=text/css"/>. Sheets are kept verbatim: the
+// Kindle's browser engine resolves the cascade. Only resource URLs are rewritten:
+//   url(images/x.png)         → url(kindle:embed:XXXX?mime=image/png)  (manifest image)
+//   @import url(other.css)    → @import url(kindle:flow:NNNN?mime=text/css)  (unquoted:
+//                               readers rewrite everything inside url(…) and add quotes)
+//   @font-face {src:url(…)}   → dropped: fonts are not embedded (yet), so the src can't
+//                               resolve; the font-family then falls back to the default.
+// Only sheets actually referenced (by a chapter or an @import) are written; identical
+// sheets share one flow. MOBI v6 has no flows and keeps parseEpub's hidden-rules `css`.
+
+const CSS_URL = String.raw`url\(\s*(?:"([^"]*)"|'([^']*)'|([^'")\s]*))\s*\)`;
+const CSS_URL_RE = new RegExp(CSS_URL, 'gi');
+const CSS_IMPORT_RE = new RegExp(String.raw`@import\s+(?:${CSS_URL}|"([^"]*)"|'([^']*)')([^;]*);`, 'gi');
+
+/**
+ * @param {Map<string,string>} cssFiles - normalised zip path → stylesheet text
+ * @param {Map<string,{idx:number,mt:string}>} imageByPath - normalised zip path → image resource
+ * @returns {{flows: string[], sheet(path): number|null, inline(css, baseDir): number|null}}
+ *          flows[k] is KF8 flow k+1; sheet()/inline() return the flow number to link
+ */
+function makeCssFlows(cssFiles, imageByPath) {
+  const flows = [];
+  const byText = new Map();  // final sheet text → flow number (de-duplication)
+  const byPath = new Map();  // zip path → flow number; null while processing (@import cycle)
+  const strip = u => u.split(/[?#]/)[0];
+
+  const rewrite = (css, baseDir) => css
+    .replace(/@font-face\s*\{[^}]*\}/gi, rule => /url\(\s*(?!['"]?data:)/i.test(rule) ? '' : rule)
+    .replace(CSS_IMPORT_RE, (m, a, b, c, d, e, media) => {
+      const n = sheet(normPath(baseDir + strip(a ?? b ?? c ?? d ?? e ?? '')));
+      return n ? `@import url(${kindleFlowCss(n)})${media};` : m;
+    })
+    .replace(CSS_URL_RE, (m, a, b, c) => {
+      const img = imageByPath.get(normPath(baseDir + strip(a ?? b ?? c ?? '')));
+      return img ? `url(kindle:embed:${kindleEmbed(img.idx + 1)}?mime=${img.mt})` : m;
+    });
+
+  const add = (css, baseDir) => {
+    const text = rewrite(css, baseDir);
+    if (!text.trim()) return null;
+    let n = byText.get(text);
+    if (n === undefined) { flows.push(text); n = flows.length; byText.set(text, n); }
+    return n;
+  };
+
+  function sheet(path) {
+    if (byPath.has(path)) return byPath.get(path);
+    if (!cssFiles.has(path)) return null;
+    byPath.set(path, null);
+    const n = add(cssFiles.get(path), dirOf(path));
+    byPath.set(path, n);
+    return n;
+  }
+
+  return { flows, sheet, inline: add };
 }
 
 // ─── EPUB Parser ─────────────────────────────────────────────────────────────
@@ -752,18 +875,18 @@ async function parseEpub(buf) {
     .map(ir => manifest[ir.getAttribute('idref')]?.href)
     .filter(Boolean);
 
-  // CSS — extract only critical visibility rules from stylesheets.
-  // We do NOT inline the full CSS because a large <style> block in the skeleton_head
-  // can span multiple 4096-byte KF8 text records, splitting the HTML mid-tag and
-  // causing CSS to appear as visible text. Kindle provides its own typography.
-  // We only keep: display:none, visibility:hidden, and similar rules that hide
-  // publisher watermarks and other content that should be invisible.
+  // CSS. KF8: every stylesheet is read in full and written as its own flow
+  // (makeCssFlows, below). MOBI v6 has no flows and no real CSS support, so for it
+  // we keep only the critical visibility rules (display:none, visibility:hidden)
+  // that hide publisher watermarks; convertToAzw3 inlines those in its <head>.
   let css = '';
+  const cssFiles = new Map();  // normalised zip path → stylesheet text (KF8 flows)
   for (const item of Object.values(manifest)) {
     if (item.mt === 'text/css') {
       const f = zip.file(resolve(item.href)) || zip.file(decodeURIComponent(resolve(item.href)));
       if (f) try {
         const sheet = await f.async('string');
+        cssFiles.set(normPath(opfDir + item.href), sheet);
         // Extract rules that contain display:none or visibility:hidden
         // These prevent publisher watermarks from showing as gibberish
         const criticalRules = [];
@@ -806,14 +929,21 @@ async function parseEpub(buf) {
     if (!f) continue;
     try {
       const bytes = await f.async('uint8array');
-      const idx = imageResources.length;
-      imageResources.push({ bytes, mt: item.mt, href: item.href });
-      imageIndex[item.href] = idx;
-      imageIndex[item.href.split('/').pop()] = idx;
-      // Track cover position for EXTH CoverOffset
-      if (coverId && manifest[coverId]?.href === item.href) coverResourceIdx = idx;
+      const res = { bytes, mt: item.mt, href: item.href };
+      // Cover goes first (EXTH CoverOffset = 0). The resource order is decided
+      // HERE, once: convertToAzw3 writes records in exactly this order, so the
+      // kindle:embed:XXXX / recindex numbers assigned below stay correct.
+      if (coverResourceIdx < 0 && coverId && manifest[coverId]?.href === item.href) {
+        imageResources.unshift(res); coverResourceIdx = 0;
+      } else imageResources.push(res);
     } catch(e) { console.warn('Could not load image:', item.href, e); }
   }
+  const imageByPath = new Map();  // normalised zip path → {idx, mt} (CSS url() lookup)
+  imageResources.forEach((r, idx) => {
+    imageIndex[r.href] = idx;
+    imageIndex[r.href.split('/').pop()] = idx;
+    imageByPath.set(normPath(opfDir + r.href), {idx, mt: r.mt});
+  });
   // Keep coverImage on metadata for backwards compat (now points into imageResources)
   metadata.coverImage = null;  // no longer needed separately
   metadata.coverResourceIdx = coverResourceIdx;
@@ -853,10 +983,17 @@ async function parseEpub(buf) {
     } catch(e) {}
   }
 
+  // KF8 context shared by all chapters: stylesheet flows, and internal links
+  // (placeholder → {path, frag, href}; resolved to kindle:pos in convertToAzw3).
+  const cssFlows = makeCssFlows(cssFiles, imageByPath);
+  const links = new Map();
+  const spinePaths = new Set(spineHrefs.map(h => normPath(resolve(h))));
+
   const chapters = [];
   for (const href of spineHrefs) {
     const path = resolve(href);
     const chapterDir = href.includes('/') ? href.split('/').slice(0,-1).join('/') + '/' : '';
+    const chapterPath = normPath(path);
     const hrefBase = href.split('/').pop().split('#')[0];
     const ncxTitle = ncxTitles[hrefBase] || null;
     const f = zip.file(path) || zip.file(decodeURIComponent(path));
@@ -867,13 +1004,17 @@ async function parseEpub(buf) {
       const parsed = doc.querySelector('parsererror')
         ? new DOMParser().parseFromString(xhtml, 'text/html')
         : doc;
-      const ch = extractContent(parsed, css, imageIndex, chapterDir);
+      const ch = extractContent(parsed, imageIndex, chapterDir,
+        {path: chapterPath, cssFlows, links, spinePaths});
       // Prefer NCX title over auto-detected heading (more authoritative)
       if (ncxTitle) ch.title = ncxTitle;
       chapters.push(ch);
     } catch(e) { console.warn('Skip chapter:', path, e); }
   }
-  return {metadata, chapters, css, imageResources};
+  // Link targets → chapter index (-1: spine item was skipped; the link keeps its href)
+  const chapterOf = new Map(chapters.map((ch, i) => [ch.path, i]));
+  for (const l of links.values()) l.chapter = chapterOf.get(l.path) ?? -1;
+  return {metadata, chapters, css, stylesheets: cssFlows.flows, links, imageResources};
 }
 
 let _aid = 1;
@@ -881,15 +1022,29 @@ const BLOCKS = new Set(['p','div','h1','h2','h3','h4','h5','h6','section',
   'article','blockquote','pre','ul','ol','li','table','tr','td','th',
   'figure','figcaption','nav','header','footer','aside','main']);
 
+// Body/html attributes carried over to the skeleton (author CSS selects on them,
+// e.g. body.calibre, and an id on <body> can be a link target).
+const SKEL_ATTRS = new Set(['class', 'id', 'style', 'lang', 'xml:lang', 'dir', 'epub:type']);
+function skelAttrs(el, names = SKEL_ATTRS) {
+  let out = '';
+  if (el) for (const a of el.attributes)
+    if (names.has(a.name)) out += ` ${a.name}="${escAttr(a.value)}"`;
+  return out;
+}
+
 /**
  * @param {Document} doc - parsed chapter DOM
- * @param {string} css - combined stylesheet text (will be inlined in <head>)
  * @param {Object} imageIndex - map of image href/filename → index in imageResources
  * @param {string} chapterDir - chapter's directory prefix for resolving relative img src
+ * @param {Object} ctx - {path: normalised zip path of this chapter, cssFlows: makeCssFlows()
+ *                        result, links: Map placeholder → link target (filled here),
+ *                        spinePaths: Set of normalised spine document paths}
+ * @returns {{skelHead, skelTail, content, firstAid, title, path, ids: Map<id, aid>}}
  */
-function extractContent(doc, css, imageIndex, chapterDir) {
+function extractContent(doc, imageIndex, chapterDir, ctx) {
   const head = doc.head || doc.querySelector('head');
   const body = doc.body || doc.querySelector('body');
+  const dir = dirOf(ctx.path);
 
   let headContent = '';
   let chapterTitle = '';
@@ -905,19 +1060,44 @@ function extractContent(doc, css, imageIndex, chapterDir) {
     headContent = `<title>${(chapterTitle || htmlTitle).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n`;
   }
 
-  // Inline only critical CSS (visibility rules) — kept small to avoid
-  // splitting the skeleton_head across multiple 4096-byte text records.
-  const styleBlock = css ? `<style type="text/css">\n${css}</style>\n` : '';
+  // Stylesheets → KF8 flows, linked from the skeleton <head> in document order:
+  // <link rel=stylesheet> to a manifest sheet, and every XHTML <style> (head or
+  // body; a body <style> is removed so no CSS text stays in the chunk, and its
+  // link follows the head ones, as in the cascade). See makeCssFlows.
+  let cssLinks = '';
+  for (const el of [...doc.querySelectorAll('link, style')]) {
+    if (el.namespaceURI && el.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue; // SVG <style>
+    let n = null;
+    if (el.localName.toLowerCase() === 'link') {
+      const rel = (el.getAttribute('rel') || '').toLowerCase().split(/\s+/);
+      if (!rel.includes('stylesheet') || rel.includes('alternate')) continue;
+      n = ctx.cssFlows.sheet(normPath(dir + (el.getAttribute('href') || '').split(/[?#]/)[0]));
+    } else {
+      // CDATA / HTML-comment wrappers are no-ops in CSS, but readers turn a flow
+      // containing "[CDATA[" into an inline <style> instead of a .css file
+      n = ctx.cssFlows.inline(el.textContent.replace(/<!\[CDATA\[|\]\]>|<!--|-->/g, ''), dir);
+    }
+    el.remove();
+    const media = el.getAttribute('media');
+    if (n) cssLinks += `<link rel="stylesheet" type="text/css" href="${kindleFlowCss(n)}"` +
+      (media ? ` media="${escAttr(media)}"` : '') + '/>\n';
+  }
+
+  // html/body attributes the author CSS may select on (epub:type needs its namespace)
+  const htmlAttrs = skelAttrs(doc.documentElement, new Set(['class', 'lang', 'xml:lang', 'dir']));
+  const bodyAttrs = skelAttrs(body);
+  const epubNs = bodyAttrs.includes(' epub:type=') ? ' xmlns:epub="http://www.idpf.org/2007/ops"' : '';
 
   // No <?xml?> declaration: browsers render it as visible text in HTML mode,
   // and Kindle doesn't need it.
   const skelHead =
-    `<html xmlns="http://www.w3.org/1999/xhtml">\n` +
+    `<html xmlns="http://www.w3.org/1999/xhtml"${epubNs}${htmlAttrs}>\n` +
     `<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n` +
-    headContent + styleBlock + `</head>\n<body aid="0">\n`;
+    headContent + cssLinks + `</head>\n<body${bodyAttrs} aid="0">\n`;
   const skelTail = `</body>\n</html>\n`;
 
   const firstAid = _aid; // capture before adding aids to this chapter
+  const ids = new Map(); // id (or <a name>) → aid: internal link targets
   if (body) {
     // Replace image src with kindle:embed:XXXX references (1-indexed base-32).
     // Images are stored as binary PDB records; Kindle resolves kindle:embed: URLs
@@ -941,18 +1121,107 @@ function extractContent(doc, css, imageIndex, chapterDir) {
       }
     }
 
-    // Add aid attributes to all block elements
+    // Add aid attributes to all block elements, and to every element that can be
+    // a link target (any element with an id, <a name>). Stale source aids are dropped.
     const walk = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
     let n = walk.nextNode();
     while (n) {
-      if (BLOCKS.has(n.tagName.toLowerCase()) && !n.getAttribute('aid'))
-        n.setAttribute('aid', String(_aid++));
+      const tag = n.tagName.toLowerCase();
+      const id = n.getAttribute('id');
+      const name = tag === 'a' ? n.getAttribute('name') : null;
+      if (BLOCKS.has(tag) || id || name) {
+        const aid = String(_aid++);
+        n.setAttribute('aid', aid);
+        if (id && !ids.has(id)) ids.set(id, aid);
+        if (name && !ids.has(name)) ids.set(name, aid);
+      } else if (n.hasAttribute('aid')) n.removeAttribute('aid');
       n = walk.nextNode();
+    }
+
+    // Internal links (Calibre writer8/main.py replace_internal_links_with_placeholders):
+    // an <a href> to a spine document (with or without #fragment), or a bare
+    // #fragment, gets a placeholder of the same length as the final
+    // kindle:pos:fid:FFFF:off:OOOOOOOOOO, so byte offsets measured in convertToAzw3
+    // stay valid when it is substituted (resolveInternalLinks). External links and
+    // links to non-spine resources are left alone.
+    for (const a of body.querySelectorAll('a[href]')) {
+      const raw = a.getAttribute('href');
+      const href = raw.trim();
+      if (!href || /^[a-z][a-z0-9+.-]*:/i.test(href)) continue;  // http:, mailto:, kindle:, …
+      const hash = href.indexOf('#');
+      const file = (hash < 0 ? href : href.slice(0, hash)).split('?')[0];
+      const frag = hash < 0 ? '' : safeDecode(href.slice(hash + 1));
+      if (!file && !frag) continue;
+      const target = file ? normPath(dir + file) : ctx.path;
+      if (!ctx.spinePaths.has(target)) continue;
+      const ph = LINK_PLACEHOLDER + String(ctx.links.size).padStart(10, '0');
+      ctx.links.set(ph, {path: target, frag, href: raw});
+      a.setAttribute('href', ph);
     }
   }
 
   const content = body ? body.innerHTML : '';
-  return {skelHead, skelTail, content, firstAid, title: chapterTitle};
+  return {skelHead, skelTail, content, firstAid, title: chapterTitle, path: ctx.path, ids};
+}
+
+// ─── Internal links → kindle:pos:fid ─────────────────────────────────────────
+
+const LINK_PLACEHOLDER = 'kindle:pos:fid:0000:off:';  // + 10 decimal digits
+const LINK_PLACEHOLDER_RE = /kindle:pos:fid:0000:off:\d{10}/g;
+
+/** Put the original hrefs back (MOBI v6, and KF8 links whose target chapter was skipped). */
+function restoreLinks(content, links, onlyUnresolved = false) {
+  if (!content.includes(LINK_PLACEHOLDER)) return content;
+  return content.replace(LINK_PLACEHOLDER_RE, ph => {
+    const l = links?.get(ph);
+    return l && (!onlyUnresolved || l.chapter < 0) ? escAttr(l.href) : ph;
+  });
+}
+
+/** Byte offset (in html's UTF-8 encoding) of the '<' of the start tag carrying each wanted aid. */
+function aidOffsets(html, wanted) {
+  const res = new Map();
+  // innerHTML always double-quotes attribute values, so a '>' inside "…" is skipped
+  const tagRe = /<[a-zA-Z](?:[^>"]|"[^"]*")*>/g;
+  let m, last = 0, bytes = 0;
+  while (res.size < wanted.size && (m = tagRe.exec(html))) {
+    const a = /\said="([^"]*)"/.exec(m[0]);
+    if (a && wanted.has(a[1]) && !res.has(a[1])) {
+      bytes += utf8Len(html, last, m.index);
+      last = m.index;
+      res.set(a[1], bytes);
+    }
+  }
+  return res;
+}
+
+/**
+ * KF8 internal links. Reference: Calibre writer8/skeleton.py Chunker.set_internal_links.
+ * Each placeholder becomes kindle:pos:fid:FFFF:off:OOOOOOOOOO (base 32), where FFFF is
+ * the chunk table row of the target (one chunk per chapter: the chapter index) and
+ * OOOOOOOOOO the byte offset of the target element's start tag within that chunk's
+ * text, i.e. within chapter.content (the chunk is inserted into the skeleton at the
+ * chunk table's insert position; readers add the offset to it and then take the
+ * nearest id at or before that position). Targets without a (known) fragment point
+ * at the chapter start, offset 0. Returns new content strings; chapters is untouched.
+ */
+function resolveInternalLinks(chapters, links) {
+  if (!links?.size) return chapters.map(ch => ch.content);
+  // 1. links to skipped chapters get their href back first (that changes lengths)
+  const contents = chapters.map(ch => restoreLinks(ch.content, links, true));
+  // 2. byte offsets of the target aids, per target chapter
+  const aidOf = l => (l.frag && chapters[l.chapter].ids?.get(l.frag)) || null;
+  const wanted = chapters.map(() => new Set());
+  for (const l of links.values()) if (l.chapter >= 0 && aidOf(l)) wanted[l.chapter].add(aidOf(l));
+  const offsets = contents.map((c, i) => wanted[i].size ? aidOffsets(c, wanted[i]) : null);
+  // 3. substitute (same length: nothing moves)
+  return contents.map(c => !c.includes(LINK_PLACEHOLDER) ? c : c.replace(LINK_PLACEHOLDER_RE, ph => {
+    const l = links.get(ph);
+    if (!l || l.chapter < 0) return ph;
+    const aid = aidOf(l);
+    const off = (aid && offsets[l.chapter].get(aid)) || 0;
+    return `kindle:pos:fid:${toBase32(l.chapter, 4)}:off:${toBase32(off, 10)}`;
+  }));
 }
 
 // ─── EPUB → AZW3 converter ───────────────────────────────────────────────────
@@ -962,33 +1231,93 @@ function convertToAzw3(epub, format='azw3') {
   // MOBI v6 is needed for old Kindles (Kindle Keyboard etc) — no FDST/skeleton/chunk
   _aid = 1;
   const {metadata, chapters, css} = epub;
+  const mobi6 = format === 'mobi';
 
-  // Compute byte lengths for each chapter's parts
-  let htmlByteOffset = 0;
-  const idxParts = chapters.map((ch, i) => {
-    const headB = enc.encode(ch.skelHead).length;
-    const tailB = enc.encode(ch.skelTail).length;
-    const contB = enc.encode(ch.content).length;
-    const part = {
-      chapterIndex: i,
-      chunkCount: 1,
-      skelHeadByteLen: headB,
-      skelTailByteLen: tailB,
-      contentByteLen: contB,
-      flowStart: htmlByteOffset,  // byte offset within all-HTML text (flow 0)
-      firstAid: ch.firstAid,
-    };
-    htmlByteOffset += headB + tailB + contB;
-    return part;
-  });
-  const htmlByteLen = htmlByteOffset;
+  // ── MOBI v6: single flat HTML document ──────────────────────────────────
+  // KF8 uses per-chapter skelHead/skelTail/content with FDST+INDX to split.
+  // MOBI v6 has NO skeleton model — Kindle reads the text stream as ONE HTML
+  // document. If we write multiple <html><head>...</head><body> per chapter,
+  // the subsequent <head><style> blocks appear after </html> and render as
+  // visible text. Fix: one <html> wrapper for the whole book, CSS once in
+  // <head>, all chapter content concatenated in <body>.
+  let fullText, textLen, idxParts, htmlByteLen, fdstEntries;
 
-  // FDST: single flow containing all HTML (CSS is now inlined in each chapter's <head>)
-  const fdstEntries = [{start: 0, end: htmlByteLen}];
+  if (mobi6) {
+    const styleBlock = css ? `<style type="text/css">\n${css}</style>\n` : '';
+    const docHead =
+      `<html xmlns="http://www.w3.org/1999/xhtml">\n` +
+      `<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n` +
+      `<title>${metadata.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n` +
+      styleBlock + `</head>\n<body>\n`;
+    const docTail = `</body>\n</html>\n`;
+    const docHeadB = enc.encode(docHead).length;
 
-  // Full text for PDB text records = all HTML concatenated (no separate CSS flow)
-  const fullText = chapters.map(ch => ch.skelHead + ch.skelTail + ch.content).join('');
-  const textLen = enc.encode(fullText).length;
+    // MOBI v6 markup (Calibre writer2/serializer.py, mobiml.py): chapters are
+    // separated by <mbp:pagebreak/>, images are <img recindex="NNNNN"/> (1-based
+    // index among the image records, 5 digits, resolved from first_image), and
+    // the KF8-only aid attributes are dropped. Only start tags are rewritten
+    // (innerHTML always double-quotes values, so a '>' inside "..." is skipped).
+    const toMobi6 = html => html.replace(/<[a-zA-Z](?:[^>"]|"[^"]*")*>/g, tag => tag
+      .replace(/\ssrc="kindle:embed:([0-9A-Va-v]+)"/,
+               (_, n) => ` recindex="${String(parseInt(n, 32)).padStart(5, '0')}"`)
+      .replace(/\said="\d+"/, ''));
+    const pagebreak = '<mbp:pagebreak/>';
+    const pagebreakB = enc.encode(pagebreak).length;
+    // Internal links keep their original href (no kindle:pos in MOBI v6)
+    const bodies = chapters.map(ch => toMobi6(restoreLinks(ch.content, epub.links)));
+
+    // NCX offsets: position of each chapter's content within the flat stream,
+    // computed from the FINAL (rewritten) strings, page breaks included
+    let bodyOffset = docHeadB;
+    idxParts = bodies.map((body, i) => {
+      if (i > 0) bodyOffset += pagebreakB;  // NCX entry points just after the break
+      const contB = enc.encode(body).length;
+      const part = {
+        chapterIndex: i, chunkCount: 1,
+        skelHeadByteLen: 0, skelTailByteLen: 0,  // no skeleton for mobi6
+        contentByteLen: contB,
+        flowStart: bodyOffset,  // absolute offset in flat text stream
+        firstAid: chapters[i].firstAid,
+      };
+      bodyOffset += contB;
+      return part;
+    });
+
+    fullText = docHead + bodies.join(pagebreak) + docTail;
+    htmlByteLen = enc.encode(fullText).length;
+    fdstEntries = [{start: 0, end: htmlByteLen}];  // unused for mobi6 but kept for symmetry
+
+  } else {
+    // ── KF8: per-chapter skelHead + skelTail + content ─────────────────────
+    // Internal links first: equal-length substitution, so all lengths below hold.
+    const contents = resolveInternalLinks(chapters, epub.links);
+    let htmlByteOffset = 0;
+    idxParts = chapters.map((ch, i) => {
+      const headB = enc.encode(ch.skelHead).length;
+      const tailB = enc.encode(ch.skelTail).length;
+      const contB = enc.encode(contents[i]).length;
+      const part = {
+        chapterIndex: i, chunkCount: 1,
+        skelHeadByteLen: headB, skelTailByteLen: tailB, contentByteLen: contB,
+        flowStart: htmlByteOffset, firstAid: ch.firstAid,
+      };
+      htmlByteOffset += headB + tailB + contB;
+      return part;
+    });
+    htmlByteLen = htmlByteOffset;
+    // Flow 0 = all HTML (skeleton/chunk/NCX offsets index into it); then one flow
+    // per stylesheet (kindle:flow:0001, 0002, …), contiguous after it.
+    const sheets = epub.stylesheets || [];
+    fdstEntries = [{start: 0, end: htmlByteLen}];
+    for (const sheet of sheets) {
+      const start = fdstEntries[fdstEntries.length - 1].end;
+      fdstEntries.push({start, end: start + enc.encode(sheet).length});
+    }
+    fullText = chapters.map((ch, i) => ch.skelHead + ch.skelTail + contents[i]).join('') +
+               sheets.join('');
+  }
+
+  textLen = enc.encode(fullText).length;
   const compress = textLen > 2048;
   const textRecs = buildTextRecords(fullText, compress);
   const numTextRecs = textRecs.length;
@@ -1002,7 +1331,6 @@ function convertToAzw3(epub, format='azw3') {
   if (dataLen % 4) recs.push(fill(0, 4 - (dataLen%4)));
 
   const firstNonText = recs.length;
-  const mobi6 = format === 'mobi';
 
   // Skeleton + chunk indices: KF8 only (MOBI v6 uses flat HTML, no skeleton model)
   let skelIdx = 0xffffffff, chunkIdx = 0xffffffff;
@@ -1032,27 +1360,19 @@ function convertToAzw3(epub, format='azw3') {
   const ncxIdx = ncxRecs ? recs.length : 0xffffffff;
   if (ncxRecs) for (const r of ncxRecs) recs.push(r);
 
-  // All images as binary resource records — cover first, then the rest.
+  // All images as binary resource records, in imageResources order (parseEpub
+  // already put the cover first and numbered kindle:embed / recindex refs to match).
   // Kindle resolves kindle:embed:XXXX → resource at (first_resource + XXXX - 1).
   const imageResources = epub.imageResources || [];
   let firstResource = 0xffffffff;
   let coverOffset = -1;
   if (imageResources.length > 0) {
-    // Put cover image first in resources if we know which one it is
-    const coverIdx = metadata.coverResourceIdx ?? -1;
-    // Build ordered resource list: cover first, then all others in original order
-    const orderedResources = [];
-    if (coverIdx >= 0 && imageResources[coverIdx]) {
-      orderedResources.push({ img: imageResources[coverIdx], origIdx: coverIdx });
-    }
-    for (let i = 0; i < imageResources.length; i++) {
-      if (i !== coverIdx) orderedResources.push({ img: imageResources[i], origIdx: i });
-    }
     firstResource = recs.length;
-    for (const { img } of orderedResources) recs.push(img.bytes);
-    // coverOffset = position of cover in ordered resources (0-based, relative to firstResource)
-    coverOffset = coverIdx >= 0 ? 0 : -1;
+    for (const img of imageResources) recs.push(img.bytes);
+    // coverOffset = position of cover in resources (0-based, relative to firstResource)
+    coverOffset = metadata.coverResourceIdx ?? -1;
   }
+  const lastContentRec = recs.length - 1;  // MOBI v6 header: last text/index/image record
 
   // FDST: KF8 only (describes flow boundaries; MOBI v6 uses flat text)
   const fdstRec = mobi6 ? 0xffffffff : recs.length;
@@ -1087,7 +1407,7 @@ function convertToAzw3(epub, format='azw3') {
   // Record 0
   recs[0] = buildRecord0({
     compress, textLen, numTextRecs,
-    firstNonText, fdstRec, fdstCount: fdstRec,
+    firstNonText, fdstRec, fdstCount: fdstEntries.length, lastContentRec,
     flisRec, fcisRec,
     chunkIdx, skelIdx,
     ncxIdx,

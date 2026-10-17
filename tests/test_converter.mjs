@@ -119,16 +119,21 @@ function buildFcis(textLen) {
 const EOF_RECORD = new Uint8Array([0xe9,0x8e,0x0d,0x0a]);
 const TEXT_RECORD_SIZE = 4096;
 
+// Exactly 4096 text bytes per record; a split UTF-8 char's remaining bytes are
+// appended as the multibyte trailing entry: overlap bytes + len(overlap) byte.
 function buildTextRecords(text) {
-  const bytes = enc.encode(text); const records = []; let pos = 0;
-  while (pos < bytes.length) {
-    let end = Math.min(pos + TEXT_RECORD_SIZE, bytes.length);
-    while (end < bytes.length && (bytes[end] & 0xc0) === 0x80) end++;
-    records.push(concat(bytes.slice(pos, end), new Uint8Array([0])));
-    pos = end;
+  const bytes = enc.encode(text); const records = [];
+  for (let pos = 0; pos < bytes.length; pos += TEXT_RECORD_SIZE) {
+    const end = Math.min(pos + TEXT_RECORD_SIZE, bytes.length);
+    let ovEnd = end;
+    while (ovEnd < bytes.length && ovEnd - end < 3 && (bytes[ovEnd] & 0xc0) === 0x80) ovEnd++;
+    const overlap = bytes.subarray(end, ovEnd);
+    records.push(concat(bytes.subarray(pos, end), overlap, new Uint8Array([overlap.length])));
   }
   return records.length ? records : [new Uint8Array([0])];
 }
+// Strip the multibyte trailing entry (extra_data_flags bit 0): (last & 3) + 1 bytes
+const stripTrailing = r => r.slice(0, r.length - ((r[r.length-1] & 3) + 1));
 
 const M2S = {1:0,2:1,3:0,4:2,8:3,12:2,16:4,32:5,48:4,64:6,128:7,192:6};
 
@@ -250,7 +255,7 @@ function buildAzw3(chapters, title='Test Book') {
   p+=8; dv.setUint32(p,8,false);p+=4; dv.setUint32(p,0xffffffff,false);p+=4;
   p+=16; dv.setUint32(p,0x50,false);p+=4; p+=32;
   dv.setUint32(p,0xffffffff,false);p+=4; dv.setUint32(p,0xffffffff,false);p+=4; p+=12; p+=8;
-  dv.setUint32(p,fdstRec,false);p+=4; dv.setUint32(p,fdstRec,false);p+=4;
+  dv.setUint32(p,fdstRec,false);p+=4; dv.setUint32(p,1,false);p+=4; // FDST index, section count
   dv.setUint32(p,fcisRec,false);p+=4; dv.setUint32(p,1,false);p+=4;
   dv.setUint32(p,flisRec,false);p+=4; dv.setUint32(p,1,false);p+=4;
   p+=8; dv.setUint32(p,0xffffffff,false);p+=4; p+=4;
@@ -449,26 +454,28 @@ test('records ≤ 4097 bytes (4096 + trailing 0)', () => {
 test('trailing byte is always 0', () => {
   for (const r of buildTextRecords('Hello')) eq(r[r.length-1],0);
 });
-test('UTF-8 multibyte char not split across records', () => {
+test('UTF-8 char split at 4096 → overlap trailing entry (Calibre create_text_record)', () => {
   // 4093 ASCII + emoji (4 bytes) + 10 ASCII = 4107 bytes
-  // emoji starts at byte 4093, spans 4093-4096
-  // record 1 should include the full emoji (end advances past continuation bytes)
+  // emoji spans bytes 4093-4096: record 0 holds exactly 4096 bytes (3 emoji bytes),
+  // then the missing byte as overlap + size byte 1; record 1 starts with that byte.
   const text = 'A'.repeat(4093) + '😀' + 'B'.repeat(10);
   const bytes = enc.encode(text);
   assert(bytes.length === 4107, `expected 4107 bytes, got ${bytes.length}`);
   const recs = buildTextRecords(text);
   eq(recs.length, 2, 'should split into 2 records');
-  // Record 0 (without trailing 0) must be valid UTF-8
-  try { dec.decode(recs[0].slice(0,-1)); } catch(e) { throw new Error('Record 0 not valid UTF-8'); }
-  // Record 0 should contain the full emoji
-  contains(dec.decode(recs[0].slice(0,-1)), '😀', 'emoji should be in record 0');
-  // Record 1 should contain the B's
-  contains(dec.decode(recs[1].slice(0,-1)), 'BBBBBBBBBB', 'B chars in record 1');
+  eq(recs[0].length, 4096 + 1 + 1, 'record 0 = 4096 text + 1 overlap + 1 size byte');
+  eq(recs[0][recs[0].length-1], 1, 'trailing size byte = len(overlap)');
+  eq(recs[0][recs[0].length-2], bytes[4096], 'overlap = 4th emoji byte');
+  // Record data + overlap completes the emoji
+  contains(dec.decode(recs[0].slice(0,-1)), '😀', 'emoji complete with overlap');
+  eq(stripTrailing(recs[1]).length, 11, 'record 1 = overlap byte + 10 B');
+  contains(dec.decode(stripTrailing(recs[1]).slice(1)), 'BBBBBBBBBB', 'B chars in record 1');
 });
 test('all records concatenate back to original', () => {
-  const orig = 'Hello! ' + 'X'.repeat(5000);
+  const orig = 'Hello! ' + 'X'.repeat(5000) + 'é€😀'.repeat(3000);
   const recs = buildTextRecords(orig);
-  const combined = concat(...recs.map(r=>r.slice(0,-1))); // strip trailing 0s
+  for (const r of recs) assert(stripTrailing(r).length <= TEXT_RECORD_SIZE, 'record > 4096 text bytes');
+  const combined = concat(...recs.map(stripTrailing));
   eq(dec.decode(combined), orig);
 });
 

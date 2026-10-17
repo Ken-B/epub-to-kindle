@@ -20,6 +20,7 @@ from functools import partial
 
 sys.path.insert(0, str(Path(__file__).parent))
 from epub_fixtures import make_epub, MINIMAL_PNG
+from kf8_extract import text_bytes as kf8_text_bytes, fdst_flows as kf8_fdst_flows
 
 from playwright.sync_api import sync_playwright
 
@@ -94,11 +95,9 @@ def extract_azw3_chapters(azw3: bytes) -> list[dict]:
     if skel_idx == 0xffffffff:
         return []
 
-    text_bytes = b''
-    for i in range(1, num_text+1):
-        s = rec_offsets[i]; e = rec_offsets[i+1] if i+1 < nrec else len(azw3)
-        text_bytes += azw3[s:e-1]
-    text = text_bytes.decode('utf-8', errors='replace')
+    # Decompressed text with each record's trailing entry stripped. Skeleton/chunk
+    # offsets index flow 0 (the HTML), which is the start of the text, so use it as is.
+    text = kf8_text_bytes(azw3).decode('utf-8', errors='replace')
 
     def vwi(data, pos):
         val = consumed = 0
@@ -161,6 +160,10 @@ def extract_azw3_chapters(azw3: bytes) -> list[dict]:
         if len(body_text) > 30:
             result.append({'html': html, 'body_text': body_text})
     return result
+
+def extract_azw3_flows(azw3: bytes) -> list[str]:
+    """Split the KF8 text into flows using the FDST table (flow 0 = HTML, 1..N = CSS)."""
+    return [f.decode('utf-8', errors='replace') for f in kf8_fdst_flows(azw3)]
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -434,7 +437,7 @@ with sync_playwright() as pw:
          '<p aid="1">Normal readable content here.</p>'),
     ], css_rules=[
         ('.publisher-watermark', 'display: none'),
-        ('.normal', 'color: black'),  # should NOT be included in AZW3
+        ('.normal', 'color: black'),  # kept verbatim in the CSS flow
     ])
 
     page = browser.new_page()
@@ -443,17 +446,36 @@ with sync_playwright() as pw:
     azw3_css = fetch_azw3(page)
     page.close()
 
+    # CSS is preserved as KF8 flows: flow 0 = HTML, flow 1..N = stylesheets, linked from
+    # the skeleton <head> via kindle:flow:NNNN. (Readers resolve the link; the extractor
+    # below does not, so for rendering we inline the flow CSS ourselves.)
+    flows = extract_azw3_flows(azw3_css)
     test('AZW3 contains display:none rule',
          lambda: b'display: none' in azw3_css or b'display:none' in azw3_css)
-    test('AZW3 does NOT contain non-visibility CSS (.normal color rule)',
-         lambda: b'color: black' not in azw3_css)
+    test('FDST has more than one flow (HTML + stylesheet)',
+         lambda: len(flows) > 1)
+    test('Flow 1 (after the HTML flow) contains the author CSS rules',
+         lambda: len(flows) > 1
+                 and '.publisher-watermark' in flows[1]
+                 and re.search(r'display:\s*none', flows[1]) is not None
+                 and re.search(r'color:\s*black', flows[1]) is not None)
+    test('HTML flow does not carry the stylesheet text',
+         lambda: len(flows) > 1 and 'color: black' not in flows[0])
 
     css_chapters = extract_azw3_chapters(azw3_css)
-    if css_chapters:
+    test('Skeleton head links the CSS flow (kindle:flow:0001?mime=text/css)',
+         lambda: bool(css_chapters) and re.search(
+             r'<link[^>]*href="kindle:flow:0001\?mime=text/css"', css_chapters[0]['html']) is not None)
+    if css_chapters and len(flows) > 1:
+        # Resolve kindle:flow links the way a Kindle would: inline the flow CSS
+        rendered = re.sub(
+            r'<link[^>]*href="kindle:flow:0001\?mime=text/css"[^>]*/?>',
+            lambda m: '<style type="text/css">' + flows[1] + '</style>',
+            css_chapters[0]['html'])
         css_page = browser.new_page()
-        css_page.set_content(css_chapters[0]['html'], wait_until='domcontentloaded')
+        css_page.set_content(rendered, wait_until='domcontentloaded')
 
-        test('Watermark div is hidden (display:none applied)',
+        test('Watermark div is hidden (display:none applied from flow CSS)',
              lambda: css_page.evaluate(
                  '() => getComputedStyle(document.querySelector(".publisher-watermark") '
                  '|| document.body).display') == 'none')
@@ -582,34 +604,10 @@ with sync_playwright() as pw:
 
                 # Decompress and verify first chapter text is valid UTF-8 (not garbled)
                 def check_utf8_clean(a=azw3):
-                    nrec = struct.unpack_from('>H', a, 76)[0]
-                    recs = [struct.unpack_from('>I', a, 78+i*8)[0] for i in range(nrec)]
-                    r0 = recs[0]
-                    compression = struct.unpack_from('>H', a, r0)[0]
-                    num_text = struct.unpack_from('>H', a, r0+8)[0]
-
-                    def palmdoc_decompress(data):
-                        out = bytearray(); i = 0
-                        while i < len(data):
-                            b = data[i]; i += 1
-                            if b == 0: out.append(0)
-                            elif b <= 8:
-                                for _ in range(b): out.append(data[i]); i += 1
-                            elif b <= 0x7F: out.append(b)
-                            elif b <= 0xBF:
-                                b2=data[i]; i+=1; dist=((b&0x3F)<<5)|(b2>>3); ln=(b2&7)+3
-                                for _ in range(ln): out.append(out[-dist] if dist<=len(out) else 0)
-                            else: out.append(0x20); out.append(b&0x7F)
-                        return bytes(out)
-
-                    # Decode first 3 text records
-                    sample = b''
-                    for idx in range(1, min(4, num_text+1)):
-                        s=recs[idx]; e=recs[idx+1] if idx+1<nrec else len(a)
-                        rec = a[s:e-1]
-                        if compression == 2:
-                            rec = palmdoc_decompress(rec)
-                        sample += rec
+                    # Whole text: trailing entries stripped, decompressed if needed.
+                    # (Records are 4096-byte cuts that may split a character; once the
+                    # trailing entry is stripped, the concatenation must be valid UTF-8.)
+                    sample = kf8_text_bytes(a)
 
                     # Must decode as valid UTF-8 with no replacement chars
                     decoded = sample.decode('utf-8')  # raises if invalid

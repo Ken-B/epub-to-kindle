@@ -16,13 +16,14 @@ Run:  uv run tests/test_calibre_compare.py
 # ///
 """
 
-import struct, subprocess, re, sys, threading, difflib
+import struct, subprocess, re, sys, threading, difflib, zipfile
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from functools import partial
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from epub_fixtures import make_epub, MINIMAL_PNG
+from kf8_extract import text_bytes, fdst_flows
 
 from playwright.sync_api import sync_playwright
 
@@ -62,48 +63,29 @@ def calibre_convert(epub_path: str, out_path: str) -> bool:
     return r.returncode == 0 and Path(out_path).exists()
 
 
-def palmdoc_decompress(data: bytes) -> bytes:
-    """PalmDoc decompressor (reference implementation)."""
-    out = bytearray(); i = 0
-    while i < len(data):
-        b = data[i]; i += 1
-        if b == 0:
-            out.append(0)
-        elif b <= 8:
-            for _ in range(b):
-                if i < len(data): out.append(data[i]); i += 1
-        elif b <= 0x7F:
-            out.append(b)
-        elif b <= 0xBF:
-            if i >= len(data): break
-            b2 = data[i]; i += 1
-            dist = ((b & 0x3F) << 5) | (b2 >> 3)
-            ln = (b2 & 7) + 3
-            for _ in range(ln):
-                out.append(out[-dist] if dist <= len(out) else 0)
-        else:
-            out.append(0x20); out.append(b & 0x7F)
-    return bytes(out)
+def extract_text(azw3_path: str, html_only: bool = True) -> str:
+    """Decompressed text of an AZW3/MOBI file (trailing entries stripped).
 
-
-def extract_text(azw3_path: str) -> str:
-    """Extract and decompress all text records from an AZW3/MOBI file."""
+    For KF8 the text is `html + stylesheets`; with html_only (default) only FDST
+    flow 0 (the HTML) is returned, so checks about the HTML are not confused by
+    the CSS flows. MOBI v6 has no FDST and returns the whole text.
+    """
     data = Path(azw3_path).read_bytes()
-    nrec = struct.unpack_from('>H', data, 76)[0]
-    rec_offsets = [struct.unpack_from('>I', data, 78+i*8)[0] for i in range(nrec)]
-    r0 = rec_offsets[0]
-    compression = struct.unpack_from('>H', data, r0)[0]
-    num_text = struct.unpack_from('>H', data, r0+8)[0]
+    flows = fdst_flows(data) if html_only else []
+    raw = flows[0] if flows else text_bytes(data)
+    return raw.decode('utf-8', errors='replace')
 
-    text_bytes = b''
-    for i in range(1, num_text+1):
-        s = rec_offsets[i]; e = rec_offsets[i+1] if i+1 < nrec else len(data)
-        rec = data[s:e-1]  # strip trailing overlap byte
-        if compression == 2:
-            rec = palmdoc_decompress(rec)
-        text_bytes += rec
 
-    return text_bytes.decode('utf-8', errors='replace')
+def extract_flows(azw3_path: str) -> list[str]:
+    """All FDST flows (flow 0 = HTML, 1..N = CSS) of a KF8 file."""
+    return [f.decode('utf-8', errors='replace')
+            for f in fdst_flows(Path(azw3_path).read_bytes())]
+
+
+def epub_has_css(epub_path: str) -> bool:
+    """True when the EPUB ships at least one .css file."""
+    with zipfile.ZipFile(epub_path) as z:
+        return any(n.lower().endswith('.css') for n in z.namelist())
 
 
 def header_fields(azw3_path: str) -> dict:
@@ -263,9 +245,19 @@ with sync_playwright() as pw:
         test(f'{label} AZW3: text similarity ≥ 85% vs Calibre (got {sim:.0%})',
              lambda s=sim: s >= 0.85)
 
-        # Check no CSS leaked into body text
-        test(f'{label} AZW3: no CSS rules in decompressed text',
+        # Check no CSS leaked into the HTML (flow 0 only: CSS lives in flows 1..N)
+        test(f'{label} AZW3: no CSS rules in HTML flow (flow 0)',
              lambda t=our_text: not re.search(r'\{[^}]{10,}(display|margin|font)[^}]{0,50}\}', t))
+
+        # CSS must be present as FDST flows: flow 0 = HTML, flow 1.. = stylesheets
+        if epub_has_css(epub_path):
+            our_flows = extract_flows(our_azw3)
+            test(f'{label} AZW3: FDST has >1 flow (EPUB has a stylesheet)',
+                 lambda f=our_flows: len(f) > 1)
+            test(f'{label} AZW3: flow 1 contains CSS rules',
+                 lambda f=our_flows: len(f) > 1 and re.search(r'[^{}]+\{[^{}]*:[^{}]*\}', f[1]) is not None)
+            test(f'{label} AZW3: HTML flow links the CSS flow (kindle:flow)',
+                 lambda t=extract_text(our_azw3): 'kindle:flow:' in t and 'text/css' in t)
 
         # ── MOBI v6 comparison ──
         if our_mobi_bytes and cal_mobi_ok:
@@ -280,7 +272,8 @@ with sync_playwright() as pw:
                      oh['text_length'] < ch['text_length'] * 6
                  ))
 
-            our_mobi_text = strip_markup(extract_text(our_mobi))
+            our_mobi_raw = extract_text(our_mobi)
+            our_mobi_text = strip_markup(our_mobi_raw)
             cal_mobi_text = strip_markup(extract_text(cal_mobi))
             mobi_sim = text_similarity(cal_mobi_text, our_mobi_text)
 
@@ -289,6 +282,24 @@ with sync_playwright() as pw:
 
             test(f'{label} MOBI: text similarity ≥ 85% vs Calibre (got {mobi_sim:.0%})',
                  lambda s=mobi_sim: s >= 0.85)
+
+            # Critical: MOBI v6 must be a single flat HTML document.
+            # Multiple <html> tags cause subsequent <head><style> blocks to
+            # appear after </html> and render as visible text on Kindle.
+            html_count = our_mobi_raw.count('<html')
+            test(f'{label} MOBI: single <html> element (flat HTML, not per-chapter)',
+                 lambda c=html_count: c == 1)
+
+            # CSS rules must not appear as visible body text
+            test(f'{label} MOBI: no CSS rules in decompressed body text',
+                 lambda t=our_mobi_text: not re.search(
+                     r'\{[^}]{5,}(display|margin|font|visibility)[^}]{0,50}\}', t))
+
+            # <style> must not appear after the closing </html> tag
+            first_close_html = our_mobi_raw.find('</html>')
+            test(f'{label} MOBI: no <style> after </html> (CSS not leaking as text)',
+                 lambda r=our_mobi_raw, fc=first_close_html: (
+                     fc == -1 or '<style' not in r[fc:]))
 
             # Validate with Calibre ebook-meta
             r = subprocess.run(['ebook-meta', our_mobi], capture_output=True, text=True)

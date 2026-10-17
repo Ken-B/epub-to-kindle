@@ -30,8 +30,19 @@ from xml.etree import ElementTree as ET
 
 sys.path.insert(0, str(Path(__file__).parent))
 from epub_fixtures import make_epub, MINIMAL_PNG
+from kf8_extract import text_bytes as kf8_text_bytes, fdst_flows as kf8_fdst_flows, strip_trailing_entries
 
-# ── KF8 binary writer (mirrors docs/index.html) ────────────────────────────
+# ── KF8 binary writer: Python REFERENCE MODEL of docs/index.html ───────────
+#
+# This is a reference model of the JS writer and it may lag behind it. The JS app
+# (docs/index.html) is the source of truth; tests that need the real thing convert
+# through the app with Playwright (see "App (JS writer)" below).
+# Modelled: skeleton/chunk/NCX/CNCX indices, FDST with a single HTML flow, text
+# records of 4096 bytes + multibyte trailing entry, visibility-only CSS inlined
+# into the skeleton <style>.
+# NOT modelled: CSS as FDST flows 1..N (kindle:flow links, @import/url() rewriting),
+# kindle:pos internal links, PalmDoc compression, MOBI v6 output, image records
+# in the app's resource order.
 
 def encint(v: int) -> bytes:
     """Calibre VLQ: high bit on LAST byte (terminator)."""
@@ -69,14 +80,19 @@ EOF_REC = bytes([0xe9, 0x8e, 0x0d, 0x0a])
 TRS = 4096
 
 def split_text_records(text_bytes: bytes) -> list[bytes]:
+    """4096 text bytes per record + multibyte trailing entry (overlap bytes + len byte).
+
+    The overlap = continuation bytes completing a character cut at the boundary; they
+    are repeated at the start of the next record. 0x00 when nothing is split.
+    """
     records = []
-    pos = 0
-    while pos < len(text_bytes):
+    for pos in range(0, len(text_bytes), TRS):
         end = min(pos + TRS, len(text_bytes))
-        while end < len(text_bytes) and (text_bytes[end] & 0xc0) == 0x80:
-            end += 1
-        records.append(text_bytes[pos:end] + b'\x00')
-        pos = end
+        ov_end = end
+        while ov_end < len(text_bytes) and ov_end - end < 3 and (text_bytes[ov_end] & 0xc0) == 0x80:
+            ov_end += 1
+        overlap = text_bytes[end:ov_end]
+        records.append(text_bytes[pos:end] + overlap + bytes([len(overlap)]))
     return records or [b'\x00']
 
 M2S = {1:0,2:1,3:0,4:2,8:3,12:2,16:4,32:5,48:4,64:6,128:7,192:6}
@@ -395,6 +411,25 @@ EPUB_TESTS = [
     (_img_epub_path,                   "Synthetic: embedded image",             "Image Test"),
 ]
 
+def check_trailing_entries(data: bytes):
+    """Every text record ends with a multibyte trailing entry: overlap bytes (0-3)
+    + one byte = len(overlap); the overlap is repeated at the start of the next
+    record, and each record holds at most 4096 text bytes."""
+    nrec = struct.unpack_from('>H', data, 76)[0]
+    offs = [struct.unpack_from('>I', data, 78+i*8)[0] for i in range(nrec)]
+    ntext = struct.unpack_from('>H', data, offs[0]+8)[0]
+    assert struct.unpack_from('>I', data, offs[0]+0xF0)[0] & 1, 'extra_data_flags bit 0 not set'
+    recs = [data[offs[i]:offs[i+1]] for i in range(1, ntext+1)]
+    for i, rec in enumerate(recs):
+        n = rec[-1]
+        assert n <= 3, f'record {i}: overlap length byte {n} > 3'
+        body = strip_trailing_entries(rec, 1)
+        assert len(body) <= 4096, f'record {i}: {len(body)} text bytes > 4096'
+        if i + 1 < len(recs):
+            assert len(body) == 4096, f'record {i}: short non-final record ({len(body)} bytes)'
+            overlap = rec[len(body):-1]
+            assert recs[i+1].startswith(overlap), f'record {i}: overlap not repeated at start of next record'
+
 for epub_path, label, expected_title_fragment in EPUB_TESTS:
     if not Path(epub_path).exists():
         print(f'  ⚠ skip {label} (not found: {epub_path})')
@@ -447,15 +482,18 @@ for epub_path, label, expected_title_fragment in EPUB_TESTS:
                  b'kindle:embed:' in Path(op).read_bytes()
              ) if Path(op).exists() else False)
 
-    # CSS-specific: display:none rule must survive into AZW3
+    # CSS-specific (Python reference model): the display:none rule must survive into AZW3
     if 'css_visibility' in epub_path.lower() or 'css' in label.lower():
         test('display:none CSS rule in AZW3 binary', lambda op=out_path: (
             (b'display: none' in Path(op).read_bytes() or
              b'display:none' in Path(op).read_bytes())
         ) if Path(op).exists() else False)
-        test('Non-visibility CSS NOT in AZW3', lambda op=out_path: (
-            b'font-family: serif' not in Path(op).read_bytes()
-        ) if Path(op).exists() else True)
+        # (Full-stylesheet-in-a-flow behaviour of the real app: see "App (JS writer)" below.)
+
+    # Text records: 4096 bytes + multibyte trailing entry
+    if meta and Path(out_path).exists():
+        test('Text records: 4096 bytes + multibyte trailing entry (overlap repeated in next record)',
+             lambda op=out_path: check_trailing_entries(Path(op).read_bytes()))
 
     # Skeleton head size check — must not exceed 4096 bytes
     if meta and Path(out_path).exists():
@@ -537,13 +575,6 @@ if Path(alice_path).exists():
             )(struct.unpack_from('>I', data, r0off+192)[0])
         )(struct.unpack_from('>H', data, 76)[0], struct.unpack_from('>I', data, 78)[0]))
 
-        test('All text records have trailing 0 byte', lambda: all(
-            True for i in range(1, struct.unpack_from('>H', data, 76)[0])
-            if (off := struct.unpack_from('>I', data, 78+i*8)[0]) and
-               (next_off := struct.unpack_from('>I', data, 78+(i+1)*8)[0] if i+1 < struct.unpack_from('>H', data, 76)[0] else len(data)) and
-               data[next_off-1] == 0
-        ))
-
         def check_skeleton_fits_in_one_record():
             """Skeleton head must fit entirely within one 4096-byte text record.
             If it's larger, the HTML gets split mid-<style> tag causing CSS to
@@ -605,11 +636,7 @@ if Path(alice_azw3).exists():
             if skel_idx == 0xffffffff:
                 return []
 
-            text_bytes = b''
-            for i in range(1, num_text_recs + 1):
-                s = rec_offsets[i]; e = rec_offsets[i + 1] if i + 1 < nrec else len(data)
-                text_bytes += data[s:e - 1]
-            text = text_bytes.decode('utf-8', errors='replace')
+            text = kf8_text_bytes(data).decode('utf-8', errors='replace')  # trailing entries stripped
 
             def decode_vwi(data, pos):
                 val, consumed = 0, 0
@@ -813,28 +840,69 @@ def test_empty_spine():
 
 test('Empty spine → 0 chapters, no crash', test_empty_spine)
 
-def test_css_extraction_logic():
-    """CSS extractor must keep only display:none / visibility:hidden rules."""
-    css = """
-        .normal { font-size: 14px; margin: 0; }
-        .watermark { display: none; color: red; }
-        .hidden { visibility: hidden; }
-        .visible { display: block; color: blue; }
-        p { font-family: serif; }
-        .combo { display: none; font-weight: bold; }
-    """
-    critical = []
-    for m in re.finditer(r'([^{}]+)\{([^}]*)\}', css):
-        if re.search(r'display\s*:\s*none|visibility\s*:\s*hidden', m.group(2), re.I):
-            critical.append(m.group(1).strip())
-    assert any('watermark' in r for r in critical), '.watermark not extracted'
-    assert any('hidden' in r for r in critical), '.hidden not extracted'
-    assert any('combo' in r for r in critical), '.combo not extracted'
-    assert not any('normal' in r for r in critical), '.normal should not be extracted'
-    assert not any('visible' in r for r in critical), '.visible should not be extracted'
-    assert not any(r.strip() == 'p' for r in critical), 'p rule should not be extracted'
+# ── App (JS writer): CSS as flows ──────────────────────────────────────────
+#
+# The Python model above keeps only visibility rules inline. The real app keeps the
+# whole stylesheet verbatim as FDST flow 1..N (flow 0 = HTML) and links it from the
+# skeleton <head> via kindle:flow:NNNN, so these assertions run the real docs/index.html.
 
-test('CSS extractor keeps only visibility rules', test_css_extraction_logic)
+print('\n── App (JS writer): CSS as flows ──────────────────────────────────')
+
+def app_convert(epub_bytes: bytes, name: str = 'test.epub') -> bytes:
+    """Convert an EPUB with the real app (docs/index.html in headless Chromium)."""
+    import threading
+    from functools import partial
+    from http.server import HTTPServer, SimpleHTTPRequestHandler
+    from playwright.sync_api import sync_playwright
+
+    class _Quiet(SimpleHTTPRequestHandler):
+        def log_message(self, *a): pass
+    httpd = HTTPServer(('localhost', 0), partial(_Quiet, directory=str(Path(__file__).parent.parent / 'docs')))
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch()
+            page = browser.new_page()
+            page.goto(f'http://localhost:{httpd.server_address[1]}')
+            page.set_input_files('#fileInput', {'name': name, 'mimeType': 'application/epub+zip',
+                                                'buffer': epub_bytes})
+            page.wait_for_selector('#dlBtn', state='visible', timeout=30000)
+            raw = page.evaluate('''async () => {
+                const r = await fetch(document.getElementById('dlBtn').href);
+                return Array.from(new Uint8Array(await r.arrayBuffer()));
+            }''')
+            browser.close()
+            return bytes(raw)
+    finally:
+        httpd.shutdown()
+
+_app_css = {}
+def _app_css_flows():
+    if 'flows' not in _app_css:
+        epub = make_epub('App CSS Flow Test',
+            [('Chapter 1', '<div class="wpt-verdwijn">HIDDEN</div><p class="normal">Visible text.</p>'),
+             ('Chapter 2', '<p>Second chapter.</p>')],
+            css_rules=[('.wpt-verdwijn', 'display: none'),
+                       ('.wpt-invis', 'visibility: hidden'),
+                       ('.normal', 'font-size: 14px; margin: 0'),
+                       ('p', 'font-family: serif')])
+        azw3 = app_convert(epub)
+        _app_css['azw3'] = azw3
+        _app_css['flows'] = [f.decode('utf-8', 'replace') for f in kf8_fdst_flows(azw3)]
+    return _app_css['flows']
+
+test('App: FDST has more than one flow (HTML + stylesheet)',
+     lambda: len(_app_css_flows()) > 1)
+test('App: flow 1 keeps the FULL stylesheet (visibility and non-visibility rules)',
+     lambda: (lambda f: len(f) > 1 and re.search(r'display:\s*none', f[1])
+              and re.search(r'visibility:\s*hidden', f[1])
+              and re.search(r'font-family:\s*serif', f[1])
+              and re.search(r'font-size:\s*14px', f[1]) is not None)(_app_css_flows()))
+test('App: HTML flow (flow 0) carries no stylesheet text',
+     lambda: (lambda f: len(f) > 1 and 'font-family' not in f[0] and 'display: none' not in f[0])(_app_css_flows()))
+test('App: skeleton <head> links the CSS flow (kindle:flow:0001?mime=text/css)',
+     lambda: (_app_css_flows(), re.search(r'<link[^>]*href="kindle:flow:0001\?mime=text/css"',
+                                          _app_css_flows()[0]) is not None)[1])
 
 # ── Image rendering via Playwright ────────────────────────────────────────
 
@@ -857,11 +925,7 @@ try:
             skel_idx  = struct.unpack_from('>I', azw3_bytes, r0+252)[0]
             chunk_idx = struct.unpack_from('>I', azw3_bytes, r0+248)[0]
             if skel_idx == 0xffffffff: return []
-            text_bytes = b''
-            for i in range(1, num_text+1):
-                s = rec_offsets[i]; e = rec_offsets[i+1] if i+1 < nrec else len(azw3_bytes)
-                text_bytes += azw3_bytes[s:e-1]
-            text = text_bytes.decode('utf-8', errors='replace')
+            text = kf8_text_bytes(azw3_bytes).decode('utf-8', errors='replace')  # trailing entries stripped
             def vwi(d, p):
                 val=consumed=0
                 for i in range(p, len(d)):

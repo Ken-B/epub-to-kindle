@@ -1,0 +1,826 @@
+{
+  "subset": "core-real-generated-local",
+  "date": "2026-10-17",
+  "total_results": 1772,
+  "formats": {
+    "azw3": {
+      "books": 886,
+      "converted": 878,
+      "calibre_ok": 834,
+      "gate_evaluated": 878,
+      "gate_pass": 870,
+      "gate_pass_rate": 0.9908883826879271,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 8,
+        "calibre_reader": 8
+      },
+      "category_books": {
+        "toc-flat": 162,
+        "toc-labels": 111,
+        "calibre-header-diff": 830,
+        "fixed-layout-unsupported": 88,
+        "links-unresolved": 1,
+        "images-misreferenced": 126,
+        "text-loss": 37,
+        "style-lost": 41,
+        "images-missing": 24,
+        "input-repair": 7,
+        "app-error": 6,
+        "gate-kindleunpack": 8,
+        "gate-calibre": 8,
+        "text-garbled": 1
+      },
+      "actionable_category_books": {
+        "toc-flat": 161,
+        "toc-labels": 110,
+        "links-unresolved": 1,
+        "text-loss": 28,
+        "style-lost": 38,
+        "images-missing": 23,
+        "images-misreferenced": 123,
+        "input-repair": 7,
+        "app-error": 6,
+        "gate-kindleunpack": 8,
+        "gate-calibre": 8,
+        "text-garbled": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 221,
+        "input repair": 12,
+        "writer bug": 179
+      },
+      "kind_instances": {
+        "unported Calibre transform": 223,
+        "input repair": 12,
+        "writer bug": 279
+      },
+      "kind_not_actionable": {
+        "informational": 830,
+        "out of scope": 106
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.7269736842105263,
+        "input repair": 0.039473684210526314,
+        "writer bug": 0.5888157894736842
+      },
+      "gap_instances": 514,
+      "books_with_gap": 304,
+      "dominant_kind": "unported Calibre transform",
+      "top_category_by_kind": {
+        "unported Calibre transform": "toc-flat",
+        "input repair": "input-repair",
+        "writer bug": "images-misreferenced"
+      },
+      "top5": [
+        {
+          "category": "toc-flat",
+          "books": 161,
+          "description": "TOC nesting depth reduced",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/cole-voyage-of-life",
+            "core/01-idpf-samples/epub30-spec"
+          ]
+        },
+        {
+          "category": "images-misreferenced",
+          "books": 123,
+          "description": "Image references in the text point at the wrong image or at none",
+          "kind": "writer bug",
+          "examples": [
+            "core/02-w3c-conformance/cnt-svg-css-reference",
+            "core/02-w3c-conformance/ocf-url_link-path-absolute",
+            "core/02-w3c-conformance/ocf-url_link-relative"
+          ]
+        },
+        {
+          "category": "toc-labels",
+          "books": 110,
+          "description": "TOC entries whose labels/targets do not match the input",
+          "kind": "writer bug",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/cole-voyage-of-life",
+            "core/01-idpf-samples/georgia-cfi"
+          ]
+        },
+        {
+          "category": "style-lost",
+          "books": 38,
+          "description": "Style score below 0.5, or the input has CSS rules and the output none",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "core/02-w3c-conformance/cnt-svg-css",
+            "core/02-w3c-conformance/cnt-svg-support",
+            "core/02-w3c-conformance/lay-pp-spine-overrides_image-spine-reflow"
+          ]
+        },
+        {
+          "category": "text-loss",
+          "books": 28,
+          "description": "Spine items whose text did not survive conversion",
+          "kind": "transform or repair",
+          "examples": [
+            "core/02-w3c-conformance/cnt-svg-css",
+            "core/02-w3c-conformance/cnt-svg-support",
+            "core/02-w3c-conformance/lay-pp-spine-overrides_image-spine-reflow"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "core/03-epubcheck-invalid/epub2__opf-spine-missing-error",
+          "category": "epubcheck-invalid",
+          "tier": 0,
+          "reasons": [
+            "gate failed (kindleunpack: IndexError: list index out of range; calibre_reader: calibre.ebooks.oeb.base.OEBError: Spine is empty)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-invalid/epub3_04-ocf__ocf-url-leaking-in-opf-error",
+          "category": "epubcheck-invalid",
+          "tier": 0,
+          "reasons": [
+            "gate failed (kindleunpack: IndexError: list index out of range; calibre_reader: calibre.ebooks.oeb.base.OEBError: Spine is empty)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-invalid/epub3_04-ocf__ocf-url-path-absolute-error",
+          "category": "epubcheck-invalid",
+          "tier": 0,
+          "reasons": [
+            "gate failed (kindleunpack: IndexError: list index out of range; calibre_reader: calibre.ebooks.oeb.base.OEBError: Spine is empty)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-other/cli__20-severity-tester",
+          "category": "epubcheck-other",
+          "tier": 0,
+          "reasons": [
+            "gate failed (kindleunpack: IndexError: list index out of range; calibre_reader: calibre.ebooks.oeb.base.OEBError: Spine is empty)"
+          ]
+        },
+        {
+          "id": "core/03-epubcheck-other/ocf-filename-not-utf8-error",
+          "category": "epubcheck-other",
+          "tier": 0,
+          "reasons": [
+            "gate failed (kindleunpack: IndexError: list index out of range; calibre_reader: calibre.ebooks.oeb.base.OEBError: Spine is empty)"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "idpf": {
+          "toc-flat": 11,
+          "toc-labels": 7,
+          "calibre-header-diff": 25,
+          "fixed-layout-unsupported": 4,
+          "links-unresolved": 1,
+          "images-misreferenced": 3,
+          "text-loss": 1,
+          "style-lost": 2,
+          "images-missing": 1
+        },
+        "w3c": {
+          "calibre-header-diff": 173,
+          "text-loss": 11,
+          "style-lost": 8,
+          "images-missing": 7,
+          "images-misreferenced": 7,
+          "fixed-layout-unsupported": 48,
+          "toc-labels": 3
+        },
+        "epubcheck-invalid": {
+          "calibre-header-diff": 204,
+          "style-lost": 15,
+          "fixed-layout-unsupported": 16,
+          "input-repair": 2,
+          "app-error": 2,
+          "images-missing": 6,
+          "images-misreferenced": 6,
+          "gate-kindleunpack": 3,
+          "gate-calibre": 3,
+          "text-loss": 8,
+          "toc-labels": 4
+        },
+        "epubcheck-other": {
+          "gate-kindleunpack": 2,
+          "gate-calibre": 2,
+          "calibre-header-diff": 29,
+          "app-error": 4,
+          "toc-labels": 1,
+          "style-lost": 1,
+          "fixed-layout-unsupported": 5
+        },
+        "epubcheck-valid": {
+          "calibre-header-diff": 149,
+          "fixed-layout-unsupported": 14,
+          "style-lost": 12,
+          "toc-labels": 4,
+          "gate-kindleunpack": 3,
+          "gate-calibre": 3,
+          "text-loss": 15,
+          "images-missing": 9,
+          "images-misreferenced": 9
+        },
+        "epubcheck-warnings": {
+          "calibre-header-diff": 41,
+          "style-lost": 2,
+          "fixed-layout-unsupported": 1,
+          "toc-labels": 2,
+          "input-repair": 4,
+          "images-misreferenced": 1,
+          "text-loss": 1
+        },
+        "generated": {
+          "calibre-header-diff": 8,
+          "text-loss": 1,
+          "text-garbled": 1,
+          "input-repair": 1,
+          "style-lost": 1
+        },
+        "local": {
+          "toc-flat": 1,
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "images-misreferenced": 100,
+          "toc-flat": 69,
+          "toc-labels": 90,
+          "calibre-header-diff": 100,
+          "images-missing": 1
+        },
+        "se": {
+          "toc-flat": 81,
+          "calibre-header-diff": 100
+        }
+      },
+      "corpus_category_books": {
+        "idpf": 27,
+        "w3c": 182,
+        "epubcheck-invalid": 222,
+        "epubcheck-other": 35,
+        "epubcheck-valid": 169,
+        "epubcheck-warnings": 42,
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 790,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 494,
+      "books_not_fully_evaluated": 0,
+      "books_fixed_layout": 88,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 16,
+        "images": 16,
+        "toc": 16,
+        "links": 16,
+        "style": 16
+      }
+    },
+    "mobi": {
+      "books": 886,
+      "converted": 878,
+      "calibre_ok": 833,
+      "gate_evaluated": 878,
+      "gate_pass": 878,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "toc-flat": 162,
+        "toc-labels": 111,
+        "links-unresolved": 223,
+        "style-lost": 329,
+        "calibre-header-diff": 831,
+        "fixed-layout-unsupported": 88,
+        "images-misreferenced": 127,
+        "text-loss": 38,
+        "images-missing": 24,
+        "input-repair": 8,
+        "app-error": 6,
+        "toc-missing": 7,
+        "text-garbled": 1
+      },
+      "actionable_category_books": {
+        "toc-flat": 161,
+        "toc-labels": 110,
+        "links-unresolved": 223,
+        "style-lost": 276,
+        "text-loss": 29,
+        "images-missing": 23,
+        "images-misreferenced": 124,
+        "input-repair": 8,
+        "app-error": 6,
+        "toc-missing": 7,
+        "text-garbled": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 326,
+        "input repair": 14,
+        "writer bug": 172
+      },
+      "kind_instances": {
+        "unported Calibre transform": 690,
+        "input repair": 14,
+        "writer bug": 264
+      },
+      "kind_not_actionable": {
+        "informational": 831,
+        "out of scope": 156
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.8810810810810811,
+        "input repair": 0.03783783783783784,
+        "writer bug": 0.4648648648648649
+      },
+      "gap_instances": 968,
+      "books_with_gap": 370,
+      "dominant_kind": "unported Calibre transform",
+      "top_category_by_kind": {
+        "unported Calibre transform": "style-lost",
+        "input repair": "input-repair",
+        "writer bug": "images-misreferenced"
+      },
+      "top5": [
+        {
+          "category": "style-lost",
+          "books": 276,
+          "description": "Style score below 0.5, or the input has CSS rules and the output none",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/childrens-media-query",
+            "core/01-idpf-samples/cole-voyage-of-life"
+          ]
+        },
+        {
+          "category": "links-unresolved",
+          "books": 223,
+          "description": "Internal links that no longer resolve",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/epub30-spec",
+            "core/01-idpf-samples/georgia-cfi"
+          ]
+        },
+        {
+          "category": "toc-flat",
+          "books": 161,
+          "description": "TOC nesting depth reduced",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/cole-voyage-of-life",
+            "core/01-idpf-samples/epub30-spec"
+          ]
+        },
+        {
+          "category": "images-misreferenced",
+          "books": 124,
+          "description": "Image references in the text point at the wrong image or at none",
+          "kind": "writer bug",
+          "examples": [
+            "core/02-w3c-conformance/cnt-svg-css-reference",
+            "core/02-w3c-conformance/ocf-url_link-path-absolute",
+            "core/02-w3c-conformance/ocf-url_link-relative"
+          ]
+        },
+        {
+          "category": "toc-labels",
+          "books": 110,
+          "description": "TOC entries whose labels/targets do not match the input",
+          "kind": "writer bug",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/cole-voyage-of-life",
+            "core/01-idpf-samples/georgia-cfi"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "core/02-w3c-conformance/cnt-svg-css-reference",
+          "category": "w3c",
+          "tier": 1,
+          "reasons": [
+            "image refs 0/1 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/02-w3c-conformance/ocf-url_link-path-absolute",
+          "category": "w3c",
+          "tier": 1,
+          "reasons": [
+            "image refs 0/1 correct (0 wrong, 1 missing)",
+            "style score 0.00"
+          ]
+        },
+        {
+          "id": "core/02-w3c-conformance/ocf-url_link-relative",
+          "category": "w3c",
+          "tier": 1,
+          "reasons": [
+            "image refs 0/1 correct (0 wrong, 1 missing)",
+            "style score 0.00"
+          ]
+        },
+        {
+          "id": "core/02-w3c-conformance/pub-cmt-avif",
+          "category": "w3c",
+          "tier": 1,
+          "reasons": [
+            "image refs 0/1 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/02-w3c-conformance/pub-cmt-jxl",
+          "category": "w3c",
+          "tier": 1,
+          "reasons": [
+            "image refs 0/1 correct (0 wrong, 1 missing)"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "idpf": {
+          "toc-flat": 11,
+          "toc-labels": 7,
+          "links-unresolved": 18,
+          "style-lost": 26,
+          "calibre-header-diff": 25,
+          "fixed-layout-unsupported": 4,
+          "images-misreferenced": 3,
+          "text-loss": 1,
+          "images-missing": 1
+        },
+        "w3c": {
+          "style-lost": 70,
+          "calibre-header-diff": 173,
+          "text-loss": 11,
+          "images-missing": 7,
+          "images-misreferenced": 7,
+          "fixed-layout-unsupported": 48,
+          "toc-labels": 3,
+          "links-unresolved": 10
+        },
+        "epubcheck-invalid": {
+          "calibre-header-diff": 204,
+          "links-unresolved": 6,
+          "style-lost": 12,
+          "fixed-layout-unsupported": 16,
+          "input-repair": 2,
+          "app-error": 2,
+          "images-missing": 6,
+          "images-misreferenced": 6,
+          "toc-missing": 2,
+          "text-loss": 9,
+          "toc-labels": 4
+        },
+        "epubcheck-other": {
+          "toc-missing": 2,
+          "calibre-header-diff": 30,
+          "app-error": 4,
+          "toc-labels": 1,
+          "input-repair": 1,
+          "fixed-layout-unsupported": 5,
+          "links-unresolved": 1,
+          "style-lost": 1
+        },
+        "epubcheck-valid": {
+          "calibre-header-diff": 149,
+          "fixed-layout-unsupported": 14,
+          "links-unresolved": 6,
+          "style-lost": 11,
+          "toc-labels": 4,
+          "toc-missing": 3,
+          "text-loss": 15,
+          "images-missing": 9,
+          "images-misreferenced": 9
+        },
+        "epubcheck-warnings": {
+          "calibre-header-diff": 41,
+          "links-unresolved": 2,
+          "fixed-layout-unsupported": 1,
+          "toc-labels": 2,
+          "input-repair": 4,
+          "images-misreferenced": 1,
+          "text-loss": 1
+        },
+        "generated": {
+          "links-unresolved": 2,
+          "style-lost": 8,
+          "calibre-header-diff": 8,
+          "text-loss": 1,
+          "text-garbled": 1,
+          "input-repair": 1
+        },
+        "local": {
+          "images-misreferenced": 1,
+          "toc-flat": 1,
+          "style-lost": 1,
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "images-misreferenced": 100,
+          "toc-flat": 69,
+          "toc-labels": 90,
+          "links-unresolved": 78,
+          "style-lost": 100,
+          "calibre-header-diff": 100,
+          "images-missing": 1
+        },
+        "se": {
+          "toc-flat": 81,
+          "links-unresolved": 100,
+          "style-lost": 100,
+          "calibre-header-diff": 100
+        }
+      },
+      "corpus_category_books": {
+        "idpf": 27,
+        "w3c": 182,
+        "epubcheck-invalid": 222,
+        "epubcheck-other": 35,
+        "epubcheck-valid": 169,
+        "epubcheck-warnings": 42,
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 790,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 427,
+      "books_not_fully_evaluated": 1,
+      "books_fixed_layout": 88,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 8,
+        "images": 8,
+        "toc": 9,
+        "links": 8,
+        "style": 8
+      }
+    }
+  },
+  "before_after": {
+    "formats": {
+      "azw3": {
+        "pairs": 886,
+        "categories": {
+          "app-error": {
+            "before": 6,
+            "after": 6
+          },
+          "gate-mobitool": {
+            "before": 878,
+            "after": 0
+          },
+          "gate-kindleunpack": {
+            "before": 8,
+            "after": 8
+          },
+          "gate-calibre": {
+            "before": 8,
+            "after": 8
+          },
+          "text-loss": {
+            "before": 37,
+            "after": 37
+          },
+          "text-garbled": {
+            "before": 1,
+            "after": 1
+          },
+          "images-missing": {
+            "before": 24,
+            "after": 24
+          },
+          "images-misreferenced": {
+            "before": 131,
+            "after": 126
+          },
+          "toc-flat": {
+            "before": 162,
+            "after": 162
+          },
+          "toc-labels": {
+            "before": 111,
+            "after": 111
+          },
+          "links-unresolved": {
+            "before": 223,
+            "after": 1
+          },
+          "style-lost": {
+            "before": 386,
+            "after": 41
+          },
+          "fixed-layout-unsupported": {
+            "before": 88,
+            "after": 88
+          },
+          "calibre-header-diff": {
+            "before": 830,
+            "after": 830
+          },
+          "input-repair": {
+            "before": 7,
+            "after": 7
+          }
+        },
+        "before": {
+          "books": 886,
+          "converted": 878,
+          "gate_pass": 0,
+          "gate_evaluated": 878,
+          "style_se_pg": 0.0094955,
+          "style_se_pg_n": 200,
+          "links": [
+            0,
+            35046
+          ],
+          "image_refs": [
+            2369,
+            3344
+          ],
+          "images_hash": [
+            3167,
+            3342
+          ],
+          "text": [
+            5586,
+            5646
+          ],
+          "toc": [
+            4889,
+            10529
+          ]
+        },
+        "after": {
+          "books": 886,
+          "converted": 878,
+          "gate_pass": 870,
+          "gate_evaluated": 878,
+          "style_se_pg": 0.9999945,
+          "style_se_pg_n": 200,
+          "links": [
+            35045,
+            35046
+          ],
+          "image_refs": [
+            3103,
+            3344
+          ],
+          "images_hash": [
+            3167,
+            3342
+          ],
+          "text": [
+            5586,
+            5646
+          ],
+          "toc": [
+            4889,
+            10529
+          ]
+        },
+        "regressions": []
+      },
+      "mobi": {
+        "pairs": 886,
+        "categories": {
+          "app-error": {
+            "before": 6,
+            "after": 6
+          },
+          "gate-mobitool": {
+            "before": 127,
+            "after": 0
+          },
+          "text-loss": {
+            "before": 38,
+            "after": 38
+          },
+          "text-garbled": {
+            "before": 1,
+            "after": 1
+          },
+          "images-missing": {
+            "before": 24,
+            "after": 24
+          },
+          "images-misreferenced": {
+            "before": 271,
+            "after": 127
+          },
+          "toc-missing": {
+            "before": 7,
+            "after": 7
+          },
+          "toc-flat": {
+            "before": 162,
+            "after": 162
+          },
+          "toc-labels": {
+            "before": 111,
+            "after": 111
+          },
+          "links-unresolved": {
+            "before": 223,
+            "after": 223
+          },
+          "style-lost": {
+            "before": 329,
+            "after": 329
+          },
+          "fixed-layout-unsupported": {
+            "before": 88,
+            "after": 88
+          },
+          "calibre-header-diff": {
+            "before": 831,
+            "after": 831
+          },
+          "input-repair": {
+            "before": 8,
+            "after": 8
+          }
+        },
+        "before": {
+          "books": 886,
+          "converted": 878,
+          "gate_pass": 751,
+          "gate_evaluated": 878,
+          "style_se_pg": 0.00936,
+          "style_se_pg_n": 200,
+          "links": [
+            0,
+            35046
+          ],
+          "image_refs": [
+            0,
+            3344
+          ],
+          "images_hash": [
+            3167,
+            3342
+          ],
+          "text": [
+            5586,
+            5648
+          ],
+          "toc": [
+            4889,
+            10537
+          ]
+        },
+        "after": {
+          "books": 886,
+          "converted": 878,
+          "gate_pass": 878,
+          "gate_evaluated": 878,
+          "style_se_pg": 0.00936,
+          "style_se_pg_n": 200,
+          "links": [
+            0,
+            35046
+          ],
+          "image_refs": [
+            3102,
+            3344
+          ],
+          "images_hash": [
+            3167,
+            3342
+          ],
+          "text": [
+            5586,
+            5648
+          ],
+          "toc": [
+            4889,
+            10537
+          ]
+        },
+        "regressions": []
+      }
+    },
+    "unpaired_before": 0,
+    "unpaired_after": 0
+  }
+}
