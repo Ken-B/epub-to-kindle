@@ -553,6 +553,99 @@ test('5-chapter AZW3: skel_index and chunk_index != NULL', () => {
   assert(chunkIdx !== 0xffffffff, 'chunk_index is NULL');
 });
 
+// ── Kindle profile helpers (the real source from docs/index.html) ───────────
+//
+// Pure, DOM-free helpers of the KF8 Kindle profile (kpNormalise) are taken from
+// docs/index.html itself (by name) and evaluated here, so these tests cannot drift.
+
+console.log('\n── Kindle profile: declaration helpers ─────────────────────────');
+const KP = (() => {
+  const html = readFileSync(new URL('../docs/index.html', import.meta.url), 'utf8');
+  const take = name => {
+    const fn = new RegExp(`^function ${name}\\(`, 'm').exec(html);
+    if (fn) {
+      const line = html.slice(fn.index, html.indexOf('\n', fn.index));
+      const opened = (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+      return opened === 0 ? line : html.slice(fn.index, html.indexOf('\n}\n', fn.index) + 2);  // one-liner or block
+    }
+    const c = new RegExp(`^const ${name} =`, 'm').exec(html);
+    if (!c) throw new Error(`${name} not found in docs/index.html`);
+    const end = /;[ \t]*(?:\/\/[^\n]*)?\n(?! )/g; end.lastIndex = c.index;  // ";" ending the statement
+    return html.slice(c.index, end.exec(html).index + 1);
+  };
+  const consts = ['dict', 'CSS_URL', 'CSS_URL_RE', 'MOBI_SIZE', 'FONT_KW', 'KP_SIDES', 'KP_BAD_VALUE_RE',
+    'KP_GLOBAL_RE', 'KP_INHERITED', 'KP_BORDER_STYLE_RE', '_kpSupports', 'kpNum'];
+  const fns = ['cssSplit', 'cssWords', 'cssPx', 'safeDecode', 'normPath', 'joinPath', 'toBase32', 'kindleEmbed',
+    'kpSupported', 'kpDecls', 'kpExpand', 'kpBoxText', 'kpSerialize', 'kpFontSize', 'kpLineHeight'];
+  const src = [...consts, ...fns].map(take).join('\n');
+  return new Function(`${src}\nreturn {${fns.join(', ')}};`)();
+})();
+const declMap = (body, base = '', images = null) =>
+  Object.fromEntries(KP.kpDecls(body, base, images).map(([p, v, imp]) => [p, imp ? `${v} !` : v]));
+
+test('kpDecls: margin shorthand → four longhands', () => {
+  const d = declMap('margin: 1em 2em');
+  eq(JSON.stringify(d), JSON.stringify({'margin-top': '1em', 'margin-right': '2em', 'margin-bottom': '1em', 'margin-left': '2em'}));
+});
+test('kpDecls: !important kept as a flag, not in the value', () => {
+  eq(declMap('font-weight: bold !important')['font-weight'], 'bold !');
+});
+test('kpDecls: calc(), var(), env(), viewport units and custom properties are ignored', () => {
+  eq(KP.kpDecls('width: calc(100% - 2em); height: 50vh; color: var(--c); top: env(x); --c: red; max-width: min(1em, 2px)').length, 0);
+  eq(declMap('width: -webkit-calc(1em + 1px); width: 50%').width, '50%');
+});
+test('kpDecls: border shorthand → width/style/color per side, omitted parts reset (null)', () => {
+  const d = declMap('border: 1px solid');
+  eq(d['border-top-width'], '1px'); eq(d['border-left-style'], 'solid'); eq(d['border-bottom-color'], null);
+});
+test('kpDecls: font shorthand → style, variant, weight, size, line-height, family', () => {
+  const d = declMap('font: italic bold 12px/1.5 "Times New Roman", serif');
+  eq([d['font-style'], d['font-variant'], d['font-weight'], d['font-size'], d['line-height'], d['font-family']].join('|'),
+     'italic|normal|bold|12px|1.5|"Times New Roman", serif');
+  eq(KP.kpDecls('font: caption').length, 0);
+});
+test('kpDecls: list-style none, text-decoration, break-before → page-break-before', () => {
+  const d = declMap('list-style: none; text-decoration: underline dotted; break-before: page; break-inside: avoid-page');
+  eq(d['list-style-type'], 'none'); eq(d['list-style-image'], 'none'); eq(d['text-decoration'], 'underline');
+  eq(d['text-decoration-style'], 'dotted'); eq(d['page-break-before'], 'always'); eq(d['page-break-inside'], 'avoid');
+});
+test('kpDecls: unset → inherit (inherited property) / initial (other); revert → null (nothing written)', () => {
+  const d = declMap('color: unset; margin-top: unset; font-weight: revert');
+  eq(d.color, 'inherit'); eq(d['margin-top'], 'initial'); eq(d['font-weight'], null);
+});
+test('kpDecls: url() of a manifest image → kindle:embed, relative to the sheet', () => {
+  const images = new Map([['OEBPS/img/a.png', {idx: 2, mt: 'image/png'}]]);
+  eq(declMap('background-image: url("../img/a.png")', 'OEBPS/css/', images)['background-image'],
+     'url(kindle:embed:0003?mime=image/png)');
+  eq(declMap('fill: url(#grad)', 'OEBPS/css/', images).fill, 'url(#grad)');
+});
+test('kpSerialize: sorted, margin/padding and equal border sides compacted, resets not written', () => {
+  const m = new Map(KP.kpDecls('margin: 0 1em; border: 1px solid; color: red').map(([p, v]) => [p, v]));
+  eq(KP.kpSerialize(m), 'border:1px solid;color:red;margin:0 1em');
+});
+test('kpSerialize: a side with only some longhands set stays longhand', () => {
+  const m = new Map(KP.kpDecls('border-width: 2px; border-top: 1px dashed red').map(([p, v]) => [p, v]));
+  eq(KP.kpSerialize(m), 'border-bottom-width:2px;border-left-width:2px;border-right-width:2px;border-top:1px dashed red');
+});
+test('kpBoxText: shortest box value', () => {
+  eq(KP.kpBoxText(['1em', '1em', '1em', '1em']), '1em'); eq(KP.kpBoxText(['1em', '0', '1em', '0']), '1em 0');
+  eq(KP.kpBoxText(['1em', '0', '0', '0']), '1em 0 0'); eq(KP.kpBoxText(['1em', '2em', '3em', '4em']), '1em 2em 3em 4em');
+});
+test('kpLineHeight: below 1.2 raised, absolute units dropped, others kept', () => {
+  const lh = v => { const m = new Map([['line-height', v]]); KP.kpLineHeight(m); return m.get('line-height'); };
+  eq(lh('1'), '1.2'); eq(lh('0.9em'), '1.2em'); eq(lh('90%'), '120%'); eq(lh('14px'), undefined);
+  eq(lh('10pt'), undefined); eq(lh('normal'), 'normal'); eq(lh('1.5'), '1.5'); eq(lh('1.25em'), '1.25em');
+});
+test('kpFontSize: px/pt/rem → em of the parent, computed size returned', () => {
+  const fs = (v, tag, ps, rs) => { const m = new Map(v ? [['font-size', v]] : []); const px = KP.kpFontSize(m, tag, ps, rs); return [m.get('font-size'), +px.toFixed(3)].join('|'); };
+  eq(fs('12px', 'p', 16, 16), '0.75em|12');
+  eq(fs('24pt', 'span', 16, 16), '2em|32');
+  eq(fs('1.5rem', 'p', 20, 10), '0.75em|15');     // rem: of the root (html) size
+  eq(fs('1.2em', 'p', 10, 16), '1.2em|12');       // em and % stay
+  eq(fs('large', 'p', 10, 16), 'large|18');       // keywords stay
+  eq(fs(null, 'h1', 16, 16), '|32');              // UA size of a heading
+});
+
 // ── Results ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${'═'.repeat(60)}`);

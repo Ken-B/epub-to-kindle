@@ -20,6 +20,12 @@ treated as "unknown/false" when absent):
     result["invariants"]["text"]["non_xhtml_spine_items"]
                                                 spine items whose manifest type is not XHTML/HTML (not
                                                 compared as text; category `spine-non-xhtml`, informational)
+    result["invariants"]["style"]["device_score"]
+                                                AZW3 style score under the Kindle device model (category
+                                                `device-style-lost` below DEVICE_STYLE_MIN)
+    result["invariants"]["layout_hygiene"] / ["layout_hygiene_input"]
+                                                {empty_blocks, trailing_breaks, whitespace_runs, nbsp_indents}
+                                                in our output / in the input (category `layout-hygiene`)
 Without them: fixed layout is guessed from "fixed-layout"/"pre-paginated" in id/path, garbling from
 U+FFFD in `invariants.text.first_diff.ours_excerpt` (and not in `input_excerpt`), and images-missing
 from matched_by_hash < input.
@@ -61,6 +67,11 @@ TAXONOMY: dict[str, tuple[str, str]] = {
     "links-unresolved": ("Internal links that no longer resolve", "unported Calibre transform"),
     "style-lost": ("Style score below 0.5, or the input has CSS rules and the output none",
                    "unported Calibre transform"),
+    "device-style-lost": ("AZW3 style score under the Kindle device model (Kindle UA defaults, no @media/"
+                          "@supports, no sibling/attribute/structural selectors) below 0.8",
+                          "unported Calibre transform"),
+    "layout-hygiene": ("Output markup has empty p/div, trailing <br>, raw whitespace runs or &nbsp; indents",
+                       "informational"),
     "fixed-layout-unsupported": ("Input is fixed-layout (pre-paginated)", "out of scope"),
     "calibre-header-diff": ("MOBI/EXTH header fields differ from Calibre's beyond the ignore list",
                             "informational"),
@@ -71,6 +82,10 @@ TAXONOMY: dict[str, tuple[str, str]] = {
 }
 
 KINDS_ACTIONABLE = ("unported Calibre transform", "input repair", "writer bug")
+DEVICE_STYLE_MIN = 0.8
+HYGIENE_KEYS = ("empty_blocks", "trailing_breaks", "whitespace_runs", "nbsp_indents")
+# stricter facts (intentional markers, double breaks, verse/column nbsp): shown, not categorised
+HYGIENE_EXTRA_KEYS = ("empty_blocks_styled", "trailing_breaks_double", "nbsp_indents_ambiguous")
 INVARIANTS = ("text", "images", "toc", "links", "style")
 KIND_ADVICE = {
     "unported Calibre transform": "port the missing Calibre transforms",
@@ -242,6 +257,12 @@ def categorize(result: dict) -> list[str]:
         css_dropped = bool(css_in) and css_out == 0 and r.get("format") != "mobi"
         if (sc is not None and sc < 0.5) or css_dropped:
             cats.add("style-lost")
+        dsc = _int(st.get("device_score"))
+        if dsc is not None and dsc < DEVICE_STYLE_MIN and r.get("format") != "mobi":
+            cats.add("device-style-lost")
+        hy = _d(inv.get("layout_hygiene"))
+        if any((_int(hy.get(k)) or 0) > 0 for k in HYGIENE_KEYS):
+            cats.add("layout-hygiene")
 
     if _fixed_layout(r):
         cats.add("fixed-layout-unsupported")
@@ -303,6 +324,37 @@ def _gate_pass(r: dict):
 
 def _score(r: dict):
     return _int(_d(_d(r.get("invariants")).get("style")).get("score"))
+
+
+def _device_score(r: dict):
+    return _int(_d(_d(r.get("invariants")).get("style")).get("device_score"))
+
+
+def mean_score(rs: list[dict], fn, cats=("se", "pg")):
+    """(mean of fn(r) over the results of corpus categories `cats` where it is a number, n);
+    (None, 0) when there is none (e.g. results written before the field existed)."""
+    v = [s for r in rs if r.get("category") in cats and (s := fn(r)) is not None]
+    return (sum(v) / len(v), len(v)) if v else (None, 0)
+
+
+def hygiene_pooled(rs: list[dict], key: str = "layout_hygiene"):
+    """{count: sum} of invariants[key] over the results that have it, plus "books" (results with the
+    field) and "books_nonzero"; None when no result has it."""
+    tot = dict.fromkeys(HYGIENE_KEYS + HYGIENE_EXTRA_KEYS, 0)
+    books = nonzero = 0
+    for r in rs:
+        h = _d(r.get("invariants")).get(key)
+        if not isinstance(h, dict):
+            continue
+        books += 1
+        nonzero += any((_int(h.get(k)) or 0) for k in HYGIENE_KEYS)
+        for k in HYGIENE_KEYS + HYGIENE_EXTRA_KEYS:
+            tot[k] += _int(h.get(k)) or 0
+    return {**tot, "books": books, "books_nonzero": nonzero} if books else None
+
+
+def hygiene_str(h, keys=HYGIENE_KEYS) -> str:
+    return "n/a" if not h else " / ".join(str(h.get(k, 0)) for k in keys)
 
 
 def _frac(a, b) -> str:
@@ -528,6 +580,10 @@ def _aggregate(rs: list[dict]) -> dict:
         "books_not_fully_evaluated": not_full,
         "books_fixed_layout": fixed, "books_harness_error": harness,
         "invariants_not_evaluated": {k: not_eval[k] for k in INVARIANTS},
+        "style_score_se_pg": mean_score(rs, _score),
+        "device_score_se_pg": mean_score(rs, _device_score),
+        "layout_hygiene_pooled": hygiene_pooled(rs),
+        "layout_hygiene_input_pooled": hygiene_pooled(rs, "layout_hygiene_input"),
     }
 
 
@@ -577,6 +633,19 @@ def _summary_paragraph(fmt: str, a: dict) -> str:
                 "(harness error, clean refusal or missing invariants)" if a["books_not_fully_evaluated"] else "")
              + (f"; {a['books_fixed_layout']} fixed-layout books are out of scope and not counted"
                 if a["books_fixed_layout"] else "") + ".")
+    ms, ns = a.get("style_score_se_pg") or (None, 0)
+    md, nd = a.get("device_score_se_pg") or (None, 0)
+    if ms is not None or md is not None:
+        s.append(f"Mean style score on se+pg books: preservation {'n/a' if ms is None else f'{ms:.3f} (n={ns})'}"
+                 + (f", Kindle device model {'n/a' if md is None else f'{md:.3f} (n={nd})'}" if fmt != "mobi" else "")
+                 + ".")
+    hy, hyi = a.get("layout_hygiene_pooled"), a.get("layout_hygiene_input_pooled")
+    if hy:
+        s.append(f"Layout hygiene, pooled over {hy['books']} books (empty blocks / trailing breaks / whitespace "
+                 f"runs / nbsp indents): output {hygiene_str(hy)}, input {hygiene_str(hyi)}; "
+                 f"{hy['books_nonzero']} books have at least one in the output. Not counted in "
+                 "`layout-hygiene` (styled empty blocks / double trailing breaks / ambiguous nbsp indents): "
+                 f"output {hygiene_str(hy, HYGIENE_EXTRA_KEYS)}, input {hygiene_str(hyi, HYGIENE_EXTRA_KEYS)}.")
     ne = {k: v for k, v in a["invariants_not_evaluated"].items() if v}
     if ne:
         s.append("Invariants not evaluated (books): " + ", ".join(f"{k} {v}" for k, v in ne.items()) + ".")
@@ -607,7 +676,7 @@ def _fmt_section(fmt: str, rs: list[dict], a: dict) -> list[str]:
                     [[i + 1, f"`{t['category']}`", t["books"], _pct(t["books"], a["books"]),
                       t["description"], t["kind"]] for i, t in enumerate(a["top5"])])
         L += ["", ("Informational, acceptable, harness and out-of-scope categories are not ranked here "
-              "(`calibre-header-diff`, `images-resized`, `images-unextractable`, `spine-non-xhtml`, "
+              "(`calibre-header-diff`, `images-resized`, `images-unextractable`, `spine-non-xhtml`, `layout-hygiene`, "
               "`app-clean-error`, `harness-error`, "
               "`fixed-layout-unsupported`), and nothing on a fixed-layout book is; "
               "they appear in the per-category breakdown and the per-book table. "
@@ -642,7 +711,7 @@ def _fmt_section(fmt: str, rs: list[dict], a: dict) -> list[str]:
     L += ["### 5. All books", ""]
     hdr = ["id", "category", "verdict", "app ok", "calibre ok", "gate pass", "text match/spine",
            "images matched/referenced", "image refs ok/total", "toc matched/input", "links resolved/total",
-           "style", "css rules out/in", "categories"]
+           "style", "device style", "hygiene out (e/b/ws/nb)", "css rules out/in", "categories"]
     rows = []
     for r in sorted(rs, key=lambda x: str(x.get("id"))):
         inv = _d(r.get("invariants"))
@@ -660,6 +729,9 @@ def _fmt_section(fmt: str, rs: list[dict], a: dict) -> list[str]:
                      _frac(toc.get("matched"), toc.get("input_entries")),
                      _frac(lk.get("resolved"), lk.get("internal_total")),
                      "-" if sc is None else f"{sc:.2f}",
+                     "-" if _device_score(r) is None else f"{_device_score(r):.2f}",
+                     "-" if not isinstance(inv.get("layout_hygiene"), dict) else
+                     "/".join(str(_int(inv["layout_hygiene"].get(k)) or 0) for k in HYGIENE_KEYS),
                      _frac(st.get("output_css_rules"), st.get("input_css_rules")),
                      ", ".join(_cats_of(r)) or "-"])
     L += _table(hdr, rows) + [""]

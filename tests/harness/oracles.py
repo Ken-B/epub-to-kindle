@@ -38,12 +38,14 @@ import threading
 import traceback
 import unicodedata
 import zipfile
+from collections import Counter
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import ClassVar
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
+import device
 from common import ROOT, entry_path, sha256_file, write_json_atomic
 
 KINDLEUNPACK = ROOT / "tests/corpus/tools/KindleUnpack/lib/kindleunpack.py"
@@ -2189,8 +2191,14 @@ def _authored(e: dict, idx=_ALL_IDX) -> int:
     return sum(1 for pi in idx if not _prop_equal(STYLE_PROPS[pi], e["props"][pi], e["base"][pi]))
 
 
+# margin/padding of <html>/<body>: the page margins, which a Kindle owns (left out of the device score)
+_PAGE_BOX_IDX = frozenset(STYLE_PROPS.index(p) for p in ("margin-top", "margin-bottom", "margin-left",
+                                                          "margin-right", "padding-left", "padding-right"))
+
+
 class _StyleAcc:
-    def __init__(self, excluded=(), box_only_ancestors: bool = False, reader_default=()):
+    def __init__(self, excluded=(), box_only_ancestors: bool = False, reader_default=(),
+                 page_box_free: bool = False):
         # property indexes scored (all), compared across element kinds (inherited), and compared on
         # the ancestors of an anchor pair (all; MOBI v6: the non-inherited box properties only, as
         # MobiML puts the inherited formatting on the text itself, where the anchor pair checks it)
@@ -2200,6 +2208,8 @@ class _StyleAcc:
         # properties left at the reader's default on both sides count as agreeing (MOBI v6: the
         # output's baseline is the MOBI reader's defaults, which differ from a browser's)
         self.reader_default = {STYLE_PROPS.index(x) for x in reader_default}
+        # device score: html/body box properties are not compared (the device owns the page margins)
+        self.page_box_free = page_box_free
         self.hist: dict[str, int] = {}
         self.examples: dict[str, list] = {}
         self.seen: set = set()
@@ -2212,7 +2222,10 @@ class _StyleAcc:
         a `reader_default` property the input leaves at the browser's default and the output at its
         own baseline (the MOBI reader's default) is not checked either."""
         checked = equal = all_checked = all_equal = 0
+        page = self.page_box_free and (a["tag"] in ("html", "body") or b["tag"] in ("html", "body"))
         for pi in idx:
+            if page and pi in _PAGE_BOX_IDX:
+                continue
             prop = STYLE_PROPS[pi]
             same = _prop_equal(prop, a["props"][pi], b["props"][pi])
             all_checked += 1
@@ -2358,9 +2371,43 @@ def _fallback(a: dict, eout: list, ao: list, order: list, pos: dict, p: int):
     return None
 
 
-def _style_page(page, base_url: str):
+def _device_response(url, resource_type: str, root: Path, state: dict):
+    """(body, content type) the device context serves for one request instead of the file server,
+    or None to let the request through. A document URL with `device=1` gets device.device_document
+    (Kindle UA sheet first, inline <style> rewritten); every style sheet (a .css file, or any
+    request Chromium makes for a stylesheet) gets device.device_css, memoised per file. A document
+    URL with `devin=1` (served in any context with a state, rewrite or not) gets
+    device.input_reference_document: the input with html/body side margins/paddings zeroed."""
+    q = parse_qs(url.query)
+    if not ("devin" in q or state.get("rewrite", True)):
+        return None
+    f = (root / unquote(url.path).lstrip("/")).resolve()
+    if not f.is_relative_to(root) or not f.is_file():
+        return None
+    mode = q.get("as", [None])[0]
+    ctype = ("application/xhtml+xml" if mode == "xhtml" or (mode is None and f.suffix.lower() in (".xhtml", ".xht"))
+             else "text/html; charset=utf-8")
+    if "devin" in q:      # the device score's input reference (author CSS untouched)
+        return device.input_reference_document(f.read_bytes(), state["stats"]), ctype
+    if not state.get("rewrite", True):
+        return None
+    if "device" in q:
+        return device.device_document(f.read_bytes(), state["stats"]), ctype
+    if resource_type == "stylesheet" or f.suffix.lower() == ".css":
+        s = f.stat()
+        key = (str(f), s.st_mtime_ns, s.st_size)
+        if key not in state["css"]:
+            state["css"][key] = device.device_css(f.read_bytes().decode("utf-8", "replace"),
+                                                  state["stats"]).encode("utf-8")
+        return state["css"][key], "text/css; charset=utf-8"
+    return None
+
+
+def _style_page(page, base_url: str, device_state: dict | None = None, root: Path | None = None):
     """(context, page) of a dedicated Chromium context: JavaScript disabled, 600 x 800 screen, every
-    request that does not go to base_url's host aborted."""
+    request that does not go to base_url's host aborted. With `device_state` ({"stats": Counter,
+    "css": {}, "errors": []}) and the server's `root`, the context reads documents and style sheets
+    through the device model (_device_response)."""
     browser = page.context.browser
     if browser is None:  # persistent context: no browser handle to open a dedicated context
         raise RuntimeError("style score needs a page from browser.new_context()/new_page(), "
@@ -2368,13 +2415,25 @@ def _style_page(page, base_url: str):
     ctx = browser.new_context(viewport=STYLE_VIEWPORT, device_scale_factor=1, java_script_enabled=False,
                               service_workers="block")
     host = urlparse(base_url).netloc
+    root = Path(root).resolve() if root is not None else None
 
     def route(r):
         try:
-            if urlparse(r.request.url).netloc == host:
-                r.continue_()
-            else:
+            u = urlparse(r.request.url)
+            if u.netloc != host:
                 r.abort()
+                return
+            if device_state is not None and root is not None:
+                try:
+                    resp = _device_response(u, r.request.resource_type, root, device_state)
+                except Exception as e:
+                    device_state["errors"].append(_err(e))
+                    resp = None
+                if resp is not None:
+                    r.fulfill(status=200, body=resp[0],
+                              headers={"Content-Type": resp[1], "Cache-Control": "no-store"})
+                    return
+            r.continue_()
         except Exception:
             pass
     ctx.route("**/*", route)
@@ -2414,13 +2473,32 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
     MOBI v6 (no CSS in the file): the output is read with MOBI_CSS and its width/height attributes
     applied, MOBI_EXCLUDED_PROPS are not scored, and the input elements the author CSS hides are
     left out (the writer removes them); the same load prunes them from book's documents for the
-    text/links/images invariants (InputBook.prune_hidden)."""
+    text/links/images invariants (InputBook.prune_hidden).
+
+    AZW3 only, the device score (device_*): every output document is loaded a second time, in a
+    context that serves it through the Kindle device model (device.py: KINDLE_UA_CSS as the first
+    sheet, @media/@supports/@namespace/@layer and the selectors a Kindle is assumed not to match
+    removed), and aligned and scored against a second load of each input chapter with its html/body
+    side margins and paddings forced to 0 (device.INPUT_PAGE_CSS, after the author sheets: the
+    device owns the page margins, so percentages resolve against the same content box on both
+    sides), html/body margins and paddings left out. A failure of that pass leaves device_score None (device_error says why)."""
     mobi = outb.kind == "mobi7"
-    ctx, pg = _style_page(page, base_url)
+    dev = {"on": not mobi, "error": None, "stats": Counter(), "css": {}, "errors": []}
+    srv_root = _SERVERS.get(base_url, out_dir.resolve().parent)
+    # the plain context serves files as they are, except the device pass's input reference (devin=1)
+    ctx, pg = _style_page(page, base_url, {**dev, "rewrite": False}, srv_root)
     acc = _StyleAcc(MOBI_EXCLUDED_PROPS if mobi else (), box_only_ancestors=mobi,
                     reader_default=MOBI_READER_DEFAULT_PROPS if mobi else ())
     n = len(book.spine)
     chk, eq = [0] * n, [0] * n
+    dacc = _StyleAcc(page_box_free=True)
+    dchk, deq = [0] * n, [0] * n
+    dctx = dpg = None
+    if dev["on"]:
+        try:
+            dctx, dpg = _style_page(page, base_url, dev, srv_root)
+        except Exception as e:
+            dev.update(on=False, error=_err(e))
     tot_in = tot_out = authored_els = 0
     stats_all: dict[str, int] = {}
     parsed = {"input_html_fallback": 0, "output_html_fallback": 0}
@@ -2445,6 +2523,31 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             parsed["output_html_fallback"] += d["parsed_as"] == "html" and out_xhtml_first
             return d["els"]
 
+        def load_in_dev(i):
+            """Input chapter i as the device pass's reference (page side margins zeroed); None once
+            the device pass has failed."""
+            if not book.spine[i]["xhtml"]:
+                return []
+            if not dev["on"]:
+                return None
+            try:
+                ux, uh = _input_urls(book, i, base_url, out_dir)
+                return _collect(pg, ux + "&devin=1", uh + "&devin=1")["els"]
+            except Exception as e:
+                dev.update(on=False, error=_err(e))
+                return None
+
+        def load_dev(p):
+            """Output document p under the device model; None once the device pass has failed."""
+            if not dev["on"]:
+                return None
+            try:
+                return _collect(dpg, _url_for(base_url, out_dir, p, "xhtml") + "&device=1",
+                                _url_for(base_url, out_dir, p, "html") + "&device=1")["els"]
+            except Exception as e:
+                dev.update(on=False, error=_err(e))
+                return None
+
         def shifted(els, off):
             out = []
             for e in els:
@@ -2465,6 +2568,13 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
                 for c, e in contrib.values():
                     chk[i] += c
                     eq[i] += e
+                if dev["on"]:
+                    eind = load_in_dev(i)
+                    edev = (load_dev(p) if p is not None else []) if eind is not None else None
+                    if edev is not None:
+                        for c, e in _align_score(eind, edev, dacc, i)[0].values():
+                            dchk[i] += c
+                            deq[i] += e
         else:
             ein, owner = [], []
             for i in range(n):
@@ -2480,14 +2590,52 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             for k, (c, e) in contrib.items():
                 chk[owner[k]] += c
                 eq[owner[k]] += e
+            eind, downer = [], []
+            for i in range(n):
+                d = load_in_dev(i) if dev["on"] else None
+                if d is None:
+                    break
+                eind += shifted(d, len(eind))
+                downer += [i] * len(d)
+            if dev["on"]:
+                edev = []
+                for p in outb.docs:
+                    d = load_dev(p)
+                    if d is None:
+                        break
+                    edev += shifted(d, len(edev))
+                if dev["on"]:
+                    for k, (c, e) in _align_score(eind, edev, dacc, "book")[0].items():
+                        dchk[downer[k]] += c
+                        deq[downer[k]] += e
     finally:
-        try:
-            ctx.close()
-        except Exception:
-            pass
+        for c in (ctx, dctx):
+            try:
+                if c is not None:
+                    c.close()
+            except Exception:
+                pass
     hist = dict(sorted(acc.hist.items(), key=lambda kv: -kv[1]))
     denom = max(tot_in, tot_out)
     checked, equal = sum(chk), sum(eq)
+    if mobi:
+        device_res: dict = {"device_score": None}
+    elif not dev["on"]:
+        device_res = {"device_score": None, "device_error": dev["error"] or "device pass failed"}
+    else:
+        dh = dict(sorted(dacc.hist.items(), key=lambda kv: -kv[1]))
+        dc, de = sum(dchk), sum(deq)
+        device_res = {
+            "device_score": round(de / dc, 4) if dc else 1.0,
+            "device_per_chapter": [round(deq[i] / dchk[i], 4) if dchk[i] else None for i in range(n)],
+            "device_checked_props": dc, "device_equal_props": de,
+            "device_prop_disagreements": dh,
+            "device_prop_examples": {k: dacc.examples[k][:2] for k in list(dh)[:8]},
+            "device_model": device.DEVICE_MODEL,
+            "device_css_removed": dict(sorted(dev["stats"].items())),
+        }
+        if dev["errors"]:
+            device_res["device_route_errors"] = dev["errors"][:3]
     return {"score": round(equal / checked, 4) if checked else 1.0,
             "per_chapter": [round(eq[i] / chk[i], 4) if chk[i] else None for i in range(n)],
             "mode": mode, "elements_in": tot_in, "elements_out": tot_out,
@@ -2502,7 +2650,79 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             "output_css_rules": outb.css_rules(),
             "prop_disagreements": hist, "prop_examples": {k: acc.examples[k] for k in hist},
             "props_excluded_for_format": list(MOBI_EXCLUDED_PROPS) if mobi else [],
-            **parsed}
+            **parsed, **device_res}
+
+
+# ── layout hygiene ──────────────────────────────────────────────────────────
+
+def _doc_css_texts(root, resolve) -> list[str]:
+    """Texts of the style sheets one document uses: <link rel=stylesheet> (resolve(href) -> Path or
+    None), their @import targets (one level) and <style> blocks."""
+    texts: list[str] = []
+
+    def read(href: str, base=None):
+        href = (href or "").strip().split("#")[0].split("?")[0]
+        if not href or _has_scheme(href):
+            return None
+        f = resolve(href, base)
+        if f is None or not f.is_file():
+            return None
+        return f, f.read_bytes().decode("utf-8", "replace")
+    for el in _elements(root, {"link", "style"}):
+        if _local(el) == "style":
+            texts.append("".join(el.itertext()))
+            continue
+        if "stylesheet" not in (_attr(el, "rel") or "").lower().split():
+            continue
+        got = read(_attr(el, "href") or "")
+        if got:
+            texts.append(got[1])
+            for imp in _css_imports(got[1]):
+                sub = read(imp, got[0])
+                if sub:
+                    texts.append(sub[1])
+    return texts
+
+
+def inv_layout_hygiene(book: InputBook, outb: OutputBook) -> tuple[dict, dict]:
+    """(layout_hygiene, layout_hygiene_input): device.layout_hygiene_doc counts over the output
+    documents (KindleUnpack parts / mobi7 book.html) and over the input XHTML spine documents, with
+    `pre` elements and empty marker/spacer blocks recognised by tag, style attribute and tag/class
+    rules of the document's sheets (device.pre_selectors, device.marker_selectors). Static (lxml), no browser."""
+    memo: dict = {}
+
+    def sel_of(texts: list[str]):
+        key = tuple(texts)
+        if key not in memo:
+            memo[key] = (device.pre_selectors(texts), device.marker_selectors(texts))
+        return memo[key]
+
+    keys = device.HYGIENE_KEYS + device.HYGIENE_EXTRA_KEYS
+
+    def run(docs) -> dict:
+        counts, ex, n = Counter(), {}, 0
+        for root, resolve, name in docs:
+            pre, markers = sel_of(_doc_css_texts(root, resolve))
+            device.layout_hygiene_doc(_find_body(root), pre, counts, ex, name, markers=markers)
+            n += 1
+        return {**{k: counts[k] for k in keys}, "documents": n,
+                "examples": {k: ex[k] for k in keys if k in ex}}
+
+    def out_docs():
+        for p in outb.docs:
+            yield outb.doc(p), (lambda h, base, p=p: (base or p).parent / unquote(h)), p.name
+
+    def in_docs():
+        for sp in book.spine:
+            if not sp["xhtml"]:
+                continue
+
+            def resolve(h, base, path=sp["path"]):
+                if base is not None:
+                    return base.parent / unquote(h)
+                return book.dir / book.join(path, h)
+            yield book.doc(sp["path"]), resolve, sp["path"]
+    return run(out_docs()), run(in_docs())
 
 
 def _err(e: BaseException) -> str:
@@ -2534,8 +2754,15 @@ def invariants(entry: dict, out_dir: Path, fmt: str, page, base_url: str | None 
         outb = OutputBook(out_dir, fmt, who)
         mode, pairs = _mapping(book, outb)
     except Exception as e:
-        return {**res, "fixed_layout": None, "errors": {n: f"setup: {_err(e)}" for n in names}}
+        return {**res, "fixed_layout": None, "layout_hygiene": None, "layout_hygiene_input": None,
+                "errors": {n: f"setup: {_err(e)}" for n in names}}
     res["fixed_layout"] = book.fixed_layout
+    # static, before anything prunes the input documents (MOBI v6 hidden content)
+    try:
+        res["layout_hygiene"], res["layout_hygiene_input"] = inv_layout_hygiene(book, outb)
+    except Exception as e:
+        res["layout_hygiene"] = res["layout_hygiene_input"] = None
+        errors["layout_hygiene"] = _err(e)
     mobi = outb.kind == "mobi7"
     base = base_url or _server_for(out_dir.parent)
     jobs = {

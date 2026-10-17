@@ -7,8 +7,10 @@
 Books are paired by (sha256, format). Categories are recomputed with report.categorize for both sides so
 that a changed taxonomy cannot show up as a change in the converter. A book REGRESSED when, compared
 with its baseline result, any of these holds: the app fails now but not before; a parser gate passed
-before and fails now; a text/image/TOC/link invariant count got worse; the style score dropped by more
-than STYLE_TOL; or a new gap category (other than informational ones) appeared.
+before and fails now; a text/image/TOC/link invariant count got worse; the style score or the (AZW3)
+device score dropped by more than STYLE_TOL; or a new gap category (other than informational ones)
+appeared. A baseline written before a field existed (no device_score, no layout_hygiene) shows "n/a"
+and is not compared on it.
 """
 from __future__ import annotations
 
@@ -18,7 +20,21 @@ import report as R
 
 STYLE_TOL = 0.05
 MAX_ROWS = 60
-INFORMATIONAL = {"calibre-header-diff", "images-resized", "spine-non-xhtml", "images-unextractable"}
+INFORMATIONAL = {"calibre-header-diff", "images-resized", "spine-non-xhtml", "images-unextractable",
+                 "layout-hygiene"}
+
+
+# categories that need a result field older results lack: on a baseline without the field the category
+# was not evaluated, so it is neither counted ("n/a") nor a "new category" regression
+CAT_FIELD = {
+    "device-style-lost": lambda r: R._device_score(r) is not None,
+    "layout-hygiene": lambda r: isinstance(R._d(r.get("invariants")).get("layout_hygiene"), dict),
+}
+
+
+def _evaluated(r: dict, cat: str) -> bool:
+    f = CAT_FIELD.get(cat)
+    return f is None or f(r)
 
 
 def _inv(r: dict, key: str) -> dict:
@@ -47,19 +63,17 @@ def _pool(rs: list[dict], key: str, num: str, den: str):
     return (n, d)
 
 
-def _mean_style(rs: list[dict]):
-    v = [s for r in rs if r.get("category") in ("se", "pg") and (s := _num(_inv(r, "style").get("score"))) is not None]
-    return (sum(v) / len(v), len(v)) if v else (None, 0)
-
-
 def _metrics(rs: list[dict]) -> dict:
     conv = [r for r in rs if R._d(r.get("app")).get("ok")]
     gate_known = [r for r in conv if R._gate_pass(r) is not None]
-    ms, ns = _mean_style(rs)
+    ms, ns = R.mean_score(rs, R._score)
+    md, nd = R.mean_score(rs, R._device_score)
     return {
         "books": len(rs), "converted": len(conv),
         "gate_pass": sum(1 for r in gate_known if R._gate_pass(r)), "gate_evaluated": len(gate_known),
         "style_se_pg": ms, "style_se_pg_n": ns,
+        "device_se_pg": md, "device_se_pg_n": nd,
+        "hygiene": R.hygiene_pooled(rs),
         "links": _pool(rs, "links", "resolved", "internal_total"),
         "image_refs": _pool(rs, "images", "refs_correct", "refs_total"),
         "images_hash": _pool(rs, "images", "matched_by_hash", "input"),
@@ -87,7 +101,10 @@ def _regression_reasons(b: dict, a: dict, cb: list[str], ca: list[str]) -> list[
     sb, sa = _num(_inv(b, "style").get("score")), _num(_inv(a, "style").get("score"))
     if sb is not None and sa is not None and sa < sb - STYLE_TOL:
         why.append(("style score", f"style score {sb:.2f} -> {sa:.2f}"))
-    new = [c for c in ca if c not in cb and c not in INFORMATIONAL]
+    db, da = R._device_score(b), R._device_score(a)
+    if db is not None and da is not None and da < db - STYLE_TOL:
+        why.append(("device score", f"device score {db:.2f} -> {da:.2f}"))
+    new = [c for c in ca if c not in cb and c not in INFORMATIONAL and _evaluated(b, c)]
     if new:
         why.append(("new category", "new categories: " + ", ".join(new)))
     return why
@@ -114,6 +131,9 @@ def compare(before: list[dict], after: list[dict]) -> dict:
             for x in c:
                 cat_a[x] += 1
         cats = [c for c in R.TAXONOMY if cat_b.get(c) or cat_a.get(c)]
+        # None: no baseline result has the field the category needs (rendered "n/a")
+        unev_b = {c for c in CAT_FIELD if not any(_evaluated(r, c) for r in rb)}
+        unev_a = {c for c in CAT_FIELD if not any(_evaluated(r, c) for r in ra)}
         regs = []
         for b, a, cb, ca in zip(rb, ra, cb_all, ca_all, strict=True):
             why = _regression_reasons(b, a, cb, ca)
@@ -121,7 +141,8 @@ def compare(before: list[dict], after: list[dict]) -> dict:
                 regs.append({"id": a.get("id"), "category": a.get("category"), "reasons": why})
         out["formats"][fmt] = {
             "pairs": len(keys),
-            "categories": {c: {"before": cat_b.get(c, 0), "after": cat_a.get(c, 0)} for c in cats},
+            "categories": {c: {"before": None if c in unev_b else cat_b.get(c, 0),
+                               "after": None if c in unev_a else cat_a.get(c, 0)} for c in cats},
             "before": _metrics(rb), "after": _metrics(ra), "regressions": regs,
         }
     return out
@@ -152,14 +173,17 @@ def render(cmp: dict, before_label: str) -> str:
         L += [f"Unpaired results: {cmp['unpaired_before']} only in the baseline, {cmp['unpaired_after']} only now.", ""]
     for fmt, f in cmp["formats"].items():
         b, a = f["before"], f["after"]
-        def style(m):
-            return "n/a" if m["style_se_pg"] is None else f"{m['style_se_pg']:.3f} (n={m['style_se_pg_n']})"
+        def style(m, k="style_se_pg"):
+            return "n/a" if m.get(k) is None else f"{m[k]:.3f} (n={m[k + '_n']})"
 
         rows = [
             ("books with an output file", f"{b['converted']}/{b['books']}", f"{a['converted']}/{a['books']}"),
             ("gate pass (all three parsers)", _frac((b["gate_pass"], b["gate_evaluated"])),
              _frac((a["gate_pass"], a["gate_evaluated"]))),
             ("mean style score, se+pg books", style(b), style(a)),
+            ("mean device score, se+pg books", style(b, "device_se_pg"), style(a, "device_se_pg")),
+            ("layout hygiene, pooled (empty blocks / trailing breaks / whitespace runs / nbsp indents)",
+             R.hygiene_str(b.get("hygiene")), R.hygiene_str(a.get("hygiene"))),
             ("internal links resolved (pooled)", _frac(b["links"]), _frac(a["links"])),
             ("image refs correct (pooled)", _frac(b["image_refs"]), _frac(a["image_refs"])),
             ("images present by hash (pooled)", _frac(b["images_hash"]), _frac(a["images_hash"])),
@@ -171,7 +195,10 @@ def render(cmp: dict, before_label: str) -> str:
         L += [f"| {m} | {x} | {y} |" for m, x, y in rows]
         L += ["", "| category | books before | books after | delta |", "|---|---|---|---|"]
         for c, v in f["categories"].items():
-            L.append(f"| `{c}` | {v['before']} | {v['after']} | {_signed(v['after'] - v['before'])} |")
+            na = v["before"] is None or v["after"] is None
+            L.append(f"| `{c}` | {'n/a' if v['before'] is None else v['before']} | "
+                     f"{'n/a' if v['after'] is None else v['after']} | "
+                     f"{'n/a' if na else _signed(v['after'] - v['before'])} |")
         L.append("")
         regs = f["regressions"]
         L.append(f"#### {fmt.upper()} regressions ({len(regs)})")

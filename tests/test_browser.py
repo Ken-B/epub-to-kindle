@@ -429,8 +429,10 @@ with sync_playwright() as pw:
          lambda: bool(page.get_attribute('#status', 'class')))
     page.close()
 
-    # ── T7: CSS visibility ─────────────────────────────────────────────────
-    print('\n── T7: CSS visibility ─────────────────────────────────────────')
+    # ── T7: CSS visibility (author mode) ───────────────────────────────────
+    # ?css=author: the author stylesheets verbatim as KF8 flows (the default, the Kindle
+    # profile, bakes them into generated classes: T7b)
+    print('\n── T7: CSS visibility (author mode, ?css=author) ──────────────')
     epub_css = make_epub('CSS Visibility Test', [
         ('Chapter 1',
          '<div class="publisher-watermark">SECRET WATERMARK TEXT</div>'
@@ -441,7 +443,7 @@ with sync_playwright() as pw:
     ])
 
     page = browser.new_page()
-    page.goto(base_url)
+    page.goto(base_url + '/?css=author')
     upload_and_wait(page, epub_css, 'csstest.epub')
     azw3_css = fetch_azw3(page)
     page.close()
@@ -486,6 +488,224 @@ with sync_playwright() as pw:
              lambda: 'Normal readable content' in css_page.evaluate(
                  '() => document.body.innerText'))
         css_page.close()
+
+    # ── T7b: Kindle profile (default KF8 CSS mode) ─────────────────────────
+    print('\n── T7b: Kindle profile (KF8 CSS normalisation) ────────────────')
+    kp_epub = make_epub('Kindle Profile Test', [
+        ('One', '<h2 id="t1">Title</h2>\n'
+                '<p>First   para\n   after the title.</p>\n'
+                '<p class="noind">&#160;&#160;&#160;Indented by nbsp.</p>\n'
+                '<p class="scr imp">Screen <i>red</i> <b>bold</b> text<br/></p>\n'
+                '<p></p>\n<p class="keep1">&#160;</p>\n<p class="keep2"><br/></p>\n'
+                '<p class="small">Small print.</p>\n'
+                '<div class="calc">Calc fallback</div>\n'
+                '<p class="pos">Positioned and floated.</p>\n'
+                '<p><span class="dropcap">D</span>rop cap.</p>\n'
+                '<div class="hidden">HIDDEN</div>\n'
+                '<pre>  keep   this\n   spacing</pre>\n'
+                '<p>Line one<br/>\n   &#160;&#160;verse indent</p>\n'
+                '<p><a href="chapter02.xhtml#target">to the target</a> and <a href="#t1">back</a></p>'),
+        ('Two', '<p>Some text.</p>\n<p id="target">Target paragraph.</p>\n<p>After.</p>'),
+    ], css_rules=[
+        ('body', 'margin: 0 5%; padding: 0 1em; line-height: 1'),
+        ('p', 'text-indent: 1.5em; margin: 0'),
+        ('h2 + p', 'text-indent: 0'),
+        ('.noind', 'text-indent: 0'),
+        ('@media screen { .scr', 'color: red } }'),
+        ('@media amzn-mobi { .scr', 'color: blue } }'),
+        ('.imp', 'font-weight: bold !important'),
+        ('p.imp', 'font-weight: normal'),
+        ('.small', 'font-size: 12px'),
+        ('.calc', 'width: 50%; width: calc(100% - 2em)'),
+        ('.pos', 'position: relative; top: 2px; float: left'),
+        ('span.dropcap', 'float: left; font-size: 24pt'),
+        ('.hidden', 'display: none'),
+    ])
+    import base64, json
+    page = browser.new_page()
+    kp_console = []
+    page.on('console', lambda m: kp_console.append(f'{m.type}: {m.text}'))
+    page.goto(base_url)
+    kp = page.evaluate('''async (b64) => {
+        const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+        const e = await parseEpub(buf, {mobi: false, kf8: true});
+        const sheet = e.stylesheets[0];
+        const ch = e.chapters[0].content, head = e.chapters[0].skelHead;
+        // declarations of the generated class(es) of the first element matching a start-tag regex
+        const decls = re => {
+            const m = new RegExp(re).exec(ch);
+            const cls = m && /\sclass="([^"]*)"/.exec(m[0]);
+            if (!cls) return null;
+            return cls[1].split(' ').map(c => (new RegExp('\\.' + c + '\\{([^}]*)\\}').exec(sheet) || [])[1] || '').join(';');
+        };
+        const bodyCls = /<body[^>]*\sclass="([^"]*)"/.exec(head)?.[1];
+        const bodyDecls = bodyCls && (new RegExp('\\.' + bodyCls + '\\{([^}]*)\\}').exec(sheet) || [])[1];
+        // internal link to chapter02#target: its kindle:pos offset lands on the target's start tag
+        const contents = resolveInternalLinks(e.chapters, e.links);
+        const pos = /kindle:pos:fid:(\w{4}):off:(\w{10})/.exec(contents[0]);
+        const bytes = new TextEncoder().encode(contents[parseInt(pos[1], 32)]);
+        const at = new TextDecoder().decode(bytes.slice(parseInt(pos[2], 32), parseInt(pos[2], 32) + 60));
+        // MOBI must not depend on the KF8 pass
+        const m1 = await parseEpub(buf, {mobi: true, kf8: true}), m2 = await parseEpub(buf, {mobi: true, kf8: false});
+        const r = Math.random, d = Date.now;
+        Math.random = () => 0.5; Date.now = () => 0;
+        const b1 = convertToAzw3(m1, 'mobi'), b2 = convertToAzw3(m2, 'mobi');
+        Math.random = r; Date.now = d;
+        // a failing pass falls back to the author sheets for that chapter
+        const orig = window.kpNormalise;
+        window.kpNormalise = () => { throw new Error('test failure'); };
+        let fb;
+        try { fb = await parseEpub(buf, {mobi: false, kf8: true}); } finally { window.kpNormalise = orig; }
+        const enc = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s); };
+        return {sheet, ch, head, flows: e.stylesheets.length, bodyDecls,
+            afterH2: decls('<p[^>]*aid="2"[^>]*>'), noind: decls('<p[^>]*>(?=Indented)'),
+            scr: decls('<p[^>]*>(?=Screen)'), small: decls('<p[^>]*>(?=Small)'),
+            calc: decls('<div[^>]*>(?=Calc)'), pos: decls('<p[^>]*>(?=Positioned)'),
+            dropcap: decls('<span[^>]*>(?=D<)'), hidden: decls('<div[^>]*>(?=HIDDEN)'),
+            linkTarget: at, mobiSame: b1.length === b2.length && b1.every((x, i) => x === b2[i]),
+            fbFlows: fb.stylesheets, fbHead: fb.chapters[0].skelHead, fbContent: fb.chapters[0].content,
+            azw3: enc(convertToAzw3(e))};
+    }''', base64.b64encode(kp_epub).decode())
+    page.close()
+    has = lambda d, pat: d is not None and re.search(pat, d) is not None
+    test('Profile: one generated stylesheet flow (no author sheet flow)',
+         lambda: kp['flows'] == 1 and '.noind' not in kp['sheet'] and re.search(r'^\.kp1\{', kp['sheet'], re.M) is not None)
+    test('Profile: skeleton links the generated sheet (kindle:flow:0001)',
+         lambda: re.search(r'<link[^>]*href="kindle:flow:0001\?mime=text/css"', kp['head']) is not None)
+    test('Profile: pinned element defaults lead the sheet (p, h2, ul/ol, pre, sectioning)',
+         lambda: kp['sheet'].startswith('p{display:block;margin:1em 0;text-indent:0}')
+                 and 'blockquote{display:block;margin:1em 40px}' in kp['sheet'] and 'h2{display:block;font-size:1.5em' in kp['sheet']
+                 and 'ul,ol{display:block;margin:1em 0;padding-left:40px}' in kp['sheet']
+                 and 'white-space:pre-wrap' in kp['sheet'] and 'section,article,aside,nav' in kp['sheet'])
+    test('Profile: sibling selector h2 + p {text-indent:0} baked onto the p',
+         lambda: has(kp['afterH2'], r'(^|;)text-indent:0(;|$)'))
+    test('Profile: @media screen rule baked, @media amzn-mobi not',
+         lambda: has(kp['scr'], r'color:red') and not has(kp['scr'], r'color:blue'))
+    test('Profile: !important wins over a more specific rule (and is not written)',
+         lambda: has(kp['scr'], r'font-weight:bold') and '!important' not in kp['sheet'])
+    test('Profile: &nbsp; indent becomes text-indent (3 × 0.25em), the nbsp run removed',
+         lambda: has(kp['noind'], r'text-indent:0\.75em') and '>Indented by nbsp.' in kp['ch'])
+    test('Profile: empty <p></p> dropped, <p>&nbsp;</p> and <p><br/></p> kept',
+         lambda: '<p aid="5"' not in kp['ch'] and re.search(r'<p[^>]*>(?:</p>)', kp['ch']) is None
+                 and re.search(r'<p[^>]*>\u00a0</p>', kp['ch']) is not None and re.search(r'<p[^>]*><br ?/></p>', kp['ch']) is not None)
+    test('Profile: trailing <br> of a paragraph dropped', lambda: '<b>bold</b> text</p>' in kp['ch'])
+    test('Profile: whitespace runs collapsed, kept in <pre>, nbsp after <br> kept',
+         lambda: '>First para after the title.</p>' in kp['ch'] and '  keep   this\n   spacing</pre>' in kp['ch']
+                 and '<br />\u00a0\u00a0verse indent' in kp['ch'] and '<i>red</i> <b>bold</b>' in kp['ch'])
+    test('Profile: body side margins and padding 0 (top/bottom untouched)',
+         lambda: has(kp['bodyDecls'], r'margin:0') and has(kp['bodyDecls'], r'padding:0') and not has(kp['bodyDecls'], '5%'))
+    test('Profile: line-height 1 raised to 1.2', lambda: has(kp['bodyDecls'], r'line-height:1\.2(;|$)'))
+    test('Profile: px font-size becomes em of the parent (12px → 0.75em, 24pt → 2em)',
+         lambda: has(kp['small'], r'font-size:0\.75em') and has(kp['dropcap'], r'font-size:2em'))
+    test('Profile: calc() ignored, the earlier width wins', lambda: has(kp['calc'], r'width:50%') and 'calc(' not in kp['sheet'])
+    test('Profile: position/top/float dropped on a text block, float kept on the drop cap',
+         lambda: kp['pos'] is not None and not has(kp['pos'], r'position|top:|float') and has(kp['dropcap'], r'float:left'))
+    test('Profile: hidden element has a class with display:none', lambda: has(kp['hidden'], r'display:none'))
+    test('Profile: no author class or style attribute left in the HTML',
+         lambda: re.search(r'class="(?!kp\d)', kp['ch']) is None and ' style="' not in kp['ch'])
+    test('Profile: internal link offset lands on the target element',
+         lambda: kp['linkTarget'].startswith('<p') and 'id="target"' in kp['linkTarget'])
+    test('Profile: MOBI output identical with and without the KF8 pass (opts.kf8)', lambda: kp['mobiSame'])
+    test('Profile: a failing pass falls back to the author sheet for that chapter',
+         lambda: len(kp['fbFlows']) == 2 and '.noind' in kp['fbFlows'][1]
+                 and 'kindle:flow:0002?mime=text/css' in kp['fbHead'] and 'class="noind"' in kp['fbContent'])
+    # Review regressions: hiding idioms, presentational attributes, spacers, stanza gaps, <br clear>
+    kp2_epub = make_epub('Kindle Profile Regressions', [
+        ('One', '<h1><span class="screen-reader-text">Chapter 1</span>Title</h1>\n'
+                '<p><span class="sr-only">Skip</span>Visible</p>\n'
+                '<ol type="a"><li>one</li></ol>\n<hr size="5" color="red" align="left"/>\n'
+                '<table cellpadding="4"><tr><td>cell</td></tr></table>\n'
+                '<p>a</p><div class="sb"></div><p>b</p><p class="pad"></p>\n'
+                '<div class="poem"><p>line</p><p> </p><p>line2</p></div>\n'
+                '<p><img src="x.png" class="fl" alt=""/>text<br class="cl"/></p>\n'
+                '<p>a <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><style>.q{fill:red}</style>'
+                '<text class="q">T</text></svg> b</p>\n<p class="rv">revert</p>\n'
+                '<div id="hd"><div id="al">Authors</div></div>\n'
+                '<div class="poem2"><p>Indented by the ancestor</p></div>\n'
+                '<p><a href="#hd"><b>I.</b><br/> EARLY LETTERS</a></p>\n'
+                '<p>before</p><div class="inl"></div><p>after</p>\n'
+                '<p class="m">m1</p><p class="m"></p><p class="m">m2</p><div class="pb"></div><p>end</p>\n'
+                '<div class="st"><div class="mm"></div><div class="mm">first stanza line</div></div>\n<div class="verse"><span class="vl">line one<br class="hb"/></span><span class="vl">line two<br class="hb"/></span></div>\n'
+                '<div><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9">\n  <g>\n    <rect width="9" height="9"/>\n  </g>\n  <text> spaced  text </text>\n</svg></div>'),
+    ], css_rules=[
+        ('p', 'margin: 0; font-weight: bold'),
+        ('.screen-reader-text', 'clip: rect(1px, 1px, 1px, 1px); position: absolute !important; height: 1px; width: 1px; overflow: hidden'),
+        ('.sr-only', 'position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%)'),
+        ('.sb', 'margin-top: 2em'), ('.pad', 'padding-top: 1em'), ('.poem', 'white-space: pre-wrap'),
+        ('.fl', 'float: left'), ('.cl', 'clear: both'), ('text', 'fill: blue'), ('.rv', 'font-weight: revert'),
+        ('div', 'display: block; margin-left: 2em'), ('#hd #al', 'all: initial; margin-top: 0'),
+        ('.poem2', 'text-indent: -2em; margin-left: 0'),
+        ('.m', 'margin: 0 0 1em'), ('.pb', 'page-break-before: always'),
+        ('.vl', 'display: block'), ('.hb', 'display: none'), ('.inl', 'display: inline'), ('.mm', 'margin: 1em 0'),
+    ])
+    page = browser.new_page()
+    page.goto(base_url)
+    kp2 = page.evaluate('''async (b64) => {
+        const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+        const e = await parseEpub(buf, {mobi: false, kf8: true});
+        const sheet = e.stylesheets[0], ch = e.chapters[0].content;
+        const decls = re => {
+            const m = new RegExp(re).exec(ch);
+            const cls = m && /\sclass="([^"]*)"/.exec(m[0]);
+            if (!cls) return '';
+            return cls[1].split(' ').map(c => (new RegExp('\\.' + c + '\\{([^}]*)\\}').exec(sheet) || [])[1] || '').join(';');
+        };
+        return {sheet, ch, sr: decls('<span[^>]*>(?=Chapter 1)'), sr2: decls('<span[^>]*>(?=Skip)'),
+            hr: decls('<hr[^>]*>'), td: decls('<td[^>]*>(?=cell)'), sb: decls('<div[^>]*>(?=</div><p[^>]*>b<)'),
+            pad: decls('<p[^>]*>(?=</p>)'), rv: decls('<p[^>]*>(?=revert)'), al: decls('<div[^>]*>(?=Authors)'),
+            anc: decls('<p[^>]*>(?=Indented by the ancestor)'), plain: decls('<p[^>]*>(?=<a )')};
+    }''', base64.b64encode(kp2_epub).decode())
+    page.close()
+    test('Profile: clip / clip-path screen-reader text stays hidden (display:none), not revealed',
+         lambda: 'display:none' in kp2['sr'] and 'display:none' in kp2['sr2'] and 'position' not in kp2['sr'])
+    test('Profile: <ol type> not overridden (no pinned list-style-type), attribute kept',
+         lambda: 'list-style-type' not in kp2['sheet'] and re.search(r'<ol [^>]*type="a"', kp2['ch']) is not None)
+    test('Profile: <hr size color align> and <table cellpadding> carried into the class',
+         lambda: all(d in kp2['hr'] for d in ['height:5px', 'color:red', 'background-color:red', 'margin-left:0'])
+                 and 'padding:4px' in kp2['td'])
+    test('Profile: empty spacer div (margin-top) and p (padding-top) kept',
+         lambda: 'margin-top:2em' in kp2['sb'] and 'padding-top:1em' in kp2['pad'])
+    test('Profile: whitespace-only <p> in a white-space:pre-wrap block (stanza gap) kept',
+         lambda: re.search(r'>line</p><p[^>]*> </p><p[^>]*>line2<', kp2['ch']) is not None)
+    test('Profile: trailing <br> with clear kept', lambda: re.search(r'text<br[^>]*class="kp\d+"[^>]*/></p>', kp2['ch']) is not None)
+    test('Profile: nothing baked inside an <svg> with its own <style>',
+         lambda: '<text class="q">T</text>' in kp2['ch'])
+    test('Profile: revert overrides the author rule but writes nothing (the pinned/UA value applies)',
+         lambda: 'font-weight' not in kp2['rv'] and 'margin:0' in kp2['rv'])
+
+    test('Profile: an empty div displayed inline (e.g. all:initial) is dropped',
+         lambda: re.search(r'>before</p><p[^>]*>after</p>', kp2['ch']) is not None)
+    test('Profile: a winning `all: initial` resets weaker rules (no margin-left/display:block), written first',
+         lambda: kp2['al'].startswith('all:initial;') and 'display:inline' in kp2['al'] and 'margin-left' not in kp2['al']
+                 and 'margin-top:0' in kp2['al'])
+    test('Profile: p under an indented ancestor gets text-indent:inherit (pinned p text-indent:0 elsewhere)',
+         lambda: 'text-indent:inherit' in kp2['anc'] and 'text-indent' not in kp2['plain'])
+    test('Profile: empty p whose margins collapse into its neighbours dropped; page-break div kept',
+         lambda: re.search(r'>m1</p><p[^>]*>m2</p><div[^>]*></div><p[^>]*>end</p>', kp2['ch']) is not None)
+    test('Profile: empty first child whose margin collapses into the next sibling\'s dropped',
+         lambda: re.search(r'<div[^>]*><div[^>]*>first stanza line</div></div>', kp2['ch']) is not None)
+    test('Profile: hidden <br> (display:none, Gutenberg verse br.hidebr) dropped',
+         lambda: re.search(r'line one</span><span[^>]*>line two</span>', kp2['ch']) is not None)
+    test('Profile: whitespace between SVG elements emptied, kept inside <text>',
+         lambda: re.search(r'<svg[^>]*><g[^>]*><rect[^>]*/></g><text[^>]*> spaced  text </text></svg>', kp2['ch']) is not None)
+    test('Profile: skeleton <body> tag ends skelHead; chunk inserted right after it (no newline before </body>)',
+         lambda: kp['head'].endswith('aid="0">') and (lambda chs: bool(chs) and all(
+             re.search(r'<body[^>]*aid="0"><', c['html']) and not re.search(r'\s</body>', c['html'])
+             for c in chs))(extract_azw3_chapters(base64.b64decode(kp['azw3']))))
+    test('Profile: the fallback (author-mode) chapter keeps the author skeleton (newline before </body>)',
+         lambda: kp['fbHead'].endswith('aid="0">\n'))
+    test('Profile: words around a <br> stay separated in the text (link text "I. EARLY LETTERS")',
+         lambda: re.search(r'<b>I\. </b><br ?/>EARLY LETTERS</a>', kp2['ch']) is not None)
+
+    kp_tmp = '/tmp/browser_kindle_profile.azw3'
+    Path(kp_tmp).write_bytes(base64.b64decode(kp['azw3']))
+    test('Profile: Calibre converts the book (all text present)',
+         lambda: subprocess.run(['ebook-convert', kp_tmp, '/tmp/browser_kindle_profile.txt'],
+                                capture_output=True, timeout=60).returncode == 0
+                 and all(t in Path('/tmp/browser_kindle_profile.txt').read_text() for t in
+                         ['Indented by nbsp.', 'Target paragraph.', 'verse indent']))
+    test('Profile: no console warnings (besides the forced fallback above)',
+         lambda: not [l for l in kp_console if l.startswith(('warning', 'error')) and 'test failure' not in l])
 
     # ── T8: Offline / PWA ─────────────────────────────────────────────────
     print('\n── T8: Offline / service worker ───────────────────────────────')

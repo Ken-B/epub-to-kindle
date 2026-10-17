@@ -133,12 +133,18 @@
  *     filepos links, recindex images (buildRecord0, convertToAzw3)
  *   - src/calibre/ebooks/mobi/mobiml.py (MobiMLizer): CSS flattened into MOBI 6 markup
  *     (mobiComputed, mobiMarkup, mobiMeasure)
+ *   - src/calibre/ebooks/oeb/transforms/flatcss.py (CSSFlattener): the idea of the KF8 Kindle
+ *     profile, the cascade baked into one generated class per element (kpNormalise; written
+ *     anew, not a line-by-line port)
+ * The Kindle profile's element defaults (KP_DEFAULTS) are taken from calibre's
+ * resources/templates/html.css, itself Mozilla's html.css (© Netscape Communications
+ * Corporation and contributors; MPL 1.1 / GPL 2.0 / LGPL 2.1, used here under the GPL).
  * kf8-rs (https://github.com/codetheweb/kf8-rs, © its authors; no licence declared in
  * the repository) was used as a format reference for the KF8 serialisation.
  */
 'use strict';
 
-const APP_VERSION = 'v1.0.13';
+const APP_VERSION = 'v1.0.14';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -493,7 +499,8 @@ function buildSkeletonIndex(parts) {
 const CHUNK_TAGS = [{num:2,vpe:1,mask:1},{num:3,vpe:1,mask:2},{num:4,vpe:1,mask:4},{num:6,vpe:2,mask:8}];
 
 /**
- * parts: [{skelHeadByteLen, skelTailByteLen, contentByteLen, flowStart, chapterIndex, firstAid}]
+ * parts: [{skelHeadByteLen, skelTailByteLen, contentByteLen, flowStart, chapterIndex, firstAid,
+ *          skelInsert (byte offset in the skeleton where the chunk goes; default skelHeadByteLen - 1)}]
  */
 function buildChunkIndex(parts) {
   // CNCX selector strings, one per chunk, format per Calibre: "P-//*[@aid='N']".
@@ -505,7 +512,7 @@ function buildChunkIndex(parts) {
   const entries = parts.map((p, i) => {
     // insertPos must be GLOBAL (absolute byte offset in full text) so each
     // chapter gets a unique key. Calibre converts to local via: insertpos - skelpos.
-    const globalInsertPos = p.flowStart + p.skelHeadByteLen - 1;
+    const globalInsertPos = p.flowStart + (p.skelInsert ?? p.skelHeadByteLen - 1);
     const contentStart = p.flowStart + p.skelHeadByteLen + p.skelTailByteLen;
     return {
       key: String(globalInsertPos).padStart(10, '0'),
@@ -823,6 +830,8 @@ function utf8Len(s, from = 0, to = s.length) {
 // ─── Stylesheets → KF8 flows ─────────────────────────────────────────────────
 //
 // Reference: Calibre writer8/main.py extract_css_into_flows + replace_resource_links.
+// Author mode (parseEpub opts.css 'author', or a chapter whose Kindle profile pass failed;
+// by default flow 1 is the profile's generated sheet instead, see kpNormalise).
 // Every distinct stylesheet (a linked .css file or an inline <style>) becomes its
 // own FDST flow after the HTML (flow 1, 2, …), referenced from the skeleton <head>
 // as <link href="kindle:flow:NNNN?mime=text/css"/>. Sheets are kept verbatim: the
@@ -847,7 +856,7 @@ const CSS_IMPORT_RE = new RegExp(String.raw`@import\s+(?:${CSS_URL}|"([^"]*)"|'(
  * @param {Map<string,string>} cssFiles - normalised zip path → stylesheet text
  * @param {Map<string,{idx:number,mt:string}>} imageByPath - normalised zip path → image resource
  * @returns {{flows: string[], sheet(path): number|null, inline(css, baseDir): number|null,
- *            svg(path, bytes): number|null}}
+ *            svg(path, bytes): number|null, reserve(): number}}
  *          flows[k] is KF8 flow k+1 (stylesheets and SVG images); sheet()/inline()/svg()
  *          return the flow number to link
  */
@@ -910,7 +919,11 @@ function makeCssFlows(cssFiles, imageByPath) {
     return n;
   }
 
-  return { flows, sheet, inline: add, svg };
+  // A flow whose text is set later (the Kindle profile's generated sheet, filled in once
+  // every chapter is parsed)
+  const reserve = () => { flows.push(''); return flows.length; };
+
+  return { flows, sheet, inline: add, svg, reserve };
 }
 
 /** Stand-in for makeCssFlows when only MOBI v6 is written (it has no flows): no sheet is
@@ -1012,10 +1025,13 @@ function uuid4() {
 
 /** opts.mobi (default true): also prepare the MOBI v6 markup (chapter.mobiContent).
  *  opts.kf8 (default true): also prepare the KF8 stylesheet/SVG flows (stylesheets);
- *  without it the result is only good for convertToAzw3(…, 'mobi'). */
+ *  without it the result is only good for convertToAzw3(…, 'mobi').
+ *  opts.css (KF8): 'profile' (default; the Kindle profile, kpNormalise: one generated
+ *  stylesheet) or 'author' (the author sheets verbatim as flows). */
 async function parseEpub(buf, opts = {}) {
   const mobi = opts.mobi !== false;
   const kf8 = opts.kf8 !== false;
+  const profile = kf8 && opts.css !== 'author';
   _aid = 1;  // aids are assigned while parsing (extractContent), per book from 1
   const zip = await JSZip.loadAsync(buf, {decodeFileName: decodeZipName});
 
@@ -1210,6 +1226,12 @@ async function parseEpub(buf, opts = {}) {
   const cssFlows = kf8 ? makeCssFlows(cssFiles, imageByPath) : NO_CSS_FLOWS;
   const links = new Map();
   const mobiRules = new Map();  // MOBI cascade: parsed rules per stylesheet (mobiCssRules)
+  // Kindle profile: the generated sheet is flow 1 (filled in below), the parsed rules per
+  // stylesheet (a cache, as mobiRules), the classes made so far (book-wide), @font-face
+  // rules kept, and the number of selectors querySelectorAll rejected
+  const kp = profile ? {flow: cssFlows.reserve(), rules: new Map(), classes: new Map(), sheet: [],
+    fontFaces: new Set(), rejected: 0, profile: {media: kf8MediaOk, pseudo: true, fontFace: true,
+      decls: (body, base) => kpDecls(body, base, imageByPath)}} : null;
 
   const chapters = [];
   for (const item of spineItems) {
@@ -1237,7 +1259,7 @@ async function parseEpub(buf, opts = {}) {
         ? new DOMParser().parseFromString(xhtml, 'text/html')
         : doc;
       const ch = extractContent(parsed, imageIndex, chapterDir,
-        {path, cssFlows, links, spinePaths, imageResources, imageByPath, cssFiles, mobi, mobiRules});
+        {path, cssFlows, links, spinePaths, imageResources, imageByPath, cssFiles, mobi, mobiRules, kp});
       if (kind === 'svg') ch.svgPage = true;
       // TOC entries name the spine item itself; when it was replaced by its
       // fallback (or became an image/SVG page) they still map here (resolveToc)
@@ -1267,6 +1289,11 @@ async function parseEpub(buf, opts = {}) {
   // MOBI v6 <style>: the MOBI markup already dropped every hidden element the cascade could
   // match; what is left are hiding rules whose selector querySelectorAll rejects
   const css = mobi ? [...new Set(chapters.flatMap(ch => ch.mobiHidden || []))].map(r => r + '\n').join('') : '';
+  if (kp) {
+    cssFlows.flows[kp.flow - 1] = KP_DEFAULTS + [...kp.fontFaces].map(r => r + '\n').join('') +
+      kp.sheet.map(r => r + '\n').join('');
+    if (kp.rejected) console.debug(`Kindle profile: ${kp.rejected} selector match(es) rejected by querySelectorAll, dropped`);
+  }
   return {metadata, chapters, css, stylesheets: cssFlows.flows, links, imageResources, toc};
 }
 
@@ -1369,6 +1396,7 @@ const BLOCKS = new Set(['p','div','h1','h2','h3','h4','h5','h6','section',
 // Body/html attributes carried over to the skeleton (author CSS selects on them,
 // e.g. body.calibre, and an id on <body> can be a link target).
 const SKEL_ATTRS = new Set(['class', 'id', 'style', 'lang', 'xml:lang', 'dir', 'epub:type']);
+const KP_SKEL_ATTRS = new Set(['id', 'lang', 'xml:lang', 'dir', 'epub:type']);  // + the generated class
 function skelAttrs(el, names = SKEL_ATTRS) {
   let out = '';
   if (el) for (const a of el.attributes)
@@ -1378,9 +1406,11 @@ function skelAttrs(el, names = SKEL_ATTRS) {
 
 /**
  * One chapter: KF8 skeleton and content (aids, kindle:embed / kindle:flow resources,
- * link placeholders) and, with ctx.mobi, the MOBI v6 markup (mobiMarkup). The MOBI part
- * is optional: when it fails, the chapter keeps only the KF8 content (convertToAzw3 then
- * uses that for MOBI too), it is never dropped.
+ * link placeholders; with ctx.kp the Kindle profile, kpNormalise) and, with ctx.mobi, the
+ * MOBI v6 markup (mobiMarkup). The profile and MOBI parts are optional: when the profile
+ * fails, the chapter links the author sheets as flows; when the MOBI part fails, the
+ * chapter keeps only the KF8 content (convertToAzw3 then uses that for MOBI too). A
+ * chapter is never dropped for either.
  * @param {Document} doc - parsed chapter DOM (changed)
  * @param {Object} imageIndex - prototype-less map of image href/filename → index in imageResources
  * @param {string} chapterDir - chapter's directory prefix for resolving relative img src
@@ -1392,8 +1422,9 @@ function skelAttrs(el, names = SKEL_ATTRS) {
  *                        imageByPath: Map normalised path → {idx, mt},
  *                        cssFiles: Map normalised path → stylesheet text,
  *                        mobi: prepare the MOBI markup,
- *                        mobiRules: Map sheet key → mobiCssRules() (cache, shared)}
- * @returns {{skelHead, skelTail, content, firstAid, title, path, ids: Map<id, aid>,
+ *                        mobiRules: Map sheet key → mobiCssRules() (cache, shared),
+ *                        kp: the Kindle profile context (parseEpub), or null: author CSS}
+ * @returns {{skelHead, skelTail, skelInsert, content, firstAid, title, path, ids: Map<id, aid>,
  *            mobiContent?: string, mobiHidden?: string[]}}
  */
 function extractContent(doc, imageIndex, chapterDir, ctx) {
@@ -1417,13 +1448,22 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
 
   // Stylesheets, in document order: <link rel=stylesheet> and every XHTML <style> (head or
   // body; SVG <style>s stay in their SVG).
-  // KF8: each becomes a flow (makeCssFlows) linked from the skeleton <head>; a body
-  // <style>'s link follows the head ones, as in the cascade, and no CSS text stays in the
-  // chunk. MOBI v6: the sheets whose media apply are matched against the untouched DOM
-  // (mobiCascade; the elements are removed only after that), and the markup is rewritten
-  // at the end, after the KF8 content has been serialised (mobiMarkup).
+  // KF8 author mode: each becomes a flow (makeCssFlows) linked from the skeleton <head>; a
+  // body <style>'s link follows the head ones, as in the cascade, and no CSS text stays in
+  // the chunk. KF8 Kindle profile (ctx.kp): the sheets whose media apply are matched
+  // against the untouched DOM and baked into generated classes (kpNormalise, on a clone
+  // of the body, after the aids and links are set); only when that fails do the author
+  // sheets become flows. MOBI v6: the sheets whose media apply are matched against the
+  // untouched DOM (mobiCascade; the elements are removed only after that), and the markup
+  // is rewritten at the end, after the KF8 content has been serialised (mobiMarkup).
+  const kp = ctx.kp || null;
   let cssLinks = '';
-  const sheetEls = [], mobiSheets = [];
+  const sheetEls = [], mobiSheets = [], kpSheets = [], authorSheets = [];
+  const authorLink = ({path, text, media}) => {
+    const n = path != null ? ctx.cssFlows.sheet(path) : ctx.cssFlows.inline(text, dir);
+    return n ? `<link rel="stylesheet" type="text/css" href="${kindleFlowCss(n)}"` +
+      (media ? ` media="${escAttr(media)}"` : '') + '/>\n' : '';
+  };
   for (const el of doc.querySelectorAll('link, style')) {
     if (el.namespaceURI && el.namespaceURI !== XHTML_NS) continue;  // SVG <style>
     const media = el.getAttribute('media');
@@ -1438,12 +1478,15 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
       text = el.textContent.replace(CSS_WRAPPER_RE, '');
     }
     sheetEls.push(el);
-    const n = path != null ? ctx.cssFlows.sheet(path) : ctx.cssFlows.inline(text, dir);
-    if (n) cssLinks += `<link rel="stylesheet" type="text/css" href="${kindleFlowCss(n)}"` +
-      (media ? ` media="${escAttr(media)}"` : '') + '/>\n';
+    if (kp) authorSheets.push({path, text, media});
+    else cssLinks += authorLink({path, text, media});
     if (ctx.mobi && (media == null || mobiMediaOk(media))) {
       if (path == null) mobiSheets.push({key: dir + '\0' + text, text, base: dir});
       else if (ctx.cssFiles?.has(path)) mobiSheets.push({key: path, text: ctx.cssFiles.get(path), base: dirOf(path)});
+    }
+    if (kp && (media == null || kf8MediaOk(media))) {
+      if (path == null) kpSheets.push({key: dir + '\0' + text, text, base: dir});
+      else if (ctx.cssFiles?.has(path)) kpSheets.push({key: path, text: ctx.cssFiles.get(path), base: dirOf(path)});
     }
   }
   let mobiCss = null;
@@ -1456,20 +1499,19 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
       }));
     } catch(e) { console.warn('MOBI styles skipped:', ctx.path, e); }
   }
+  let kpCss = null;
+  if (kp) {
+    try {
+      const sheets = kpSheets.map(({key, text, base}) => {
+        if (!kp.rules.has(key)) kp.rules.set(key, mobiCssRules(text, base, ctx.cssFiles, new Set([key]), 0, kp.profile));
+        return kp.rules.get(key);
+      });
+      for (const rules of sheets) for (const r of rules) if (r.fontFace) kp.fontFaces.add(r.fontFace);
+      kpCss = mobiCascade(doc, sheets, st => kpDecls(st, dir, ctx.imageByPath));
+      kp.rejected += kpCss.rejected;
+    } catch(e) { console.warn('Kindle profile skipped:', ctx.path, e); }
+  }
   for (const el of sheetEls) el.remove();
-
-  // html/body attributes the author CSS may select on (epub:type needs its namespace)
-  const htmlAttrs = skelAttrs(doc.documentElement, new Set(['class', 'lang', 'xml:lang', 'dir']));
-  const bodyAttrs = skelAttrs(body);
-  const epubNs = bodyAttrs.includes(' epub:type=') ? ' xmlns:epub="http://www.idpf.org/2007/ops"' : '';
-
-  // No <?xml?> declaration: browsers render it as visible text in HTML mode,
-  // and Kindle doesn't need it.
-  const skelHead =
-    `<html xmlns="http://www.w3.org/1999/xhtml"${epubNs}${htmlAttrs}>\n` +
-    `<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n` +
-    headContent + cssLinks + `</head>\n<body${bodyAttrs} aid="0">\n`;
-  const skelTail = `</body>\n</html>\n`;
 
   const firstAid = _aid; // capture before adding aids to this chapter
   const ids = new Map(); // id (or <a name>) → aid: internal link targets
@@ -1545,6 +1587,7 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
         if (o.hasAttribute(a)) img.setAttribute(a, o.getAttribute(a));
       img.setAttribute('src', ref);
       img.setAttribute('alt', o.textContent.replace(/\s+/g, ' ').trim());
+      if (kpCss?.decl.has(o)) kpCss.decl.set(img, kpCss.decl.get(o));
       o.replaceWith(img);
     }
     // SVG <image xlink:href> (or SVG 2 plain href), e.g. the svg-wrapped covers of
@@ -1599,14 +1642,45 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
     }
   }
 
-  const content = body ? body.innerHTML : '';
+  // KF8 Kindle profile (on a clone: the DOM stays as it is for MOBI); on failure the
+  // chapter is written as in author mode
+  let kpOut = null;
+  if (kpCss) {
+    try { kpOut = kpNormalise(doc, body, kpCss, firstAid, kp); }
+    catch(e) { console.warn('Kindle profile skipped:', ctx.path, e); }
+  }
+  if (kp) cssLinks = kpOut ? `<link rel="stylesheet" type="text/css" href="${kindleFlowCss(kp.flow)}"/>\n`
+                           : authorSheets.map(authorLink).join('');
+  const content = kpOut ? kpOut.content : body ? body.innerHTML : '';
+
+  // html/body attributes the author CSS may select on (epub:type needs its namespace); in
+  // the profile their generated class instead of class/style
+  const clsAttr = c => c ? ` class="${escAttr(c)}"` : '';
+  const htmlAttrs = kpOut ? skelAttrs(doc.documentElement, new Set(['lang', 'xml:lang', 'dir'])) + clsAttr(kpOut.htmlClass)
+                          : skelAttrs(doc.documentElement, new Set(['class', 'lang', 'xml:lang', 'dir']));
+  const bodyAttrs = kpOut ? skelAttrs(body, KP_SKEL_ATTRS) + clsAttr(kpOut.bodyClass) : skelAttrs(body);
+  const epubNs = bodyAttrs.includes(' epub:type=') ? ' xmlns:epub="http://www.idpf.org/2007/ops"' : '';
+
+  // No <?xml?> declaration: browsers render it as visible text in HTML mode,
+  // and Kindle doesn't need it.
+  // The chunk (content) is inserted at skelInsert bytes into the skeleton (chunk index):
+  // author mode, before skelHead's final "\n" (so that newline ends up before </body>);
+  // the Kindle profile ends skelHead with the <body> tag and inserts right after it, so the
+  // body holds no whitespace of the skeleton's own.
+  const skelHead =
+    `<html xmlns="http://www.w3.org/1999/xhtml"${epubNs}${htmlAttrs}>\n` +
+    `<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n` +
+    headContent + cssLinks + `</head>\n<body${bodyAttrs} aid="0">` + (kpOut ? '' : '\n');
+  const skelTail = `</body>\n</html>\n`;
+  const skelInsert = utf8Len(skelHead) - (kpOut ? 0 : 1);
+
   // MOBI v6 serialisation (changes the DOM, so strictly after the KF8 one)
   let mobiContent;
   if (mobiCss && body) {
     try { mobiContent = mobiMarkup(doc, body, mobiCss.decl); }
     catch(e) { console.warn('MOBI markup skipped:', ctx.path, e); }
   }
-  return {skelHead, skelTail, content, firstAid, title: chapterTitle, path: ctx.path, ids,
+  return {skelHead, skelTail, skelInsert, content, firstAid, title: chapterTitle, path: ctx.path, ids,
           mobiContent, mobiHidden: mobiCss?.hidden};
 }
 
@@ -1797,7 +1871,11 @@ function cssColor(v) {
 /** Does a media query list apply to a MOBI 6 reader (a 600 × 800 screen, light)?
  *  "not …" negates a query that is understood ("not amzn-kf8", "not print"); a query
  *  with an unknown media feature never applies, negated or not. */
-function mobiMediaOk(q) {
+function mobiMediaOk(q) { return cssMediaOk(q, MOBI_MEDIA_TYPES); }
+/** The same for a KF8 reader (Kindle profile): media types all, screen and amzn-kf8. */
+function kf8MediaOk(q) { return cssMediaOk(q, KF8_MEDIA_TYPES); }
+const MOBI_MEDIA_TYPES = /^(all|screen|amzn-mobi)$/, KF8_MEDIA_TYPES = /^(all|screen|amzn-kf8)$/;
+function cssMediaOk(q, types) {
   q = (q || '').trim().toLowerCase();
   if (!q) return true;
   return cssSplit(q, ',').some(mq => {
@@ -1805,7 +1883,7 @@ function mobiMediaOk(q) {
     const not = /^not\s+/.test(mq);
     let known = true;
     const ok = mq.replace(/^not\s+/, '').split(/\s+and\s+/).every((p, k) => {
-      if (k === 0 && /^[a-z][a-z0-9-]*$/.test(p)) return /^(all|screen|amzn-mobi)$/.test(p);  // media type
+      if (k === 0 && /^[a-z][a-z0-9-]*$/.test(p)) return types.test(p);  // media type
       const f = /^\(\s*([\w-]+)\s*(?::([^)]*))?\)$/.exec(p);
       if (!f) { known = false; return false; }
       const v = (f[2] || '').trim(), px = cssPx(v, 16, null);
@@ -1831,9 +1909,19 @@ function mobiSupportsOk(cond) {
 // blocks are ignored, which also bounds the recursion of mobiCssRules
 const CSS_MAX_DEPTH = 64;
 
-/** Rules of one stylesheet for the MOBI cascade, in source order: [{sels: [{q, raw, spec}],
- *  decls, hide}]; @import (through cssFiles), @media/@supports/@layer blocks inlined when they apply. */
-function mobiCssRules(css, baseDir, cssFiles, seen = new Set(), depth = 0) {
+/** What a cascade keeps of the sheets: media(q) (applies?), decls(body, baseDir) (the
+ *  declarations, shorthands expanded), pseudo (keep ::before/::after/::first-letter/
+ *  ::first-line/::marker rules, matched on their base selector), fontFace (keep
+ *  @font-face rules without a non-data url()). MOBI 6 (mobiMarkup) and the KF8 Kindle
+ *  profile (kpNormalise) each have one. */
+const MOBI_CSS_PROFILE = Object.freeze({media: q => mobiMediaOk(q), decls: body => mobiDecls(body),
+                                        pseudo: false, fontFace: false});
+const PSEUDO_ELEMENT_RE = /(::?)(before|after|first-line|first-letter|marker)$/i;
+
+/** Rules of one stylesheet for a cascade, in source order: [{sels: [{q, raw, spec, pseudo}],
+ *  decls, hide}] (and {sels: [], decls: [], fontFace} with prof.fontFace); @import (through
+ *  cssFiles), @media/@supports/@layer blocks inlined when they apply. */
+function mobiCssRules(css, baseDir, cssFiles, seen = new Set(), depth = 0, prof = MOBI_CSS_PROFILE) {
   const out = [];
   const add = (text, level) => {
     if (level >= CSS_MAX_DEPTH) return;
@@ -1843,25 +1931,35 @@ function mobiCssRules(css, baseDir, cssFiles, seen = new Set(), depth = 0) {
         if (!m) continue;
         const name = m[1].toLowerCase(), rest = m[2].trim();
         if (body != null) {
-          if (name === 'media' ? mobiMediaOk(rest) : name === 'supports' ? mobiSupportsOk(rest) : name === 'layer') add(body, level + 1);
+          if (name === 'font-face') {
+            if (prof.fontFace && !/url\(\s*(?!['"]?data:)/i.test(body))
+              out.push({sels: [], decls: [], fontFace: `@font-face{${body.trim()}}`});
+          } else if (name === 'media' ? prof.media(rest) : name === 'supports' ? mobiSupportsOk(rest) : name === 'layer') add(body, level + 1);
         } else if (name === 'import') {
           const im = /^(?:url\(\s*)?["']?([^"')\s]+)["']?\s*\)?\s*(.*)$/.exec(rest);
-          if (!im || !mobiMediaOk(im[2])) continue;
+          if (!im || !prof.media(im[2])) continue;
           const path = joinPath(baseDir, im[1].split(/[?#]/)[0]);
           if (seen.has(path) || !cssFiles?.has(path)) continue;
           seen.add(path);
-          for (const r of mobiCssRules(cssFiles.get(path), dirOf(path), cssFiles, seen, level + 1)) out.push(r);
+          for (const r of mobiCssRules(cssFiles.get(path), dirOf(path), cssFiles, seen, level + 1, prof)) out.push(r);
         }
         continue;
       }
       if (body == null) continue;
-      const decls = mobiDecls(body);
+      const decls = prof.decls(body, baseDir);
       if (!decls.length) continue;
       const sels = [];
       for (let s of cssSplit(prelude, ',')) {
         s = s.trim();
+        const raw = s;
+        let pseudo = null, pm;
+        if (prof.pseudo && (pm = PSEUDO_ELEMENT_RE.exec(s)) && !(pm[1] === ':' && /^marker$/i.test(pm[2]))) {
+          pseudo = pm[2].toLowerCase();
+          s = s.slice(0, pm.index).trim();
+          if (!s || /[>+~]$/.test(s)) s += '*';
+        }
         if (!s || /::|:(?:before|after|first-line|first-letter|marker|selection)\b/i.test(s)) continue;
-        sels.push({q: s.replace(/\[\s*[\w-]*\|(?!=)/g, '[*|'), raw: s, spec: mobiSpecificity(s)});
+        sels.push({q: s.replace(/\[\s*[\w-]*\|(?!=)/g, '[*|'), raw, spec: mobiSpecificity(s) + (pseudo ? 1 : 0), pseudo});
       }
       if (sels.length) out.push({sels, decls, hide: decls.some(([p, v]) =>
         p === 'display' && /^none$/i.test(v) || p === 'visibility' && /^(hidden|collapse)$/i.test(v))});
@@ -1929,13 +2027,16 @@ function mobiSelectorValid(q) {
   catch(e) { return false; }
 }
 
-/** Winning declarations per element: {decl: Map<Element, Map<prop, [value, important, spec]>>,
- *  hidden: ["selector{display:none}"] for hiding rules whose selector querySelectorAll rejects}.
+/** Winning declarations per element: {decl: Map<Element, Map<prop, [value, important, spec, seq]>>,
+ *  hidden: ["selector{display:none}"] for hiding rules whose selector querySelectorAll rejects,
+ *  pseudo: Map<Element, Map<pseudo-element, Map<prop, […]>>> (rules with sel.pseudo),
+ *  rejected: number of selectors querySelectorAll rejected}. styleDecls parses style="".
  *  A selector whose rightmost compound names a tag, class or id the chapter does not have
  *  (mobiSelectorNeeds) cannot match and is not run (chapters × selectors querySelectorAll
  *  calls otherwise); the facts about a selector are cached on the shared rule object. */
-function mobiCascade(doc, sheets) {
-  const decl = new Map(), hidden = [];
+function mobiCascade(doc, sheets, styleDecls = mobiDecls) {
+  const decl = new Map(), pseudo = new Map(), hidden = [];
+  let rejected = 0;
   // tag names, class names and ids present in the chapter (lower-cased)
   const tags = new Set(), classes = new Set(), ids = new Set();
   if (sheets.length) {
@@ -1954,12 +2055,14 @@ function mobiCascade(doc, sheets) {
     if (s.valid === undefined) s.valid = mobiSelectorValid(s.q);
     return s.valid;  // an invalid selector still goes to querySelectorAll (→ hidden)
   };
-  const put = (el, list, spec) => {
-    let m = decl.get(el);
-    if (!m) decl.set(el, m = new Map());
+  let seq = 0;  // order of application (ties of importance and specificity: the later wins)
+  const put = (store, key, list, spec) => {
+    let m = store.get(key);
+    if (!m) store.set(key, m = new Map());
     for (const [p, v, imp] of list) {
       const cur = m.get(p);
-      if (!cur || imp > cur[1] || (imp === cur[1] && spec >= cur[2])) m.set(p, [v, imp, spec]);
+      if (!cur || imp > cur[1] || (imp === cur[1] && spec >= cur[2])) m.set(p, [v, imp, spec, seq]);
+      seq++;
     }
   };
   for (const rules of sheets) for (const r of rules) for (const s of r.sels) {
@@ -1967,14 +2070,21 @@ function mobiCascade(doc, sheets) {
     let els;
     try { els = doc.querySelectorAll(s.q); }
     catch(e) {
+      rejected++;
       if (r.hide) hidden.push(`${s.raw}{${r.decls.filter(([p]) => p === 'display' || p === 'visibility')
         .map(([p, v]) => `${p}:${v}`).join(';')}}`);
       continue;
     }
-    for (const el of els) put(el, r.decls, s.spec);
+    if (s.pseudo) {
+      for (const el of els) {
+        let pm = pseudo.get(el);
+        if (!pm) pseudo.set(el, pm = new Map());
+        put(pm, s.pseudo, r.decls, s.spec);
+      }
+    } else for (const el of els) put(decl, el, r.decls, s.spec);
   }
-  for (const el of doc.querySelectorAll('[style]')) put(el, mobiDecls(el.getAttribute('style')), 1e9);
-  return {decl, hidden};
+  for (const el of doc.querySelectorAll('[style]')) put(decl, el, styleDecls(el.getAttribute('style')), 1e9);
+  return {decl, hidden, pseudo, rejected};
 }
 
 /** Computed MOBI-relevant style of an element from its declarations d and its parent's p. */
@@ -2193,6 +2303,677 @@ function mobiMarkup(doc, body, decl) {
     if (w.isConnected && !w.firstElementChild && !/\S/.test(w.textContent)) w.replaceWith(...w.childNodes);
   }
   return body.innerHTML.replaceAll(`<!--${MOBI_PAGEBREAK}-->`, '<mbp:pagebreak/>');
+}
+
+// ─── Kindle profile (KF8 CSS normalisation) ──────────────────────────────────
+//
+// Kindles render KF8 with a browser engine, but one that ignores much of the cascade
+// (sibling, attribute and :not() selectors, @media/@supports/@namespace), has its own UA
+// defaults, adds the author's body side margins to its own and keeps pretty-print
+// whitespace, &nbsp; runs and trailing <br>s / empty paragraphs as visible gaps. So for
+// KF8 (parseEpub opts.css 'profile', the default) the author sheets are not written as
+// flows; as Calibre's flatcss (CSSFlattener) does, the cascade is baked per element into
+// one generated class, and the markup is tidied, on a clone of the chapter body (the MOBI
+// v6 markup is made from the original DOM, so it does not change):
+//   1. cascade: the chapter's sheets as for MOBI (mobiCssRules/mobiCascade) with the KF8
+//      profile (media all/screen/amzn-kf8, the same 600 × 800 light screen; @supports by
+//      CSS.supports; @layer inlined; @import followed; @page/@namespace ignored; @font-face
+//      without a non-data url() kept) and every property (kpDecls: shorthands expanded to
+//      longhands; values with calc()/var()/env()/min()/max()/clamp() or viewport units, and
+//      values CSS.supports rejects for a property it knows, are ignored before the cascade,
+//      so an earlier fallback wins). !important decides the cascade and is not written.
+//      Each element's winning declarations become a class kpN (identical sets share one,
+//      book-wide) that replaces its class attribute; style="" goes. ::before/::after (with
+//      content), ::first-letter, ::first-line and ::marker rules give the element a second
+//      class, .kpN:first-letter{…}. Inherited properties are not copied to descendants.
+//      Elements outside XHTML (SVG, MathML) get the class added and keep class/style
+//      (their own <style> may select on them), and none of the rules below; inside an <svg>
+//      that has its own <style> nothing is baked. `revert` wins the cascade but writes nothing
+//      (the pinned/UA value or inheritance applies), `unset` becomes inherit/initial. Elements nested deeper than
+//      KP_MAX_DEPTH keep their markup but lose their (now undefined) author classes.
+//   2. the sheet starts with explicit element defaults (KP_DEFAULTS: the browser UA values;
+//      no list-style-type, so <ol type>/<ul type> work; p text-indent:0): classes override them
+//      by specificity. Presentational attributes the defaults would cancel (<hr size color
+//      noshade align>, <table cellpadding> on its cells) go into the element's class when
+//      the cascade sets nothing for that property (kpPresentational).
+//   3. html/body: margin-left/right and padding-left/right 0 (the device owns the page
+//      side margins); the classes go on the skeleton <html>/<body>.
+//      A winning `all` resets the longhands it beats (kpWinners).
+//   4. whitespace outside pre (white-space pre/pre-wrap/pre-line/break-spaces, inherited;
+//      pre/listing/textarea…): ASCII whitespace runs collapse to one space (never U+00A0)
+//      and are dropped at the start/end of a block's lines (block edges, around <br>, next
+//      to a nested block) and after another collapsible space, as CSS renders it (at a <br>
+//      one space stays before it when the source separated the words there). A run of
+//      ≥ 2 U+00A0 (and spaces) opening a p/div/li/dd/dt/h1-h6 with text after it and no
+//      block inside becomes text-indent: 0.25em per U+00A0 (about a word space), unless the
+//      block has its own non-zero text-indent. nbsp after a <br> or mid-text stays.
+//   5. empty p/div (no element child, only ASCII whitespace) that is not a link/TOC target
+//      (no id/name, not the chapter's first aid) and whose class has no border, background,
+//      height/min-height, width, clear, page break or vertical padding, and whose vertical
+//      margins do not exceed its neighbours' (they would collapse into them; else a spacer)
+//      is dropped (also one displayed inline) (<p>&nbsp;</p>, <p><br/></p> and a whitespace-only p in a
+//      white-space:pre* context, a stanza gap, stay); a <br> ending a p/div/li/h1-h6/
+//      blockquote/dd/dt right after text/inline content is dropped unless it has clear or a
+//      page break; a <br> whose class hides it (display:none) is dropped; whitespace-only text
+//      between SVG elements (not in text/tspan/title/desc/style) is emptied.
+//   6. line-height below 1.2 (unitless, em/rem, %) → 1.2 / 1.2em / 120%; px/pt/… dropped.
+//   7. position/top/left/right/bottom/z-index dropped on elements with text (absolute/fixed
+//      and visually hidden, ≥ 500px off the page or clipped to ≤ 1px: kpVisuallyHidden,
+//      becomes display:none); float dropped
+//      on block elements (p, div, h1, li, figure…) with text (kept on images, image-only
+//      figures and inline elements such as drop caps).
+//   8. font-size in px/pt/pc/in/cm/mm/rem → em of the parent's computed size (16px root),
+//      3 decimals; keywords, % and em stay.
+// Any exception in a chapter's pass makes that chapter fall back to the author sheets as
+// flows ('author' mode), never a failed conversion.
+
+// Element defaults: the browsers' UA values (Chromium/WebKit html.css, the reference look),
+// which match calibre's resources/templates/html.css (Mozilla's) except blockquote (1em
+// 40px, not 1em), hr (no extra height: 2px) and th (centred); pre is pre-wrap rather than the
+// UA's pre (long lines wrap on a small screen). p text-indent:0 is pinned too (kpNormalise
+// writes text-indent:inherit on a p inside an indented ancestor).
+const KP_DEFAULTS =
+  'p{display:block;margin:1em 0;text-indent:0}\n' +
+  'blockquote{display:block;margin:1em 40px}\n' +
+  'h1{display:block;font-size:2em;font-weight:bold;margin:.67em 0}\n' +
+  'h2{display:block;font-size:1.5em;font-weight:bold;margin:.83em 0}\n' +
+  'h3{display:block;font-size:1.17em;font-weight:bold;margin:1em 0}\n' +
+  'h4{display:block;font-weight:bold;margin:1.33em 0}\n' +
+  'h5{display:block;font-size:.83em;font-weight:bold;margin:1.67em 0}\n' +
+  'h6{display:block;font-size:.67em;font-weight:bold;margin:2.33em 0}\n' +
+  'ul,ol{display:block;margin:1em 0;padding-left:40px}\n' +
+  'ul ul,ul ol,ol ul,ol ol{margin-top:0;margin-bottom:0}\n' +
+  'dd{display:block;margin-left:40px}\n' +
+  'hr{display:block;border:1px inset;margin:.5em auto;color:gray;overflow:hidden}\n' +
+  'td{display:table-cell;padding:1px}\nth{display:table-cell;font-weight:bold;text-align:center;padding:1px}\n' +
+  'pre{display:block;font-family:monospace;white-space:pre-wrap;margin:1em 0}\n' +
+  'address{display:block;font-style:italic}\n' +
+  'section,article,aside,nav,header,footer,main,figure,figcaption,hgroup,details,summary{display:block}\n';
+
+const KP_SIDES = ['top', 'right', 'bottom', 'left'];
+// values Kindle cannot compute: calc() & co (also -webkit-calc()), viewport units
+const KP_BAD_VALUE_RE = /(?:^|[^\w-])(?:-[a-z]+-)?(?:calc|var|env|min|max|clamp)\s*\(|\d(?:vh|vw|vmin|vmax|[sld]v[hw])\b/i;
+const KP_GLOBAL_RE = /^(inherit|initial|unset|revert|revert-layer)$/i;
+const KP_INHERITED = new Set(['color', 'font-family', 'font-size', 'font-style', 'font-variant', 'font-weight',
+  'font-stretch', 'line-height', 'letter-spacing', 'word-spacing', 'text-align', 'text-indent', 'text-transform',
+  'white-space', 'visibility', 'list-style-type', 'list-style-position', 'list-style-image', 'hyphens',
+  'orphans', 'widows', 'direction', 'quotes', 'border-collapse', 'border-spacing', 'caption-side', 'cursor',
+  'empty-cells', 'text-shadow', 'word-wrap', 'overflow-wrap', 'word-break', 'text-align-last',
+  'font-kerning', 'font-feature-settings', 'tab-size', 'writing-mode']);
+const KP_BORDER_STYLE_RE = /^(none|hidden|dotted|dashed|solid|double|groove|ridge|inset|outset)$/i;
+const KP_POSITION = ['position', 'top', 'left', 'right', 'bottom', 'z-index'];
+const KP_PARA = new Set(['p', 'div', 'li', 'dd', 'dt', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+const KP_TRAILING_BR = new Set([...KP_PARA, 'blockquote']);
+const KP_PRE_TAGS = new Set(['pre', 'listing', 'textarea', 'plaintext', 'xmp']);
+const KP_PRE_WS_RE = /^(pre|pre-wrap|pre-line|break-spaces)$/;
+// inline content a block's line cannot see into (whitespace next to it is kept)
+const KP_ATOMIC = new Set(['img', 'video', 'audio', 'object', 'embed', 'iframe', 'input', 'textarea', 'select',
+  'canvas', 'button', 'picture', 'svg', 'math']);
+const KP_BLOCK_DISPLAY_RE = /^(block|list-item|table|table-[\w-]+|flex|grid|flow-root|run-in)$/;
+const KP_INLINE_BLOCK_RE = /^inline-(block|table|flex|grid)$/;
+// an empty p/div with one of these is a deliberate box or break: kept
+const KP_KEEP_EMPTY_RE = /^(border|background|height$|min-height$|width$|clear$|page-break-|break-)/;
+const KP_ZERO_RE = /^(?:[+-]?0*\.?0+[a-z%]*|initial)$/i;  // a zero length (text-indent:0)
+/** an empty p/div with these declarations is a box or break (padding: a spacer) */
+const kpKeepEmpty = out => [...out.keys()].some(k => KP_KEEP_EMPTY_RE.test(k)) ||
+  ['padding-top', 'padding-bottom'].some(k => { const v = (out.get(k) || '').trim(); return v && !/^(?:[+-]?0*\.?0+[a-z%]*|auto|initial|inherit|unset)$/i.test(v); });
+// vertical margins (em) the pinned defaults / UA give a block without its own
+const KP_UA_VMARGIN = dict({p: 1, blockquote: 1, h1: .67, h2: .83, h3: 1, h4: 1.33, h5: 1.67, h6: 2.33,
+  ul: 1, ol: 1, dl: 1, pre: 1, hr: .5, figure: 1, menu: 1});
+const KP_PSEUDO_SEL = dict({'before': ':before', 'after': ':after', 'first-letter': ':first-letter',
+  'first-line': ':first-line', 'marker': '::marker'});
+const ASCII_WS_RE = /[ \t\n\r\f]+/g;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const KP_SVG_TEXT = new Set(['text', 'tspan', 'textPath', 'title', 'desc', 'style', 'script', 'foreignObject']);
+const HAS_TEXT_RE = /[^ \t\n\r\f]/;
+
+/** Words of a CSS value (split on whitespace outside (), [] and strings). */
+function cssWords(v) { return cssSplit(v.replace(/\s+/g, ' ').trim(), ' ').filter(Boolean); }
+
+const _kpSupports = new Map();  // "prop:value" → CSS.supports verdict (cache)
+/** Can the engine use value v for prop? true for a property CSS.supports does not know at
+ *  all (vendor/Kindle properties such as -webkit-hyphens, adobe-hyphenate: kept). */
+function kpSupported(prop, v) {
+  if (typeof CSS === 'undefined' || typeof CSS.supports !== 'function') return true;
+  const k = prop + ':' + v;
+  let r = _kpSupports.get(k);
+  if (r === undefined) {
+    try { r = !CSS.supports(prop, 'inherit') || CSS.supports(prop, v); } catch(e) { r = true; }
+    _kpSupports.set(k, r);
+  }
+  return r;
+}
+
+/** Declarations of a rule body for the Kindle profile: [[prop, value | null, important]],
+ *  shorthands expanded to longhands (null: reset to the initial value, nothing written),
+ *  url()s of manifest images rewritten to kindle:embed (relative to baseDir). */
+function kpDecls(body, baseDir, imageByPath) {
+  const out = [];
+  for (const d of cssSplit(body || '', ';')) {
+    const k = d.indexOf(':');
+    if (k < 0) continue;
+    const prop = d.slice(0, k).trim().toLowerCase();
+    let v = d.slice(k + 1).trim();
+    const imp = /!\s*important\s*$/i.test(v);
+    if (imp) v = v.replace(/!\s*important\s*$/i, '').trim();
+    v = v.replace(/\s+/g, ' ');
+    if (!v || !/^-?[a-z][a-z0-9-]*$/.test(prop) || KP_BAD_VALUE_RE.test(v) || !kpSupported(prop, v)) continue;
+    if (/url\(/i.test(v)) v = v.replace(CSS_URL_RE, (m, a, b, c) => {
+      const u = (a ?? b ?? c ?? '').trim();
+      if (!u || /^(?:[a-z][a-z0-9+.-]*:|#)/i.test(u)) return m;  // data:, http:, #svg-paint
+      const img = imageByPath?.get(joinPath(baseDir, u.split(/[?#]/)[0]));
+      return img ? `url(kindle:embed:${kindleEmbed(img.idx + 1)}?mime=${img.mt})` : m;
+    });
+    // unset → inherit/initial; revert (the UA value) → null: it wins the cascade but nothing is
+    // written, so the pinned/UA value (or inheritance) applies
+    kpExpand(prop, v, (p, x) => out.push([p, x != null && /^(revert|revert-layer)$/i.test(x) ? null
+      : x != null && /^unset$/i.test(x) ? (KP_INHERITED.has(p) ? 'inherit' : 'initial') : x, imp]));
+  }
+  return out;
+}
+
+/** Longhands of one declaration: add(prop, value | null) for each. */
+function kpExpand(prop, v, add) {
+  const kw = KP_GLOBAL_RE.test(v) ? v.toLowerCase() : null;
+  const box = () => {
+    if (kw) return [kw, kw, kw, kw];
+    const t = cssWords(v);
+    if (!t.length || t.length > 4) return null;
+    const [a, b = a, c = a, d = b] = t;
+    return [a, b, c, d];
+  };
+  const border = () => {  // {w, s, c}, null for what the shorthand resets
+    if (kw) return {w: kw, s: kw, c: kw};
+    const r = {w: null, s: null, c: null};
+    for (const t of cssWords(v)) {
+      const key = KP_BORDER_STYLE_RE.test(t) ? 's' : /^(thin|medium|thick)$/i.test(t) || /^[+-]?[\d.]/.test(t) ? 'w' : 'c';
+      if (r[key] != null) return null;
+      r[key] = t;
+    }
+    return r;
+  };
+  let m;
+  switch (prop) {
+    case 'margin': case 'padding': {
+      const b = box();
+      if (b) KP_SIDES.forEach((s, i) => add(`${prop}-${s}`, b[i]));
+      return;
+    }
+    case 'border-width': case 'border-style': case 'border-color': {
+      const b = box();
+      if (b) KP_SIDES.forEach((s, i) => add(`border-${s}-${prop.slice(7)}`, b[i]));
+      return;
+    }
+    case 'border': case 'border-top': case 'border-right': case 'border-bottom': case 'border-left': {
+      const b = border();
+      if (b) for (const s of prop === 'border' ? KP_SIDES : [prop.slice(7)]) {
+        add(`border-${s}-width`, b.w); add(`border-${s}-style`, b.s); add(`border-${s}-color`, b.c);
+      }
+      return;
+    }
+    case 'font': {
+      const names = ['font-style', 'font-variant', 'font-weight', 'font-size', 'line-height', 'font-family'];
+      if (kw) { for (const n of names) add(n, kw); return; }
+      m = /^((?:(?:normal|italic|oblique|small-caps|bold|bolder|lighter|[1-9]00|(?:ultra-|extra-|semi-)?(?:condensed|expanded))\s+)*)((?:\d*\.?\d+[a-z%]*)|(?:xx?x?-)?(?:small|large)|medium|smaller|larger)(?:\s*\/\s*(\S+))?\s+(\S[\s\S]*)$/i.exec(v);
+      if (!m) return;  // system font (caption, menu, …) or not understood
+      let style = 'normal', variant = 'normal', weight = 'normal';
+      for (const t of m[1].split(/\s+/).filter(Boolean)) {
+        if (/^(italic|oblique)$/i.test(t)) style = t;
+        else if (/^small-caps$/i.test(t)) variant = t;
+        else if (/^(bold|bolder|lighter|[1-9]00)$/i.test(t)) weight = t;
+      }
+      [style, variant, weight, m[2], m[3] || 'normal', m[4].trim()].forEach((x, i) => add(names[i], x));
+      return;
+    }
+    case 'list-style': {
+      if (kw) { for (const n of ['type', 'position', 'image']) add('list-style-' + n, kw); return; }
+      let type = null, pos = null, img = null, nones = 0;
+      for (const t of cssWords(v)) {
+        if (/^(inside|outside)$/i.test(t)) pos = t;
+        else if (/^url\(/i.test(t)) img = t;
+        else if (/^none$/i.test(t)) nones++;
+        else type = t;
+      }
+      if (nones && !type) { type = 'none'; nones--; }
+      if (nones && !img) img = 'none';
+      add('list-style-type', type ?? 'disc'); add('list-style-position', pos ?? 'outside');
+      add('list-style-image', img ?? 'none');
+      return;
+    }
+    case 'background': {
+      if (kw) { add('background-color', kw); add('background-image', kw); return; }
+      if (cssSplit(v, ',').length > 1) { add('background', v); return; }  // layers: as is
+      let color = null, image = null;
+      const repeat = [], attach = [], pos = [];
+      for (const t of cssWords(v)) {
+        if (/^(none|url\(|[\w-]*gradient\()/i.test(t)) image = t;
+        else if (/^(repeat|repeat-x|repeat-y|no-repeat|space|round)$/i.test(t)) repeat.push(t);
+        else if (/^(scroll|fixed|local)$/i.test(t)) attach.push(t);
+        else if (/^(left|right|top|bottom|center)$/i.test(t) || /^[+-]?[\d.]/.test(t) || t === '/' ||
+                 /^(auto|cover|contain)$/i.test(t)) pos.push(t);
+        else if (/^(border-box|padding-box|content-box|text)$/i.test(t)) continue;
+        else color = t;
+      }
+      add('background-color', color); add('background-image', image);
+      if (repeat.length) add('background-repeat', repeat.join(' '));
+      if (attach.length) add('background-attachment', attach.join(' '));
+      if (pos.length) {
+        const [p, sz] = pos.join(' ').split(/\s*\/\s*/);
+        if (p) add('background-position', p);
+        if (sz) add('background-size', sz);
+      }
+      return;
+    }
+    case 'text-decoration': case 'text-decoration-line': {
+      if (kw) { add('text-decoration', kw); return; }
+      const lines = [];
+      let style = null, color = null;
+      for (const t of cssWords(v)) {
+        if (/^(none|underline|overline|line-through|blink)$/i.test(t)) lines.push(t);
+        else if (/^(solid|double|dotted|dashed|wavy)$/i.test(t)) style = t;
+        else if (/^(auto|from-font)$/i.test(t) || /^[+-]?[\d.]/.test(t)) continue;  // thickness
+        else color = t;
+      }
+      add('text-decoration', lines.join(' ') || 'none');
+      if (prop === 'text-decoration') { add('text-decoration-style', style); add('text-decoration-color', color); }
+      return;
+    }
+    case 'break-before': case 'break-after': case 'break-inside': {
+      // the CSS 3 names of page-break-*, which older Kindles know
+      const x = v.toLowerCase();
+      const pb = prop === 'break-inside' ? (/^avoid(-page)?$/.test(x) ? 'avoid' : x === 'auto' ? 'auto' : null)
+        : /^(left|right)$/.test(x) ? x : /^(page|always|recto|verso)$/.test(x) ? 'always'
+        : /^avoid(-page)?$/.test(x) ? 'avoid' : x === 'auto' ? 'auto' : kw;
+      if (pb) add('page-' + prop, pb);
+      return;
+    }
+  }
+  add(prop, v);
+}
+
+/** a b c d → the shortest box shorthand value */
+function kpBoxText([t, r, b, l]) {
+  return l !== r ? `${t} ${r} ${b} ${l}` : b !== t ? `${t} ${r} ${b}` : r !== t ? `${t} ${r}` : t;
+}
+
+/** Declaration block text of a prop → value | null map: sorted (equal sets give equal text),
+ *  four margin/padding sides written as margin/padding, complete border sides as border-*
+ *  (or border when all four are equal); null values (resets) are not written. */
+function kpSerialize(decls) {
+  const out = new Map(decls);
+  for (const boxName of ['margin', 'padding']) {
+    const v = KP_SIDES.map(s => out.get(`${boxName}-${s}`));
+    if (v.every(x => x != null) && (new Set(v).size === 1 || !v.some(x => KP_GLOBAL_RE.test(x)))) {
+      for (const s of KP_SIDES) out.delete(`${boxName}-${s}`);
+      out.set(boxName, kpBoxText(v));
+    }
+  }
+  const parts = ['width', 'style', 'color'];
+  const side = s => {   // shorthand text of a side whose three longhands are all set, else undefined
+    const keys = parts.map(x => `border-${s}-${x}`);
+    if (!keys.every(k => out.has(k))) return undefined;
+    const vals = keys.map(k => out.get(k)).filter(x => x != null);
+    if (vals.some(x => KP_GLOBAL_RE.test(x))) return vals.length === 3 && new Set(vals).size === 1 ? vals[0] : undefined;
+    return vals.length ? vals.join(' ') : 'none';
+  };
+  const sides = KP_SIDES.map(side);
+  const drop = s => { for (const x of parts) out.delete(`border-${s}-${x}`); };
+  if (sides.every(x => x !== undefined) && new Set(sides).size === 1) {
+    KP_SIDES.forEach(drop);
+    out.set('border', sides[0]);
+  } else sides.forEach((t, i) => { if (t !== undefined) { drop(KP_SIDES[i]); out.set(`border-${KP_SIDES[i]}`, t); } });
+  // `all` first: the longhands after it override it
+  const key = p => p === 'all' ? '' : p;
+  return [...out].filter(([, v]) => v != null).sort(([a], [b]) => key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0)
+    .map(([p, v]) => `${p}:${v}`).join(';');
+}
+
+const kpNum = x => String(+x.toFixed(3));
+
+/** Rule 8: font-size in absolute units / rem → em of the parent's size ps (root: rs);
+ *  returns the element's computed size in px. */
+function kpFontSize(out, tag, ps, rs) {
+  const v = (out.get('font-size') || '').trim().toLowerCase();
+  if (!v) return ps * (MOBI_SIZE[tag] || 1);
+  if (v === 'inherit') return ps;
+  if (v === 'initial') return 16;
+  if (FONT_KW[v] != null) return FONT_KW[v];
+  if (v === 'smaller') return ps / 1.2;
+  if (v === 'larger') return ps * 1.2;
+  const m = /^([+-]?(?:\d+\.?\d*|\.\d+))(px|pt|pc|in|cm|mm|rem)$/.exec(v);
+  const px = m && m[2] === 'rem' ? parseFloat(m[1]) * rs : cssPx(v, ps, ps);
+  if (m && px != null && ps > 0) out.set('font-size', kpNum(px / ps) + 'em');
+  return px ?? ps;
+}
+
+/** Rule 6: line-height below 1.2 raised to 1.2, absolute line-heights dropped. */
+function kpLineHeight(out) {
+  const v = out.get('line-height');
+  const m = v && /^([+-]?(?:\d+\.?\d*|\.\d+))([a-z%]*)$/i.exec(v.trim());
+  if (!m) return;  // normal, inherit, …
+  const n = parseFloat(m[1]), u = m[2].toLowerCase();
+  if (u === '' ? n < 1.2 : u === 'em' || u === 'rem' ? n < 1.2 : u === '%' ? n < 120 : false)
+    out.set('line-height', u === '%' ? '120%' : '1.2' + u);
+  else if (/^(px|pt|pc|in|cm|mm|q)$/.test(u)) out.delete('line-height');
+}
+
+const KP_MAX_DEPTH = MOBI_MAX_DEPTH;
+
+/** prop → value of the winning declarations d (mobiCascade). A winning `all` resets every
+ *  longhand that lost to it (importance, specificity, order): those are not written, and
+ *  `all` comes first in the class (kpSerialize) so the longhands that beat it override it;
+ *  all:initial/unset also writes display:inline (its initial value) unless a winner sets
+ *  display, for an engine that ignores `all`. */
+function kpWinners(d) {
+  const out = new Map();
+  const all = d?.get('all');
+  const beats = (x, y) => x[1] !== y[1] ? x[1] > y[1] : x[2] !== y[2] ? x[2] > y[2] : x[3] > y[3];
+  for (const [k, e] of d || []) {
+    if (all && k !== 'all' && k !== 'direction' && k !== 'unicode-bidi' && !beats(e, all)) continue;
+    out.set(k, e[0]);
+  }
+  if (all && /^(initial|unset)$/i.test(all[0] || '') && !out.has('display')) out.set('display', 'inline');
+  return out;
+}
+
+/** HTML presentational attributes the pinned defaults (KP_DEFAULTS) would override, as
+ *  declarations of the element's class when the cascade sets nothing for that property
+ *  (Kindle ignores attribute selectors): <hr size color noshade align>, the cellpadding of
+ *  the nearest <table> on its td/th. (ol/ul type: no list-style-type is pinned.) */
+function kpPresentational(el, tag, out, cellpadding) {
+  const set = (k, v) => { if (!out.has(k)) out.set(k, v); };
+  if (tag === 'hr') {
+    const size = /^\s*(\d+)/.exec(el.getAttribute('size') || '')?.[1];
+    if (size) set('height', `${size}px`);
+    const color = (el.getAttribute('color') || '').trim();
+    if (color && !/[;{}"']/.test(color)) {
+      set('color', color);
+      for (const s of KP_SIDES) set(`border-${s}-color`, color);
+      set('background-color', color);
+    }
+    if (el.hasAttribute('noshade')) for (const s of KP_SIDES) set(`border-${s}-style`, 'solid');
+    const align = (el.getAttribute('align') || '').trim().toLowerCase();
+    if (align === 'left') { set('margin-left', '0'); set('margin-right', 'auto'); }
+    else if (align === 'right') { set('margin-left', 'auto'); set('margin-right', '0'); }
+  } else if ((tag === 'td' || tag === 'th') && cellpadding != null) {
+    for (const s of KP_SIDES) set(`padding-${s}`, `${cellpadding}px`);
+  }
+}
+
+/** Does a positioned element hide itself (moved ≥ 500px off the page, clip: rect() of at most
+ *  1px, clip-path inset(≥ 50%) / circle(0), or width/height ≤ 1px with overflow hidden)? */
+function kpVisuallyHidden(out, size) {
+  const px = k => cssPx((out.get(k) || '').trim(), size, 600);
+  if (['left', 'top', 'right', 'bottom'].some(k => (px(k) ?? 0) <= -500)) return true;
+  const clip = /^rect\(([^)]*)\)$/i.exec((out.get('clip') || '').trim());
+  if (clip && clip[1].split(/[\s,]+/).filter(Boolean).every(v => /^auto$/i.test(v) ? false : (cssPx(v, size, 600) ?? 2) <= 1)) return true;
+  const cp = (out.get('clip-path') || '').trim().toLowerCase();
+  if (/^inset\(\s*(?:5\d|[6-9]\d|100)(?:\.\d+)?%/.test(cp) || /^circle\(\s*0(?:px|%)?\s*(?:at\b|\))/.test(cp)) return true;
+  const tiny = k => { const v = px(k); return v != null && v <= 1; };
+  return (tiny('width') || tiny('height')) && /^(hidden|clip)$/i.test((out.get('overflow') || '').trim());
+}
+
+/**
+ * The Kindle profile pass of one chapter (see the section comment) on a clone of body:
+ * returns {content, htmlClass, bodyClass}. cascade: mobiCascade() with the KF8 profile
+ * (matched on the untouched chapter DOM); reg: the book's class registry
+ * {classes: Map<key, name>, sheet: string[] (the rules)}, added to only when the pass succeeds.
+ */
+function kpNormalise(doc, body, cascade, firstAid, reg) {
+  const html = doc.documentElement;
+  const clone = body ? body.cloneNode(true) : null;
+  const pending = new Map();  // key → class name, new in this chapter
+  const nameOf = (pseudo, text) => {
+    const key = pseudo + '\0' + text;
+    let n = reg.classes.get(key) ?? pending.get(key);
+    if (!n) pending.set(key, n = 'kp' + (reg.classes.size + pending.size + 1));
+    return n;
+  };
+  const isHtml = n => n.namespaceURI === XHTML_NS || n.namespaceURI == null;
+  const firstAidStr = String(firstAid);
+
+  // Pass A (top-down, on the clone in step with the original): winning declarations with
+  // rules 3, 6, 7, 8 applied, and what the later passes need to know.
+  const info = new Map();  // clone element → {out, ps, tag, html, block, container, pre, size}
+  const containers = [];   // XHTML block containers, children before parents
+  const declsOf = (el, tag, p, rs, isRoot) => {
+    const out = kpWinners(cascade.decl.get(el));
+    const size = kpFontSize(out, tag, p.size, rs);
+    kpLineHeight(out);
+    if (isRoot) for (const k of ['margin-left', 'margin-right', 'padding-left', 'padding-right']) out.set(k, '0');
+    return {out, size};
+  };
+  const pseudoOf = (el, size, rs) => {
+    const pm = cascade.pseudo.get(el);
+    if (!pm) return null;
+    const res = new Map();
+    for (const [ps, d] of pm) {
+      const out = kpWinners(d);
+      // ::before/::after exist only with content
+      if ((ps === 'before' || ps === 'after') && !/^(?!none$|normal$)\S/i.test((out.get('content') || '').trim())) continue;
+      kpFontSize(out, '', size, rs);
+      kpLineHeight(out);
+      res.set(ps, out);
+    }
+    return res.size ? res : null;
+  };
+  const htmlD = declsOf(html, 'html', {size: 16}, 16, true);
+  const rs = htmlD.size;
+  const visit = (o, c, p, depth) => {
+    const tag = c.localName.toLowerCase();
+    const xhtml = isHtml(c);
+    let i;
+    if (xhtml) {
+      const {out, size} = declsOf(o, tag, p, rs, c === clone);
+      const ws = (out.get('white-space') || '').trim().toLowerCase();
+      const pre = KP_PRE_WS_RE.test(ws) ? true : /^(normal|nowrap|initial)$/.test(ws) ? false
+        : ws === 'inherit' ? p.pre : p.pre || KP_PRE_TAGS.has(tag);
+      const disp = (out.get('display') || '').trim().toLowerCase();
+      const block = c === clone || (KP_BLOCK_DISPLAY_RE.test(disp) ? true : KP_INLINE_BLOCK_RE.test(disp) ||
+        disp === 'inline' ? false : MOBI_BLOCK.has(tag));
+      let text;
+      const hasText = () => text ??= HAS_TEXT_RE.test(c.textContent);
+      if (KP_POSITION.some(k => out.has(k)) && hasText()) {
+        // "visually hidden" (absolute/fixed and moved far off the page, Standard Ebooks'
+        // titlepage, or clipped away, the screen-reader-text / sr-only idiom) stays hidden;
+        // any other positioning goes
+        if (/^(absolute|fixed)$/i.test((out.get('position') || '').trim()) && kpVisuallyHidden(out, size))
+          out.set('display', 'none');
+        for (const k of KP_POSITION) out.delete(k);
+      }
+      if (out.has('float') && MOBI_BLOCK.has(tag) && hasText()) out.delete('float');
+      kpPresentational(c, tag, out, p.cellpadding);
+      // p has a pinned text-indent:0, which would stop an ancestor's indent from inheriting
+      if (tag === 'p' && !out.has('text-indent') && p.ti && !KP_ZERO_RE.test(p.ti)) out.set('text-indent', 'inherit');
+      const cp = tag === 'table' ? (/^\s*(\d+)\s*$/.exec(c.getAttribute('cellpadding') || '')?.[1] ?? null) : p.cellpadding;
+      i = {out, ps: pseudoOf(o, size, rs), tag, html: true, block,
+           container: block || KP_INLINE_BLOCK_RE.test(disp), pre, size, cellpadding: cp, svgStyled: false,
+           ti: out.has('text-indent') && out.get('text-indent') !== 'inherit' ? out.get('text-indent').trim() : p.ti};
+    } else {
+      // an SVG with its own <style>: its rules are not in the cascade, so nothing is baked
+      // inside it (a generated class would beat them)
+      const svgStyled = p.svgStyled || (tag === 'svg' && c.getElementsByTagNameNS('*', 'style').length > 0);
+      const out = svgStyled ? new Map() : kpWinners(cascade.decl.get(o));
+      i = {out, ps: null, tag, html: false, block: false, container: false, pre: true, size: p.size,
+           cellpadding: null, svgStyled, ti: p.ti};
+    }
+    info.set(c, i);
+    if (depth < KP_MAX_DEPTH) {
+      const oc = o.childNodes, cc = c.childNodes;
+      for (let k = 0; k < cc.length; k++) if (cc[k].nodeType === 1) visit(oc[k], cc[k], i, depth + 1);
+    } else {
+      // deeper elements are left as they are, but their author classes name no rule any more
+      for (const e of c.getElementsByTagName('*')) if (isHtml(e)) e.removeAttribute('class');
+    }
+    if (i.container) containers.push(c);
+  };
+  const tiOf = o => { const v = o.get('text-indent'); return v != null && v !== 'inherit' ? v.trim() : null; };
+  if (clone) visit(body, clone, {size: htmlD.size, pre: false, cellpadding: null, svgStyled: false, ti: tiOf(htmlD.out)}, 0);
+
+  // Pass B (bottom-up): whitespace, nbsp indents, trailing <br>, empty paragraphs
+  const removed = new Set();  // elements Pass B took out (no element children: no descendants to track)
+  const removeNode = n => {
+    const parent = n.parentNode;
+    removed.add(n);
+    n.remove();
+    // an element must not become empty-tagged: an empty text node keeps <x></x>
+    if (parent && !parent.firstChild) parent.appendChild(doc.createTextNode(''));
+  };
+  // An empty block's margins show only where they exceed what its neighbours already give
+  // (vertical margins collapse: its top, its bottom and the neighbours' adjoining margins are
+  // one): it is a spacer when max(its margin-top, -bottom) is more than max(previous sibling's
+  // margin-bottom, next sibling's margin-top); a missing sibling (first/last child) counts 0,
+  // the other still collapses with it. Unknown (%, auto, a negative value, a non-block or text
+  // neighbour, no sibling at all): kept.
+  const vmargin = (el, i, side) => {
+    const v = i.out.get('margin-' + side);
+    if (v == null) return (KP_UA_VMARGIN[i.tag] ?? 0) * i.size;
+    const t = v.trim().toLowerCase();
+    if (t === 'initial' || t === 'unset') return 0;
+    const px = cssPx(t, i.size, null);
+    return px != null && px >= 0 ? px : null;
+  };
+  // [element, info] of the nearest sibling block, 'none' at the start/end, null when unknown
+  const neighbour = (c, dir) => {
+    for (let n = c[dir]; n; n = n[dir]) {
+      if (n.nodeType === 8 || (n.nodeType === 3 && !HAS_TEXT_RE.test(n.data))) continue;
+      const i = n.nodeType === 1 && info.get(n);
+      return i && i.html && i.block ? [n, i] : null;
+    }
+    return 'none';
+  };
+  const spacer = (c, ci) => {
+    const own = Math.max(vmargin(c, ci, 'top') ?? NaN, vmargin(c, ci, 'bottom') ?? NaN);
+    if (!(own > 0)) return Number.isNaN(own);  // no margin: nothing to keep; unknown: keep
+    const prev = neighbour(c, 'previousSibling'), next = neighbour(c, 'nextSibling');
+    if (!prev || !next || (prev === 'none' && next === 'none')) return true;
+    const room = Math.max(prev === 'none' ? 0 : vmargin(...prev, 'bottom') ?? NaN,
+                          next === 'none' ? 0 : vmargin(...next, 'top') ?? NaN);
+    return !(own <= room + 0.01);
+  };
+  const droppable = (c, ci) => (ci.tag === 'p' || ci.tag === 'div') && c !== clone && !c.firstElementChild &&
+    !HAS_TEXT_RE.test(c.textContent) && !c.hasAttribute('id') && !c.hasAttribute('name') &&
+    c.getAttribute('aid') !== firstAidStr && !ci.ps?.has('before') && !ci.ps?.has('after') &&
+    !(ci.pre && c.textContent) && !kpKeepEmpty(ci.out);
+  for (const c of containers) {
+    const ci = info.get(c);
+    if (!ci.pre) {
+      // the inline content of c in order: text, atom (replaced/opaque inline), br, break (a block)
+      const items = [];
+      const collect = el => {
+        for (const n of [...el.childNodes]) {
+          if (n.nodeType === 3) items.push({t: 'text', n});
+          else if (n.nodeType === 4) items.push({t: 'atom'});
+          else if (n.nodeType === 1) {
+            const i = info.get(n);
+            if (!i || !i.html) items.push({t: 'atom'});
+            else if (i.tag === 'br' && /^none$/i.test((i.out.get('display') || '').trim()) && !n.hasAttribute('id'))
+              removeNode(n);  // a hidden <br> (Gutenberg verse: br.hidebr) is no line break
+            else if (i.tag === 'br') items.push({t: 'br', n});
+            else if (i.block) items.push({t: 'break'});
+            else if (i.container || i.pre || KP_ATOMIC.has(i.tag)) items.push({t: 'atom'});
+            else if (i.tag !== 'wbr') collect(n);
+          }
+        }
+      };
+      collect(c);
+      for (const it of items) if (it.t === 'text') it.n.data = it.n.data.replace(ASCII_WS_RE, ' ');
+      // a trailing <br> right after text/inline content
+      if (KP_TRAILING_BR.has(ci.tag)) {
+        let k = items.length - 1;
+        while (k >= 0 && items[k].t === 'text' && !HAS_TEXT_RE.test(items[k].n.data)) k--;
+        let j = k - 1;
+        while (j >= 0 && items[j].t === 'text' && !HAS_TEXT_RE.test(items[j].n.data)) j--;
+        if (k > 0 && items[k].t === 'br' && j >= 0 && (items[j].t === 'text' || items[j].t === 'atom') &&
+            !items[k].n.hasAttribute('id') &&
+            ![...(info.get(items[k].n)?.out.keys() || [])].some(p => /^(clear$|page-break-|break-)/.test(p))) {
+          removeNode(items[k].n);
+          items.splice(k, 1);
+        }
+      }
+      // collapsible spaces at line starts/ends and after another space go
+      // At a <br> the words on both sides stay separated in the text (search, read-aloud, the
+      // <a> text of a TOC link "I.<br/> EARLY LETTERS"): the line before it keeps one trailing
+      // space, invisible at a line end, which the next line's leading space moves into.
+      let lineStart = true, prevSpace = false, last = null, brLast = null, brSpace = false;
+      const endLine = br => {
+        if (br) { brLast = last; brSpace = !!last && last.data.endsWith(' '); }
+        else { if (last && last.data.endsWith(' ')) last.data = last.data.slice(0, -1); brLast = null; }
+        lineStart = true; prevSpace = false; last = null;
+      };
+      for (const it of items) {
+        if (it.t === 'text') {
+          let s = it.n.data;
+          const lead = s.startsWith(' ');
+          if ((lineStart || prevSpace) && lead) s = s.slice(1);
+          if (s) {
+            if (brLast && lineStart && lead && !brSpace) brLast.data += ' ';
+            lineStart = false; prevSpace = s.endsWith(' '); last = it.n; brLast = null;
+          }
+          it.n.data = s;
+        } else if (it.t === 'atom') { lineStart = false; prevSpace = false; last = null; brLast = null; }
+        else endLine(it.t === 'br');
+      }
+      endLine(false);
+      // &nbsp; indent → text-indent
+      const ti = (ci.out.get('text-indent') || '').trim();
+      if (KP_PARA.has(ci.tag) && (!ti || /^[+-]?0*\.?0+[a-z%]*$/i.test(ti)) && !items.some(it => it.t === 'break')) {
+        let count = 0, found = false;
+        const cut = [];
+        for (const it of items) {
+          if (it.t !== 'text') break;
+          const s = it.n.data;
+          let k = 0;
+          while (k < s.length && (s[k] === ' ' || s[k] === ' ')) { if (s[k] === ' ') count++; k++; }
+          cut.push([it.n, k]);
+          if (k < s.length) { found = true; break; }
+        }
+        if (found && count >= 2) {
+          for (const [n, k] of cut) n.data = n.data.slice(k);
+          ci.out.set('text-indent', kpNum(count * 0.25) + 'em');
+        }
+      }
+    }
+    // an empty paragraph that is no target and no deliberate box
+    if (droppable(c, ci) && !spacer(c, ci)) removeNode(c);
+  }
+  // the same for an empty p/div displayed inline (all:initial, display:inline): no margins to show
+  for (const [c, ci] of info)
+    if (ci.html && !ci.container && !removed.has(c) && droppable(c, ci)) removeNode(c);
+
+  // Whitespace-only text between SVG elements is insignificant (not inside text content)
+  for (const [c, i] of info) {
+    if (i.html || c.namespaceURI !== SVG_NS || KP_SVG_TEXT.has(c.localName)) continue;
+    for (const n of c.childNodes) if (n.nodeType === 3 && !HAS_TEXT_RE.test(n.data)) n.data = '';
+  }
+
+  // Pass C: the classes
+  const classesOf = i => {
+    const names = [];
+    const t = kpSerialize(i.out);
+    if (t) names.push(nameOf('', t));
+    for (const [ps, d] of i.ps || []) { const pt = kpSerialize(d); if (pt) names.push(nameOf(ps, pt)); }
+    return names.join(' ');
+  };
+  let bodyClass = '';
+  for (const [c, i] of info) {
+    if (removed.has(c)) continue;
+    const cls = classesOf(i);
+    if (c === clone) bodyClass = cls;
+    else if (i.html) {
+      if (cls) c.setAttribute('class', cls); else c.removeAttribute('class');
+      c.removeAttribute('style');
+    } else if (cls) c.setAttribute('class', ((c.getAttribute('class') || '') + ' ' + cls).trim());
+  }
+  const htmlClass = classesOf({out: htmlD.out, ps: pseudoOf(html, htmlD.size, rs)});
+  const content = clone ? clone.innerHTML : '';
+  // success: the new classes join the book's sheet
+  for (const [key, n] of pending) {
+    reg.classes.set(key, n);
+    const k = key.indexOf('\0');
+    reg.sheet.push(`.${n}${k ? KP_PSEUDO_SEL[key.slice(0, k)] : ''}{${key.slice(k + 1)}}`);
+  }
+  return {content, htmlClass, bodyClass};
 }
 
 // ─── Internal links → kindle:pos:fid ─────────────────────────────────────────
@@ -2458,6 +3239,7 @@ function convertToAzw3(epub, format='azw3') {
       const part = {
         chapterIndex: i, chunkCount: 1,
         skelHeadByteLen: headB, skelTailByteLen: tailB, contentByteLen: contB,
+        skelInsert: ch.skelInsert ?? headB - 1,
         flowStart: htmlByteOffset, firstAid: ch.firstAid,
       };
       htmlByteOffset += headB + tailB + contB;
@@ -2515,7 +3297,7 @@ function convertToAzw3(epub, format='azw3') {
   for (const e of toc) {
     const p = idxParts[e.chapter];
     const off = (e.aid && tocOffsets[e.chapter].get(e.aid)) || 0;
-    e.offset = mobi6 ? p.flowStart + off : p.flowStart + p.skelHeadByteLen - 1 + off;
+    e.offset = mobi6 ? p.flowStart + off : p.flowStart + p.skelInsert + off;
     e.posFid = [e.chapter, off];
   }
   const ncxRecs = buildNcxIndex(toc, tocTextEnd, mobi6);
@@ -2631,6 +3413,8 @@ retryBtn.addEventListener('click', () => {
 // One conversion at a time (parseEpub/extractContent share module state such as _aid): a
 // file chosen or dropped while one runs waits, and only the latest one is kept.
 let converting = false, queuedFile = null;
+// KF8 stylesheets: the Kindle profile, or ?css=author for the author sheets verbatim (debugging)
+const CSS_MODE = new URLSearchParams(location.search).get('css') === 'author' ? 'author' : 'profile';
 async function handleFile(file) {
   if (converting) { queuedFile = file; return; }
   converting = true;
@@ -2673,7 +3457,7 @@ async function convertFile(file) {
           await new Promise(r => setTimeout(r, delay));
           buf = await file.arrayBuffer();
         }
-        epub = await parseEpub(buf, {mobi: fmt === 'mobi', kf8: fmt !== 'mobi'});
+        epub = await parseEpub(buf, {mobi: fmt === 'mobi', kf8: fmt !== 'mobi', css: CSS_MODE});
         break; // success
       } catch(parseErr) {
         // JSZip throws different errors depending on how the file is broken:

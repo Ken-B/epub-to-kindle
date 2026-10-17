@@ -96,7 +96,16 @@ Timeouts and harness errors (`error` starting with `harness:`) are never cached.
     "toc":    {"input_entries": 0, "output_entries": 0, "matched": 0, "depth_in": 0, "depth_out": 0},
     "links":  {"internal_total": 0, "resolved": 0},
     "style":  {"score": 0.0, "per_chapter": [0.0], "input_css_rules": 0,
-               "input_css_rules_unreferenced": 0, "output_css_rules": 0}
+               "input_css_rules_unreferenced": 0, "output_css_rules": 0,
+               "device_score": 0.0, "device_per_chapter": [0.0], "device_checked_props": 0,
+               "device_equal_props": 0, "device_prop_disagreements": {"text-indent": 0},
+               "device_prop_examples": {"text-indent": [{"text": "", "tag": "p", "out_tag": "p", "in": "0px", "out": "24px"}]},
+               "device_model": "kindle-v1", "device_css_removed": {"at:media": 0, "selectors": 0, "rules": 0}},
+    "layout_hygiene":       {"empty_blocks": 0, "trailing_breaks": 0, "whitespace_runs": 0, "nbsp_indents": 0,
+                             "empty_blocks_styled": 0, "trailing_breaks_double": 0,
+                             "nbsp_indents_ambiguous": 0, "documents": 0, "examples": {"empty_blocks": ["part0003.xhtml: <p> ''"]}},
+    "layout_hygiene_input": {"empty_blocks": 0, "trailing_breaks": 0, "whitespace_runs": 0, "nbsp_indents": 0,
+                             "documents": 0, "examples": {}}
   },
   "calibre_diff": {
     "header_fields_diff": [{"field": "…", "ours": "…", "calibre": "…"}],
@@ -244,10 +253,72 @@ elements), elements, chars (visible chars removed), anchors (<a href> removed), 
     alignment and indent on the text itself, which the anchor pair compares).
   - Hidden input elements are left out (see "MOBI v6 hidden content").
   For AZW3 `props_excluded_for_format` is `[]` and nothing of this applies.
+- Device score (AZW3 only; `device_score: null` for MOBI, and with `device_error` when the pass
+  failed): what a Kindle would show, not what a browser shows. Every output part is loaded a second
+  time in its own JS-disabled context whose requests are answered through `device.py` (Playwright
+  route fulfil): the document gets `KINDLE_UA_CSS` as its FIRST style sheet (a `<style>` right after
+  `<head>`), and every style sheet it loads (linked `Styles/*.css`, `@import`, inline `<style>`) is
+  rewritten by `device_css`: `@media`, `@supports`, `@namespace`, `@layer` (also `@container`,
+  `@scope`, `@document`, `@starting-style`) are removed with their blocks (not inlined), `@charset`
+  removed, `@import` kept only for a relative URL without condition; in every rule's selector list a
+  selector with a sibling combinator (`+`, `~`), an attribute selector, a namespace prefix (`|`),
+  `:not(`/`:is(`/`:where(`/`:has(` or a structural pseudo-class other than `:first-child`
+  (`:nth-*`, `:last-child`, `:only-child`, `:*-of-type`, `:root`, `:empty`) is dropped, and the
+  rule when none is left; pseudo-elements and declarations are kept. The rewriter is a tokeniser
+  (strings, comments, escapes, unquoted `url()`, nested blocks); `device_css_removed` counts what it
+  removed per book (unique sheets). `KINDLE_UA_CSS` is a tunable model assumption (`device_model`
+  names its version): `p {margin: 0; text-indent: 1.5em}`, `blockquote {margin: 0 0 0 2em}`,
+  `h1..h6 {margin: 0}`, `ul, ol {margin: 0; padding-left: 2em}`, and section/article/aside/nav/
+  header/footer/main/figure/figcaption/hgroup/details/summary `{display: inline}` (unknown
+  elements), so a default the writer leaves unpinned is penalised. The device rendering is aligned
+  and scored, with the same `_align_score` / `_StyleAcc` rules as `score`, against a SECOND load of
+  each input chapter (full author CSS in Chromium) served with `device.INPUT_PAGE_CSS` inserted
+  before `</body>` (after the author sheets): `html, body {margin-left/right, padding-left/right: 0
+  !important}`, i.e. the author's intended look on a page whose side margins the device owns, so the
+  percentage widths/margins of descendants resolve against the same content box as on the output
+  (whose writer zeroes them on purpose). UTF-16/32 inputs or ones without `</body>`/`</html>` are
+  loaded unchanged (`device_css_removed.input_page_not_injected`). margin-*/padding-* of
+  `<html>`/`<body>` are not compared (page margins belong to the device). The preservation `score`
+  uses the first, unmodified input load as before. `device_score` = equal / checked over the
+  book, `device_per_chapter` per spine item, `device_prop_disagreements` / `device_prop_examples`
+  as for `prop_disagreements`. It runs whenever the style pass runs (`--no-style` skips both).
 - `input_css_rules`: rule blocks of the style sheets reachable from an XHTML spine document (`<link
   rel=stylesheet>` to CSS, i.e. not `.xpgt` and not another declared type; `<style>`; `@import` chains),
   `@font-face` blocks excluded (fonts are dropped by design). The same exclusion applies to
   `output_css_rules`. `input_css_rules_unreferenced`: the rest of the manifest's `text/css` items.
+
+`layout_hygiene` (both formats; static, lxml, no browser, also with `--no-style`): counts over the
+`<body>` of the output documents (KindleUnpack `mobi8/OEBPS/Text/part*.xhtml`, or the single mobi7
+`book.html`); `layout_hygiene_input` the same over the input XHTML spine documents (before MOBI hidden
+content is pruned). `device.layout_hygiene_doc`:
+- `empty_blocks`: `<p>`/`<div>` with no element child, no text (ASCII whitespace only; U+00A0 is
+  text) and no `id`; `<p><br/></p>` is not empty. One whose tag/class rule in the document's sheets
+  (`device.marker_selectors`: last compound of the selector) or `style` attribute sets
+  page-break-*/break-*, border*, background*, height/min-height, width, clear or padding (incl.
+  -top/-bottom) is an intentional marker/spacer and counts as `empty_blocks_styled` instead.
+- `trailing_breaks`: a `<br>` that is the last non-whitespace node of a p/div/li/h1-h6/blockquote/dd/dt
+  (directly or through inline elements ending there too) whose nearest preceding non-whitespace
+  content (looking back through inline wrappers; empty ones such as `<a id>` are passed over) is text
+  or a non-`<br>` inline element (img, ...). `<p><br/></p>` (a blank line) and a `<br>` right after a
+  block do not count; `text<br/><br/>` (the last `<br>` preceded by `<br>`s after content) counts as
+  `trailing_breaks_double`.
+- `whitespace_runs`: text nodes (text and tails, whitespace-only ones between blocks included) with a
+  newline, tab, CR or two ASCII spaces in a row, outside pre/textarea/listing/plaintext/xmp and
+  outside elements whose `style` attribute, or a rule of the document's sheets whose selector's last
+  compound names their tag or class, sets `white-space: pre*`/`break-spaces` (an approximation: the
+  rest of the selector is ignored). Text inside style/script/template/noscript and inline svg/math
+  subtrees is not counted (not HTML text flow).
+- `nbsp_indents`: p/div/li/dd/dt/h1-h6 whose text (leading ASCII whitespace ignored) starts with two
+  or more U+00A0, counted on the innermost such block, and only in the unambiguous case the writer
+  converts: no nested block element, no other line of the block (after a `<br>`) starting with U+00A0
+  (verse), and the nbsp run not followed by a short non-letter mark (ditto, dash, ...) and more U+00A0
+  (table-like columns). The excluded ones count as `nbsp_indents_ambiguous`.
+- The `layout-hygiene` category and the report/compare "layout hygiene" rows use the four main
+  counts only; `empty_blocks_styled`, `trailing_breaks_double`, `nbsp_indents_ambiguous` are shown
+  in the report summary.
+`documents` = documents counted, `examples` = up to 3 per count. A failure leaves both `null` and sets
+`invariants.errors.layout_hygiene`.
+
 - `calibre_diff` is computed only when both files exist; otherwise `null`.
 
 ## Module interfaces
@@ -270,8 +341,18 @@ def install_tools(root: Path) -> None                      # brew libmobi, clone
 def gate(out_dir: Path, fmt: str, who: str = "ours") -> dict        # runs the three parsers, fills unpack/
 def invariants(entry: dict, out_dir: Path, fmt: str, page) -> dict  # needs a Playwright page for style score
 
+# device.py (self-test: uv run tests/harness/test_device.py)
+KINDLE_UA_CSS: str; DEVICE_MODEL: str
+def device_css(css: str, stats: Counter | None = None) -> str        # device-model rewrite of one sheet
+def device_document(data: bytes, stats: Counter | None = None) -> bytes  # UA sheet first, <style> rewritten
+def layout_hygiene_doc(body, pre=(set(), set()), counts=None, examples=None, doc="") -> Counter
+
 # calibre_diff.py
 def diff(entry: dict, out_dir: Path, fmt: str) -> dict
+
+# compare.py: a device_score drop > STYLE_TOL is a regression like the style score; a baseline result
+# without device_score / layout_hygiene shows "n/a" and gets no "new category" for device-style-lost /
+# layout-hygiene (CAT_FIELD); layout-hygiene is informational.
 
 # report.py
 TAXONOMY = {...}                                                     # category -> (description, kind)
@@ -299,6 +380,8 @@ def write_report(results: list[dict], out_md: Path, out_json: Path, *, subset: s
 | toc-labels | matched < min(input, output) | writer bug |
 | links-unresolved | resolved < internal_total | unported transform (writer8 main: internal links) |
 | style-lost | style.score < 0.5, or (AZW3 only) input_css_rules (reachable sheets, no @font-face) > 0 and output_css_rules == 0 | unported transform (writer8 main: css flows / oeb flatcss) |
+| device-style-lost | (AZW3 only) style.device_score < 0.8 (`report.DEVICE_STYLE_MIN`) | unported transform (oeb flatcss: cascade baked into classes, UA defaults pinned) |
+| layout-hygiene | any output layout_hygiene count > 0 | informational |
 | fixed-layout-unsupported | `invariants.fixed_layout`: input OPF has rendition:layout pre-paginated; the book's other categories become out of scope | out of scope |
 | calibre-header-diff | header_fields_diff non-empty beyond the ignore list | informational |
 | input-repair | app-error, a clean app error, or text-loss on a book Calibre converted fine and whose verdict is error/warning | input repair |

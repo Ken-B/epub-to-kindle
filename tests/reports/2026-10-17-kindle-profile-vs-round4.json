@@ -1,0 +1,2790 @@
+{
+  "subset": "real-local-generated",
+  "date": "2026-10-17",
+  "total_results": 418,
+  "formats": {
+    "azw3": {
+      "books": 209,
+      "converted": 209,
+      "calibre_ok": 209,
+      "gate_evaluated": 209,
+      "gate_pass": 209,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "style-lost": 10,
+        "calibre-header-diff": 209,
+        "input-repair": 1,
+        "layout-hygiene": 17,
+        "images-misreferenced": 1
+      },
+      "actionable_category_books": {
+        "style-lost": 10,
+        "input-repair": 1,
+        "images-misreferenced": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 10,
+        "input repair": 1,
+        "writer bug": 1
+      },
+      "kind_instances": {
+        "unported Calibre transform": 10,
+        "input repair": 1,
+        "writer bug": 1
+      },
+      "kind_not_actionable": {
+        "informational": 226
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.9090909090909091,
+        "input repair": 0.09090909090909091,
+        "writer bug": 0.09090909090909091
+      },
+      "gap_instances": 12,
+      "books_with_gap": 11,
+      "dominant_kind": "unported Calibre transform",
+      "top_category_by_kind": {
+        "unported Calibre transform": "style-lost",
+        "input repair": "input-repair",
+        "writer bug": "images-misreferenced"
+      },
+      "top5": [
+        {
+          "category": "style-lost",
+          "books": 10,
+          "description": "Style score below 0.5, or the input has CSS rules and the output none",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "generated/gen-duplicate-ids",
+            "generated/gen-footnotes-ok",
+            "generated/gen-item-not-in-manifest"
+          ]
+        },
+        {
+          "category": "images-misreferenced",
+          "books": 1,
+          "description": "Image references in the text point at the wrong image or at none",
+          "kind": "writer bug",
+          "examples": [
+            "real/gutenberg/pg63372"
+          ]
+        },
+        {
+          "category": "input-repair",
+          "books": 1,
+          "description": "App failed or lost text on a malformed input Calibre converted anyway",
+          "kind": "input repair",
+          "examples": [
+            "generated/gen-latin1-undeclared"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "real/gutenberg/pg63372",
+          "category": "pg",
+          "tier": 1,
+          "reasons": [
+            "image refs 126/128 correct (0 wrong, 2 missing)"
+          ]
+        },
+        {
+          "id": "generated/gen-footnotes-ok",
+          "category": "generated",
+          "tier": 2,
+          "reasons": [
+            "style score 0.04"
+          ]
+        },
+        {
+          "id": "generated/gen-duplicate-ids",
+          "category": "generated",
+          "tier": 2,
+          "reasons": [
+            "style score 0.07"
+          ]
+        },
+        {
+          "id": "generated/gen-latin1-declared",
+          "category": "generated",
+          "tier": 2,
+          "reasons": [
+            "style score 0.08"
+          ]
+        },
+        {
+          "id": "generated/gen-latin1-undeclared",
+          "category": "generated",
+          "tier": 2,
+          "reasons": [
+            "style score 0.09",
+            "text 2/3 spine items match"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "generated": {
+          "style-lost": 8,
+          "calibre-header-diff": 8,
+          "input-repair": 1
+        },
+        "local": {
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "calibre-header-diff": 100,
+          "layout-hygiene": 17,
+          "style-lost": 2,
+          "images-misreferenced": 1
+        },
+        "se": {
+          "calibre-header-diff": 100
+        }
+      },
+      "corpus_category_books": {
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 209,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 198,
+      "books_not_fully_evaluated": 0,
+      "books_fixed_layout": 0,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 0,
+        "images": 0,
+        "toc": 0,
+        "links": 0,
+        "style": 0
+      },
+      "style_score_se_pg": [
+        0.7297855,
+        200
+      ],
+      "device_score_se_pg": [
+        0.9954560000000001,
+        200
+      ],
+      "layout_hygiene_pooled": {
+        "empty_blocks": 21,
+        "trailing_breaks": 0,
+        "whitespace_runs": 0,
+        "nbsp_indents": 9,
+        "empty_blocks_styled": 68,
+        "trailing_breaks_double": 54,
+        "nbsp_indents_ambiguous": 426,
+        "books": 209,
+        "books_nonzero": 17
+      },
+      "layout_hygiene_input_pooled": {
+        "empty_blocks": 167,
+        "trailing_breaks": 1815,
+        "whitespace_runs": 648461,
+        "nbsp_indents": 16,
+        "empty_blocks_styled": 72,
+        "trailing_breaks_double": 54,
+        "nbsp_indents_ambiguous": 467,
+        "books": 209,
+        "books_nonzero": 209
+      }
+    },
+    "mobi": {
+      "books": 209,
+      "converted": 209,
+      "calibre_ok": 209,
+      "gate_evaluated": 209,
+      "gate_pass": 209,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "layout-hygiene": 209,
+        "calibre-header-diff": 209,
+        "input-repair": 1,
+        "style-lost": 29,
+        "text-loss": 1,
+        "images-unextractable": 1,
+        "links-unresolved": 1
+      },
+      "actionable_category_books": {
+        "input-repair": 1,
+        "style-lost": 29,
+        "text-loss": 1,
+        "links-unresolved": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 29,
+        "input repair": 1,
+        "writer bug": 1
+      },
+      "kind_instances": {
+        "unported Calibre transform": 30,
+        "input repair": 1,
+        "writer bug": 1
+      },
+      "kind_not_actionable": {
+        "informational": 419
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.9666666666666667,
+        "input repair": 0.03333333333333333,
+        "writer bug": 0.03333333333333333
+      },
+      "gap_instances": 32,
+      "books_with_gap": 30,
+      "dominant_kind": "unported Calibre transform",
+      "top_category_by_kind": {
+        "unported Calibre transform": "style-lost",
+        "input repair": "input-repair",
+        "writer bug": "text-loss"
+      },
+      "top5": [
+        {
+          "category": "style-lost",
+          "books": 29,
+          "description": "Style score below 0.5, or the input has CSS rules and the output none",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "real/gutenberg/pg16113",
+            "real/gutenberg/pg19246",
+            "real/gutenberg/pg44342"
+          ]
+        },
+        {
+          "category": "text-loss",
+          "books": 1,
+          "description": "Spine items whose text did not survive conversion",
+          "kind": "transform or repair",
+          "examples": [
+            "real/gutenberg/pg63372"
+          ]
+        },
+        {
+          "category": "links-unresolved",
+          "books": 1,
+          "description": "Internal links that no longer resolve",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "real/gutenberg/pg63372"
+          ]
+        },
+        {
+          "category": "input-repair",
+          "books": 1,
+          "description": "App failed or lost text on a malformed input Calibre converted anyway",
+          "kind": "input repair",
+          "examples": [
+            "generated/gen-latin1-undeclared"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "real/standard-ebooks/noel-coward_hay-fever",
+          "category": "se",
+          "tier": 2,
+          "reasons": [
+            "style score 0.15"
+          ]
+        },
+        {
+          "id": "real/standard-ebooks/mary-p-hamlin_george-arliss_hamilton",
+          "category": "se",
+          "tier": 2,
+          "reasons": [
+            "style score 0.15"
+          ]
+        },
+        {
+          "id": "real/standard-ebooks/ring-lardner_george-s-kaufman_june-moon",
+          "category": "se",
+          "tier": 2,
+          "reasons": [
+            "style score 0.18"
+          ]
+        },
+        {
+          "id": "real/standard-ebooks/george-macdonald_if-i-had-a-father",
+          "category": "se",
+          "tier": 2,
+          "reasons": [
+            "style score 0.19"
+          ]
+        },
+        {
+          "id": "real/gutenberg/pg55919",
+          "category": "pg",
+          "tier": 2,
+          "reasons": [
+            "style score 0.19"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "generated": {
+          "layout-hygiene": 8,
+          "calibre-header-diff": 8,
+          "input-repair": 1
+        },
+        "local": {
+          "layout-hygiene": 1,
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "layout-hygiene": 100,
+          "calibre-header-diff": 100,
+          "style-lost": 17,
+          "text-loss": 1,
+          "images-unextractable": 1,
+          "links-unresolved": 1
+        },
+        "se": {
+          "layout-hygiene": 100,
+          "calibre-header-diff": 100,
+          "style-lost": 12
+        }
+      },
+      "corpus_category_books": {
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 209,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 179,
+      "books_not_fully_evaluated": 0,
+      "books_fixed_layout": 0,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 0,
+        "images": 0,
+        "toc": 0,
+        "links": 0,
+        "style": 0
+      },
+      "style_score_se_pg": [
+        0.7475029999999999,
+        200
+      ],
+      "device_score_se_pg": [
+        null,
+        0
+      ],
+      "layout_hygiene_pooled": {
+        "empty_blocks": 241,
+        "trailing_breaks": 1436,
+        "whitespace_runs": 614888,
+        "nbsp_indents": 16,
+        "empty_blocks_styled": 0,
+        "trailing_breaks_double": 54,
+        "nbsp_indents_ambiguous": 467,
+        "books": 209,
+        "books_nonzero": 209
+      },
+      "layout_hygiene_input_pooled": {
+        "empty_blocks": 167,
+        "trailing_breaks": 1815,
+        "whitespace_runs": 648461,
+        "nbsp_indents": 16,
+        "empty_blocks_styled": 72,
+        "trailing_breaks_double": 54,
+        "nbsp_indents_ambiguous": 467,
+        "books": 209,
+        "books_nonzero": 209
+      }
+    }
+  },
+  "before_after": {
+    "formats": {
+      "azw3": {
+        "pairs": 209,
+        "categories": {
+          "images-misreferenced": {
+            "before": 0,
+            "after": 1
+          },
+          "style-lost": {
+            "before": 0,
+            "after": 10
+          },
+          "device-style-lost": {
+            "before": 61,
+            "after": 0
+          },
+          "layout-hygiene": {
+            "before": 209,
+            "after": 17
+          },
+          "calibre-header-diff": {
+            "before": 209,
+            "after": 209
+          },
+          "input-repair": {
+            "before": 1,
+            "after": 1
+          }
+        },
+        "before": {
+          "books": 209,
+          "converted": 209,
+          "gate_pass": 209,
+          "gate_evaluated": 209,
+          "style_se_pg": 1.0,
+          "style_se_pg_n": 200,
+          "device_se_pg": 0.8878515,
+          "device_se_pg_n": 200,
+          "hygiene": {
+            "empty_blocks": 167,
+            "trailing_breaks": 1815,
+            "whitespace_runs": 648729,
+            "nbsp_indents": 16,
+            "empty_blocks_styled": 72,
+            "trailing_breaks_double": 54,
+            "nbsp_indents_ambiguous": 467,
+            "books": 209,
+            "books_nonzero": 209
+          },
+          "links": [
+            29021,
+            29021
+          ],
+          "image_refs": [
+            3570,
+            3570
+          ],
+          "images_hash": [
+            3085,
+            3085
+          ],
+          "text": [
+            4366,
+            4367
+          ],
+          "toc": [
+            8928,
+            8928
+          ]
+        },
+        "after": {
+          "books": 209,
+          "converted": 209,
+          "gate_pass": 209,
+          "gate_evaluated": 209,
+          "style_se_pg": 0.7297855,
+          "style_se_pg_n": 200,
+          "device_se_pg": 0.9954560000000001,
+          "device_se_pg_n": 200,
+          "hygiene": {
+            "empty_blocks": 21,
+            "trailing_breaks": 0,
+            "whitespace_runs": 0,
+            "nbsp_indents": 9,
+            "empty_blocks_styled": 68,
+            "trailing_breaks_double": 54,
+            "nbsp_indents_ambiguous": 426,
+            "books": 209,
+            "books_nonzero": 17
+          },
+          "links": [
+            29021,
+            29021
+          ],
+          "image_refs": [
+            3568,
+            3570
+          ],
+          "images_hash": [
+            3085,
+            3085
+          ],
+          "text": [
+            4366,
+            4367
+          ],
+          "toc": [
+            8928,
+            8928
+          ]
+        },
+        "regressions": [
+          {
+            "id": "real/gutenberg/pg17016",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.66"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/theodore-roosevelt_a-book-lovers-holidays-in-the-open",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.81"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg44342",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.74"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg29047",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.63"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg36902",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.69"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/e-nesbit_beautiful-stories-from-shakespeare",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "generated/gen-wrong-media-types",
+            "category": "generated",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.10"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/ring-lardner_fred-gross-stories",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.84"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/charlotte-m-yonge_the-clever-woman-of-the-family",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg72234",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg66997",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.85"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/george-macdonald_within-and-without",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.90"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/mary-p-hamlin_george-arliss_hamilton",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.86"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg30274",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg8932",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.66"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg15228",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.67"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg30963",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/noel-loomis_short-science-fiction",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/harry-harrison_short-fiction",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg50820",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg48323",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.64"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg7199",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/h-c-mcneile_the-third-round",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg60297",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.81"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg67331",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.66"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg59227",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.74"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/dornford-yates_blind-corner",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg7237",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg19246",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.83"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg71277",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.68"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg62947",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.58"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg5578",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.67"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/kahlil-gibran_jesus-the-son-of-man",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/p-g-wodehouse_the-adventures-of-sally",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg27367",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.58"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg16578",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.68"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg34377",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.64"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg29559",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.64"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/h-g-wells_the-wheels-of-chance",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.80"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/edgar-rice-burroughs_pirates-of-venus",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg31085",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.63"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/robert-hugh-benson_the-necromancers",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/anthony-trollope_dr-wortles-school",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg43593",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.68"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/catherine-louisa-pirkis_short-fiction",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/norman-angell_the-great-illusion",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.80"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/rudolph-fisher_the-walls-of-jericho",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg71842",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.69"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/samuel-taylor-coleridge_robert-southey_the-fall-of-robespierre",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.90"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg2175",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg36578",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.73"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/noel-coward_hay-fever",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.85"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg72476",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.85"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg461",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.74"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg16866",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.66"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/david-hume_a-treatise-of-human-nature",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.80"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg52657",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.69"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/a-e-w-mason_the-house-of-the-arrow",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg70584",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.65"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg58344",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.29"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/joshua-slocum_sailing-alone-around-the-world",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "local/hertmans",
+            "category": "local",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.83"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg22088",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.58"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg28050",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "generated/gen-unterminated-tag",
+            "category": "generated",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.09"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg29815",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.62"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/anna-katharine-green_the-sword-of-damocles",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg11660",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/anne-parrish_the-perennial-bachelor",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/dorothy-m-richardson_oberland",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/siegfried-sassoon_memoirs-of-an-infantry-officer",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg4865",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.67"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/charles-dickens_barnaby-rudge",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg5513",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.67"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg74759",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/winnifred-eaton-reeve_his-royal-nibs",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg29340",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.68"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/pauline-e-hopkins_of-one-blood",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg69052",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg2037",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.51"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/joseph-conrad_the-rover",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/charles-dickens_the-mystery-of-edwin-drood",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/dornford-yates_perishable-goods",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/joseph-conrad_the-rescue",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/dorothy-m-richardson_revolving-lights",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg63372",
+            "category": "pg",
+            "reasons": [
+              [
+                "image refs correct",
+                "image refs correct 128 -> 126"
+              ],
+              [
+                "style score",
+                "style score 1.00 -> 0.90"
+              ],
+              [
+                "new category",
+                "new categories: images-misreferenced"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/charles-kingsley_hypatia",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg54611",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.71"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg6466",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.74"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/arthur-conan-doyle_brigadier-gerard-stories",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/john-donne_poetry",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.86"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg21853",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.59"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/mourning-dove_cogewea-the-half-blood",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg55919",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.72"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/edgar-saltus_short-fiction",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/katharine-a-carl_with-the-empress-dowager-of-china",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/rudyard-kipling_captains-courageous",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg22096",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/w-e-b-du-bois_the-quest-of-the-silver-fleece",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/charles-brockden-brown_wieland",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg12215",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg22110",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.64"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg23378",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.70"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/walter-white_flight",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/yung-wing_my-life-in-china-and-america",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg6568",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.70"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/wilkie-collins_basil",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg3030",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg18196",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.66"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg34433",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.50"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg7115",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.65"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg49505",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.71"
+              ]
+            ]
+          },
+          {
+            "id": "generated/gen-latin1-undeclared",
+            "category": "generated",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.09"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/walter-white_the-fire-in-the-flint",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/w-h-davies_the-autobiography-of-a-super-tramp",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg1816",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/joseph-conrad_ford-madox-ford_the-nature-of-a-crime",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg49350",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg44385",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/edmund-burke_reflections-on-the-revolution-in-france",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg23092",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.67"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg3193",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "generated/gen-latin1-declared",
+            "category": "generated",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.08"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg74064",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.59"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/arthur-b-reeve_craig-kennedy-stories",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/ring-lardner_gullibles-travels",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg34176",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.64"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/jane-c-loudon_the-mummy",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg31099",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.51"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/j-storer-clouston_the-man-from-the-clouds",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg17250",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.58"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/herbert-gorman_the-place-called-dagon",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg18214",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.63"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/anna-katharine-green_hand-and-ring",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg6072",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.66"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg69443",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.69"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/henry-seton-merriman_barlasch-of-the-guard",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/ford-madox-ford_the-fifth-queen-crowned",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg67108",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.68"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/mary-augusta-ward_lady-roses-daughter",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/d-l-moody_the-way-to-god-and-how-to-find-it",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg7906",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.80"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/dorothy-m-richardson_interim",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/marmaduke-pickthall_said-the-fisherman",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/james-branch-cabell_the-line-of-love",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.81"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/agatha-christie_partners-in-crime",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/franklin-w-dixon_the-great-airport-mystery",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg61348",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.72"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg61267",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.74"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg11993",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.65"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/h-c-mcneile_the-final-count",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/willa-cather_the-professors-house",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/catherine-louisa-pirkis_the-experiences-of-loveday-brooke-lady-detective",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg48218",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.73"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/george-macdonald_if-i-had-a-father",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.86"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/maria-lowell_poetry",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.83"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/arthur-ransome_racundras-first-cruise",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/marie-belloc-lowndes_the-chink-in-the-armour",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/john-newton_william-cowper_olney-hymns",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.87"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/joseph-conrad_the-arrow-of-gold",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/hilaire-belloc_the-cruise-of-the-nona",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.69"
+              ],
+              [
+                "device score",
+                "device score 0.98 -> 0.87"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/george-eliot_romola",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg1713",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg51700",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg6795",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.80"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg58062",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/dorothy-m-richardson_the-trap",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg57791",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.68"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/ring-lardner_george-s-kaufman_june-moon",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.86"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/edgar-saltus_the-perfume-of-eros",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/joseph-conrad_suspense",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/charlotte-perkins-gilman_moving-the-mountain",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.75"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/dorothy-l-sayers_robert-eustace_the-documents-in-the-case",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg44953",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/claude-mckay_banjo",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "generated/gen-footnotes-ok",
+            "category": "generated",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.04"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg52303",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.74"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg17721",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.58"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg60903",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.42"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg14658",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg47151",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.62"
+              ]
+            ]
+          },
+          {
+            "id": "generated/gen-item-not-in-manifest",
+            "category": "generated",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.10"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/a-e-w-mason_the-four-feathers",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/olaf-stapledon_last-and-first-men",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "generated/gen-duplicate-ids",
+            "category": "generated",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.07"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg45731",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.64"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/catherine-louisa-pirkis_a-bride-of-a-summers-day",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg16113",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.70"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/john-meade-falkner_the-lost-stradivarius",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/john-gay_the-beggars-opera",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.89"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg37394",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.63"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/h-c-mcneile_the-black-gang",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg53626",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/dorothy-m-richardson_deadlock",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/henry-van-dyke-jr_the-house-of-rimmon",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.90"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg21005",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.61"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg41097",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.58"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/pauline-e-hopkins_contending-forces",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.79"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg10450",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.62"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/henry-seton-merriman_the-sowers",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.76"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/ameen-rihani_the-book-of-khalid",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/c-h-spurgeon_the-art-of-illustration",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg64210",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.81"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/robert-louis-stevenson_poetry",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.84"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/ring-lardner_short-fiction",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.78"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg27703",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.85"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg77864",
+            "category": "pg",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.69"
+              ]
+            ]
+          },
+          {
+            "id": "generated/gen-missing-ncx",
+            "category": "generated",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.10"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/standard-ebooks/joseph-conrad_chance",
+            "category": "se",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.77"
+              ]
+            ]
+          }
+        ]
+      },
+      "mobi": {
+        "pairs": 209,
+        "categories": {
+          "text-loss": {
+            "before": 1,
+            "after": 1
+          },
+          "images-unextractable": {
+            "before": 1,
+            "after": 1
+          },
+          "links-unresolved": {
+            "before": 1,
+            "after": 1
+          },
+          "style-lost": {
+            "before": 29,
+            "after": 29
+          },
+          "layout-hygiene": {
+            "before": 209,
+            "after": 209
+          },
+          "calibre-header-diff": {
+            "before": 209,
+            "after": 209
+          },
+          "input-repair": {
+            "before": 1,
+            "after": 1
+          }
+        },
+        "before": {
+          "books": 209,
+          "converted": 209,
+          "gate_pass": 209,
+          "gate_evaluated": 209,
+          "style_se_pg": 0.7475029999999999,
+          "style_se_pg_n": 200,
+          "device_se_pg": null,
+          "device_se_pg_n": 0,
+          "hygiene": {
+            "empty_blocks": 241,
+            "trailing_breaks": 1436,
+            "whitespace_runs": 614888,
+            "nbsp_indents": 16,
+            "empty_blocks_styled": 0,
+            "trailing_breaks_double": 54,
+            "nbsp_indents_ambiguous": 467,
+            "books": 209,
+            "books_nonzero": 209
+          },
+          "links": [
+            28987,
+            28991
+          ],
+          "image_refs": [
+            3423,
+            3531
+          ],
+          "images_hash": [
+            3001,
+            3085
+          ],
+          "text": [
+            4353,
+            4367
+          ],
+          "toc": [
+            8928,
+            8928
+          ]
+        },
+        "after": {
+          "books": 209,
+          "converted": 209,
+          "gate_pass": 209,
+          "gate_evaluated": 209,
+          "style_se_pg": 0.7475029999999999,
+          "style_se_pg_n": 200,
+          "device_se_pg": null,
+          "device_se_pg_n": 0,
+          "hygiene": {
+            "empty_blocks": 241,
+            "trailing_breaks": 1436,
+            "whitespace_runs": 614888,
+            "nbsp_indents": 16,
+            "empty_blocks_styled": 0,
+            "trailing_breaks_double": 54,
+            "nbsp_indents_ambiguous": 467,
+            "books": 209,
+            "books_nonzero": 209
+          },
+          "links": [
+            28987,
+            28991
+          ],
+          "image_refs": [
+            3423,
+            3531
+          ],
+          "images_hash": [
+            3001,
+            3085
+          ],
+          "text": [
+            4353,
+            4367
+          ],
+          "toc": [
+            8928,
+            8928
+          ]
+        },
+        "regressions": []
+      }
+    },
+    "unpaired_before": 0,
+    "unpaired_after": 0
+  }
+}

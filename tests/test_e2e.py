@@ -842,13 +842,14 @@ test('Empty spine → 0 chapters, no crash', test_empty_spine)
 
 # ── App (JS writer): CSS as flows ──────────────────────────────────────────
 #
-# The Python model above keeps only visibility rules inline. The real app keeps the
-# whole stylesheet verbatim as FDST flow 1..N (flow 0 = HTML) and links it from the
-# skeleton <head> via kindle:flow:NNNN, so these assertions run the real docs/index.html.
+# The Python model above keeps only visibility rules inline. The real app, in author mode
+# (?css=author), keeps the whole stylesheet verbatim as FDST flow 1..N (flow 0 = HTML) and
+# links it from the skeleton <head> via kindle:flow:NNNN; by default (the Kindle profile)
+# flow 1 is one generated sheet of baked classes. These assertions run the real docs/index.html.
 
 print('\n── App (JS writer): CSS as flows ──────────────────────────────────')
 
-def app_convert(epub_bytes: bytes, name: str = 'test.epub') -> bytes:
+def app_convert(epub_bytes: bytes, name: str = 'test.epub', query: str = '') -> bytes:
     """Convert an EPUB with the real app (docs/index.html in headless Chromium)."""
     import threading
     from functools import partial
@@ -863,7 +864,7 @@ def app_convert(epub_bytes: bytes, name: str = 'test.epub') -> bytes:
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
             page = browser.new_page()
-            page.goto(f'http://localhost:{httpd.server_address[1]}')
+            page.goto(f'http://localhost:{httpd.server_address[1]}/{query}')
             page.set_input_files('#fileInput', {'name': name, 'mimeType': 'application/epub+zip',
                                                 'buffer': epub_bytes})
             page.wait_for_selector('#dlBtn', state='visible', timeout=30000)
@@ -877,8 +878,8 @@ def app_convert(epub_bytes: bytes, name: str = 'test.epub') -> bytes:
         httpd.shutdown()
 
 _app_css = {}
-def _app_css_flows():
-    if 'flows' not in _app_css:
+def _app_css_flows(query: str = '?css=author'):
+    if query not in _app_css:
         epub = make_epub('App CSS Flow Test',
             [('Chapter 1', '<div class="wpt-verdwijn">HIDDEN</div><p class="normal">Visible text.</p>'),
              ('Chapter 2', '<p>Second chapter.</p>')],
@@ -886,23 +887,35 @@ def _app_css_flows():
                        ('.wpt-invis', 'visibility: hidden'),
                        ('.normal', 'font-size: 14px; margin: 0'),
                        ('p', 'font-family: serif')])
-        azw3 = app_convert(epub)
-        _app_css['azw3'] = azw3
-        _app_css['flows'] = [f.decode('utf-8', 'replace') for f in kf8_fdst_flows(azw3)]
-    return _app_css['flows']
+        azw3 = app_convert(epub, query=query)
+        _app_css[query] = [f.decode('utf-8', 'replace') for f in kf8_fdst_flows(azw3)]
+    return _app_css[query]
 
-test('App: FDST has more than one flow (HTML + stylesheet)',
+def _class_decls(flows: list[str], text: str) -> str:
+    """Declarations of the generated classes of the element just before `text` in flow 0."""
+    m = re.search(r'<[a-z][^>]*\sclass="([^"]*)"[^>]*>' + re.escape(text), flows[0])
+    if not m: return ''
+    return ';'.join((re.search(r'\.' + c + r'\{([^}]*)\}', flows[1]) or [None, ''])[1] for c in m.group(1).split())
+
+test('App (author mode): FDST has more than one flow (HTML + stylesheet)',
      lambda: len(_app_css_flows()) > 1)
-test('App: flow 1 keeps the FULL stylesheet (visibility and non-visibility rules)',
-     lambda: (lambda f: len(f) > 1 and re.search(r'display:\s*none', f[1])
-              and re.search(r'visibility:\s*hidden', f[1])
-              and re.search(r'font-family:\s*serif', f[1])
-              and re.search(r'font-size:\s*14px', f[1]) is not None)(_app_css_flows()))
-test('App: HTML flow (flow 0) carries no stylesheet text',
+test('App (author mode): flow 1 keeps the FULL stylesheet (visibility and non-visibility rules)',
+     lambda: (lambda f: len(f) > 1 and all(re.search(p, f[1]) is not None for p in
+              [r'display:\s*none', r'visibility:\s*hidden', r'font-family:\s*serif', r'font-size:\s*14px']))(_app_css_flows()))
+test('App (author mode): HTML flow (flow 0) carries no stylesheet text',
      lambda: (lambda f: len(f) > 1 and 'font-family' not in f[0] and 'display: none' not in f[0])(_app_css_flows()))
-test('App: skeleton <head> links the CSS flow (kindle:flow:0001?mime=text/css)',
-     lambda: (_app_css_flows(), re.search(r'<link[^>]*href="kindle:flow:0001\?mime=text/css"',
-                                          _app_css_flows()[0]) is not None)[1])
+test('App (author mode): skeleton <head> links the CSS flow (kindle:flow:0001?mime=text/css)',
+     lambda: re.search(r'<link[^>]*href="kindle:flow:0001\?mime=text/css"', _app_css_flows()[0]) is not None)
+test('App (profile): one generated sheet in flow 1, linked from the skeleton',
+     lambda: (lambda f: len(f) == 2 and '.wpt-verdwijn' not in f[1] and re.search(r'^\.kp\d+\{', f[1], re.M) is not None
+              and re.search(r'<link[^>]*href="kindle:flow:0001\?mime=text/css"', f[0]) is not None)(_app_css_flows('')))
+test('App (profile): the hidden element\'s generated class has display:none',
+     lambda: 'display:none' in _class_decls(_app_css_flows(''), 'HIDDEN'))
+test('App (profile): px font-size became em, margin and font-family baked',
+     lambda: (lambda d: 'font-size:0.875em' in d and 'margin:0' in d and 'font-family:serif' in d
+              and '14px' not in d)(_class_decls(_app_css_flows(''), 'Visible text.')))
+test('App (profile): HTML flow (flow 0) carries no stylesheet text',
+     lambda: (lambda f: 'font-family' not in f[0] and 'display:none' not in f[0])(_app_css_flows('')))
 
 # ── Image rendering via Playwright ────────────────────────────────────────
 
