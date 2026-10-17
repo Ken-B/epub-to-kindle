@@ -25,6 +25,7 @@ import hashlib
 import html.entities
 import io
 import json
+import math
 import os
 import posixpath
 import re
@@ -811,6 +812,8 @@ class InputBook:
         self.cover_path = self._cover_path(opf)
         self._docs: dict[str, object] = {}
         self._css: dict | None = None
+        # MOBI v6: per spine path, what prune_hidden removed ({elements, chars, anchors, unmapped})
+        self.hidden: dict[str, dict] = {}
 
     # names -------------------------------------------------------------------
     def canon(self, path: str | None) -> str | None:
@@ -892,6 +895,56 @@ class InputBook:
             else:
                 self._docs[path] = _parse_or_empty(self.dir / path, self.doc_errors, path)
         return self._docs[path]
+
+    def prune_hidden(self, path: str, tags: list[str], hid: list[int]) -> dict:
+        """Remove from the parsed document of `path` the elements the author CSS hides, as the MOBI
+        v6 writer does (its readers ignore CSS). `tags`/`hid` come from _collect(hidden=True): the
+        local names of every element under <body> in document order as Chromium parsed the file,
+        and the indexes of the topmost hidden ones; they are mapped onto lxml's elements by aligning
+        the two name sequences (identical for XHTML; the parsers may differ in HTML mode). An
+        id/name inside a removed subtree stays as an empty <a id|name> (the writer keeps link
+        targets the same way); the removed element's tail text stays."""
+        root = self.doc(path)
+        body = _find_body(root)
+        mine = [e for e in body.iter() if isinstance(e.tag, str)]
+        names = [_local(e) for e in mine]
+        if names == tags:
+            m = dict(enumerate(range(len(mine))))
+        else:
+            m = {}
+            for blk in difflib.SequenceMatcher(None, tags, names, autojunk=False).get_matching_blocks():
+                m.update((blk.a + d, blk.b + d) for d in range(blk.size))
+        st = {"elements": 0, "chars": 0, "anchors": 0, "unmapped": 0}
+        for k in hid:
+            el = mine[m[k]] if k in m else None
+            if el is None:
+                st["unmapped"] += 1
+                continue
+            parent = el.getparent()
+            if el is body or parent is None or not any(a is body for a in el.iterancestors()):
+                continue        # the body itself, or inside a subtree removed already
+            st["elements"] += 1
+            st["chars"] += len(_visible_text(el))
+            st["anchors"] += sum(1 for a in _elements(el, {"a"}) if _attr(a, "href") is not None)
+            ns = el.tag[1:].split("}")[0] if el.tag.startswith("{") else None
+            pos = list(parent).index(el)
+            keep = []
+            for e in el.iter():
+                ids = {k2: v for k2 in ("id", "name") if isinstance(e.tag, str) and (v := _attr(e, k2))}
+                if ids:
+                    keep.append(parent.makeelement(f"{{{ns}}}a" if ns else "a", ids))
+            for d, a in enumerate(keep):
+                parent.insert(pos + d, a)
+            tail = el.tail
+            parent.remove(el)
+            if tail:
+                prev = keep[-1] if keep else (parent[pos - 1] if pos > 0 else None)
+                if prev is not None:
+                    prev.tail = (prev.tail or "") + tail
+                else:
+                    parent.text = (parent.text or "") + tail
+        self.hidden[path] = st
+        return st
 
     def is_binary(self, sp: dict) -> bool:
         """Spine item whose bytes are not text (raster images, media, fonts): never parsed."""
@@ -1337,6 +1390,49 @@ def _raw_record_hashes(path: Path | None) -> set[str]:
         return set()
 
 
+_EMBED_RE = re.compile(r"^kindle:embed:([0-9A-Va-v]+)(?:\?.*)?$")
+
+
+def _embed_index(url: str) -> int | None:
+    """1-based resource index of a kindle:embed:XXXX[?mime=...] URL (XXXX is base 32: 0-9, A-V)."""
+    m = _EMBED_RE.match(url.strip())
+    return int(m.group(1), 32) if m else None
+
+
+def _first_resource(path: Path | None) -> int | None:
+    """PalmDB record number of the first resource record, as KindleUnpack computes it
+    (`mh.firstresource`): the 'first image index' of the (KF8) MOBI header plus the record where
+    that header starts (0, or the one after a BOUNDARY record of a combined file)."""
+    if path is None or not Path(path).is_file():
+        return None
+    try:
+        recs = _pdb_records(Path(path).read_bytes())
+        start = next((i + 1 for i, r in enumerate(recs) if r[:8] == b"BOUNDARY"), 0)
+        ofst = struct.unpack_from(">L", recs[start], 0x6C)[0]   # offset from the record start
+        return None if ofst == 0xFFFFFFFF else ofst + start
+    except Exception:
+        return None
+
+
+def _embed_file(outb: OutputBook, first_res: int | None, url: str) -> Path | None:
+    """The file KindleUnpack extracted for a kindle:embed:XXXX URL it left unrewritten (it rewrites
+    only <img>/<image> tags, style attributes and url() in CSS: not video@poster, object@data,
+    <source srcset>, ...). KindleUnpack keeps `rscnames[XXXX - 1]` for the resource records from
+    `first_res` on and names every image after its record number (image%05d / cover%05d /
+    thumb%05d). None when the record is not an extracted image."""
+    n = _embed_index(url)
+    if n is None or first_res is None or n < 1:
+        return None
+    rec = first_res + n - 1
+    for d in (outb.dir / "mobi8/OEBPS/Images", outb.dir / "mobi7/Images"):
+        if d.is_dir():
+            for f in sorted(d.iterdir()):
+                if f.is_file() and not f.name.startswith("HD") and re.fullmatch(
+                        rf"(?:image|cover|thumb){rec:05d}\..+", f.name):
+                    return f
+    return None
+
+
 def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs, raw_file: Path | None = None) -> dict:
     """Image presence (by hash) and per-reference correctness.
 
@@ -1370,8 +1466,32 @@ def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs, raw_file: Pa
            "refs_unextractable": 0, "refs_by_kind": {}, "refs_missing_by_kind": {},
            "first_wrong_ref": None, "first_missing_ref": None}
 
-    def in_rec(base: str, e):
-        """Reference record of one input element, or None when it references no manifest image."""
+    res_start = _first_resource(raw_file)
+    first_res = res_start if outb.kind == "kf8" else None
+    try:
+        raw_recs = _pdb_records(Path(raw_file).read_bytes()) if res_start is not None else []
+    except Exception:
+        raw_recs = []
+
+    def record_exists(n: int | None, start: int | None) -> bool:
+        return n is not None and start is not None and 1 <= n and start + n - 1 < len(raw_recs) \
+            and len(raw_recs[start + n - 1]) > 0
+
+    def embed_resolves(url: str) -> bool:
+        """kindle:embed:XXXX names a resource record that exists in the file (whether or not
+        KindleUnpack could extract it, e.g. svg/xyz): the reference itself is sound."""
+        return record_exists(_embed_index(url), first_res)
+
+    def recindex_resolves(e) -> bool:
+        """MOBI v6: an <img recindex="NNNNN"> KindleUnpack left as is (it rewrites recindex to a src
+        only for the images it extracted) that names an existing resource record: as sound as an
+        unrewritten kindle:embed in KF8."""
+        ri = (_attr(e, "recindex") or "").strip()
+        return outb.kind == "mobi7" and ri.isdigit() and record_exists(int(ri), res_start)
+
+    def in_info(base: str, e):
+        """(primary manifest path | None, [manifest paths of the srcset candidates]) of one input
+        element."""
         tag = _local(e)
         prim = None
         if tag != "source" and not (tag == "object" and any(
@@ -1381,27 +1501,48 @@ def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs, raw_file: Pa
                 ip = book.join(base, r.split("#")[0].split("?")[0])
                 if ip in inp:
                     prim = ip
-        ss = None
+        cands = []
         if tag in ("img", "source"):
-            cands = []
             for u in _parse_srcset(_attr(e, "srcset")):
                 if not u.startswith("data:") and not _has_scheme(u):
                     ip = book.join(base, u.split("#")[0].split("?")[0])
                     if ip in inp:
                         cands.append(ip)
-            ss = cands or None
-        return None if prim is None and ss is None else {"tag": tag, "primary": prim, "srcset": ss}
+        return prim, cands
 
     def in_refs(i):
-        """[(offset, record)] for one spine item, plus its text."""
+        """(text, primary records, srcset records) of one spine item, each as [(offset, record)].
+        Primary records (img src, svg image href, video poster, object data) are paired with the
+        output's primary records. An <img>/<image> without a manifest reference (data: URI, remote,
+        missing src) takes part in the pairing as a placeholder (primary None, never evaluated), just
+        as the output side lists every <img>/<image> without a usable src: otherwise the output's
+        src-less counterpart of a data: image steals the pairing of a real image that has the same
+        (e.g. empty) text context. The srcset records (every <img>, every <source> with candidates)
+        are paired apart: a <source> shares its text context with the <img> next to it and must
+        never be paired with it."""
         s = book.spine[i]
         if not s["xhtml"]:
-            return "", []
+            return "", [], []
         text, _, els = _text_index(book.doc(s["path"]))
-        out = [(off, rec) for off, e in els if (rec := in_rec(s["path"], e))]
-        return text, out
+        prim, ss, by_el = [], [], {}
+        for off, e in els:
+            p, cands = in_info(s["path"], e)
+            tag = _local(e)
+            if p or tag in IMAGE_TAGS:
+                prim.append((off, {"tag": tag, "primary": p}))
+            if cands or tag == "img":
+                rec = {"tag": tag, "primary": p, "cands": cands or None, "sib": None, "el": e}
+                ss.append((off, rec))
+                by_el[e] = rec
+        for _, rec in ss:
+            par = rec["el"].getparent()
+            if rec["tag"] == "source" and par is not None and _local(par) == "picture":
+                rec["sib"] = next((by_el[c] for c in par if c in by_el and _local(c) == "img"), None)
+        return text, prim, ss
 
     def out_file(p: Path, r: str):
+        if _embed_index(r) is not None:      # left unrewritten by KindleUnpack (poster, object, ...)
+            return _embed_file(outb, first_res, r)
         f = (p.parent / unquote(r.split("#")[0].split("?")[0])).resolve()
         if not f.is_file():
             # KindleUnpack names a record that is both CoverOffset and ThumbOffset "thumbNNNNN"
@@ -1409,54 +1550,75 @@ def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs, raw_file: Pa
             f = outb.dir / "mobi7/Images" / f.name
         return f if f.is_file() else None
 
-    def out_rec(p: Path, e):
-        r = (_ref_attr(e) or "").strip()
-        usable = bool(r) and not r.startswith("data:") and not _has_scheme(r)   # kindle:embed left
-        h = None                                                                  # unresolved etc.
-        if usable:
-            f = out_file(p, r)
-            h = outb.file_hash(f) if f else None
-        ss_attr = _attr(e, "srcset") if _local(e) in ("img", "source") else None
-        ss = None
-        if ss_attr is not None:
-            ss = []
-            for u in _parse_srcset(ss_attr):
-                if u.startswith("data:"):
-                    ss.append(True)
-                elif _has_scheme(u):
-                    ss.append(not u.lower().startswith("kindle:"))
-                else:
-                    ss.append(out_file(p, u) is not None)
-        # an <img>/<image> without a usable src still takes part in the pairing (as before); other
-        # element kinds only when they carry a reference of their own
-        if not usable and ss is None and not (not r and _local(e) in IMAGE_TAGS):
-            return None
-        return {"tag": _local(e), "primary": h, "has_src": usable, "srcset": ss}
-
     def out_refs(p: Path):
+        """(text, primary records, srcset records) of one output document."""
         text, _, els = _text_index(outb.doc(p))
-        return text, [(off, rec) for off, e in els if (rec := out_rec(p, e))]
+        prim, ss = [], []
+        for off, e in els:
+            tag = _local(e)
+            r = (_ref_attr(e) or "").strip()
+            usable = bool(r) and not r.startswith("data:") and (not _has_scheme(r) or _embed_index(r) is not None)
+            h = None
+            if usable:
+                f = out_file(p, r)
+                h = outb.file_hash(f) if f else None
+            # an <img>/<image> without a src still takes part in the pairing (it is a lost image);
+            # other element kinds only when they carry a reference of their own
+            ok = h is not None or (usable and embed_resolves(r)) or (not r and tag == "img" and recindex_resolves(e))
+            if usable or (not r and tag in IMAGE_TAGS):
+                prim.append((off, {"tag": tag, "primary": h}))
+            ss_attr = _attr(e, "srcset") if tag in ("img", "source") else None
+            if tag == "img" or ss_attr is not None:
+                cands = None
+                if ss_attr is not None:
+                    cands = []
+                    for u in _parse_srcset(ss_attr):
+                        if u.startswith("data:"):
+                            cands.append(True)
+                        elif _embed_index(u) is not None:
+                            cands.append(out_file(p, u) is not None or embed_resolves(u))
+                        elif _has_scheme(u):
+                            cands.append(not u.lower().startswith("kindle:"))
+                        else:
+                            cands.append(out_file(p, u) is not None)
+                ss.append((off, {"tag": tag, "primary": h, "resolved": ok, "ss": cands}))
+        return text, prim, ss
 
-    def keyed(parts):
-        """Concatenate [(text, [(offset, value)])] and key every value by its text context."""
+    def keyed(parts, with_tag: bool = False):
+        """Concatenate [(text, [(offset, value)])] and key every value by its text context (and,
+        for the srcset records, its tag)."""
         full, items, base = [], [], 0
         for text, refs in parts:
             full.append(text)
             items += [(base + off, v) for off, v in refs]
             base += len(text)
         t = "".join(full)
-        return [(t[max(0, o - _CTX):o], t[o:o + _CTX]) for o, _ in items], [v for _, v in items]
+        keys = [(t[max(0, o - _CTX):o], t[o:o + _CTX]) + ((v["tag"],) if with_tag else ()) for o, v in items]
+        return keys, [v for _, v in items]
+
+    def pair(ki, ko):
+        """[(input index, output index | None)] from a difflib alignment of the two key sequences."""
+        out: list[tuple[int, int | None]] = []
+        for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, ki, ko, autojunk=False).get_opcodes():
+            if tag in ("equal", "replace"):
+                n = min(i2 - i1, j2 - j1)
+                out += [(i1 + d, j1 + d) for d in range(n)] + [(k, None) for k in range(i1 + n, i2)]
+            elif tag == "delete":
+                out += [(k, None) for k in range(i1, i2)]
+        return sorted(out, key=lambda x: x[0])
+
+    def group(gi, ins, outs):
+        """ins/outs: [(text, primary records, srcset records)] of the group's documents."""
+        ki, vi = keyed([(t, a) for t, a, _ in ins])
+        ko, vo = keyed([(t, a) for t, a, _ in outs])
+        kis, vis = keyed([(t, b) for t, _, b in ins], True)
+        kos, vos = keyed([(t, b) for t, _, b in outs], True)
+        return gi, ki, vi, ko, vo, kis, vis, kos, vos
 
     if mode == "aligned":
-        groups = []
-        for i, p in enumerate(pairs):
-            ki, vi = keyed([in_refs(i)])
-            ko, vo = keyed([out_refs(p)]) if p is not None else ([], [])
-            groups.append((i, ki, vi, ko, vo))
+        groups = [group(i, [in_refs(i)], [out_refs(p)] if p is not None else []) for i, p in enumerate(pairs)]
     else:
-        ki, vi = keyed([in_refs(i) for i in range(len(book.spine))])
-        ko, vo = keyed([out_refs(p) for p in outb.docs])
-        groups = [(None, ki, vi, ko, vo)]
+        groups = [group(None, [in_refs(i) for i in range(len(book.spine))], [out_refs(p) for p in outb.docs])]
 
     referenced = {book.cover_path} if book.cover_path in inp else set()
     changed: set[str] = set()
@@ -1480,49 +1642,51 @@ def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs, raw_file: Pa
             if res["first_missing_ref"] is None:
                 res["first_missing_ref"] = {"item": gi, "kind": kind, **desc}
 
-    for gi, ki, vi, ko, vo in groups:
+    for gi, ki, vi, ko, vo, kis, vis, kos, vos in groups:
         for a in vi:
             if a["primary"]:
                 referenced.add(expected(a["primary"])[0])
-        paired: list[tuple[int, dict, dict | None]] = []
-        for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, ki, ko, autojunk=False).get_opcodes():
-            if tag in ("equal", "replace"):
-                paired += [(i1 + d, vi[i1 + d], vo[j1 + d]) for d in range(min(i2 - i1, j2 - j1))]
-                paired += [(k, vi[k], None) for k in range(i1 + min(i2 - i1, j2 - j1), i2)]
-            elif tag == "delete":
-                paired += [(k, vi[k], None) for k in range(i1, i2)]
-        for k, a, b in sorted(paired, key=lambda x: x[0]):
+        for k, j in pair(ki, ko):
+            a, b = vi[k], (vo[j] if j is not None else None)
+            if not a["primary"]:
+                continue        # placeholder (data:/remote/missing src): pairing only
             kind = _KIND[a["tag"]]
-            if a["primary"]:
-                ip, accept = expected(a["primary"])
-                want = inp[ip]["sha256"]
-                got = b["primary"] if b else None
-                if got is not None and got in accept:
-                    count(kind, "correct", gi, {})
-                elif got is None:
-                    unext = want in raw and want not in outp
-                    count(kind, "unextractable" if unext else "missing", gi, {"input": ip})
-                else:
-                    res["refs_total"] += 1
-                    res["refs_by_kind"][kind] = res["refs_by_kind"].get(kind, 0) + 1
-                    res["refs_wrong_image"] += 1
-                    if res["first_wrong_ref"] is None:
-                        res["first_wrong_ref"] = {
-                            "item": gi, "img_index": k, "input": ip,
-                            "output_is_input_image": next((q for q, v in inp.items() if v["sha256"] == got), None)}
-                    if got not in in_hashes:
-                        changed.add(ip)   # present, but not byte-identical (recompressed/resized)
-                        di, do = inp[ip]["dims"], (outp.get(got) or {}).get("dims")
-                        if want not in outp and di and do and di != do:
-                            resized.add(ip)
-            if a["srcset"]:
-                if b is None or b["srcset"] is None:
-                    # dropped: fine for a <source> (the writer may remove them) and for an <img>
-                    # whose src still resolves to a file
-                    ok = a["tag"] == "source" or (b is not None and b["primary"] is not None)
-                else:
-                    ok = all(b["srcset"])
-                count("srcset", "correct" if ok else "missing", gi, {"input": a["srcset"][:3]})
+            ip, accept = expected(a["primary"])
+            want = inp[ip]["sha256"]
+            got = b["primary"] if b else None
+            if got is not None and got in accept:
+                count(kind, "correct", gi, {})
+            elif got is None:
+                unext = want in raw and want not in outp
+                count(kind, "unextractable" if unext else "missing", gi, {"input": ip})
+            else:
+                res["refs_total"] += 1
+                res["refs_by_kind"][kind] = res["refs_by_kind"].get(kind, 0) + 1
+                res["refs_wrong_image"] += 1
+                if res["first_wrong_ref"] is None:
+                    res["first_wrong_ref"] = {
+                        "item": gi, "img_index": k, "input": ip,
+                        "output_is_input_image": next((q for q, v in inp.items() if v["sha256"] == got), None)}
+                if got not in in_hashes:
+                    changed.add(ip)   # present, but not byte-identical (recompressed/resized)
+                    di, do = inp[ip]["dims"], (outp.get(got) or {}).get("dims")
+                    if want not in outp and di and do and di != do:
+                        resized.add(ip)
+        # srcset: one reference per element carrying candidates
+        match = {id(vis[k]): (vos[j] if j is not None else None) for k, j in pair(kis, kos)}
+        for a in vis:
+            if not a["cands"]:
+                continue
+            b = match.get(id(a))
+            if b is not None and b["ss"] is not None:
+                ok = all(b["ss"])                 # candidates kept: each must resolve
+            elif a["tag"] == "source":
+                # a dropped <source> is fine as long as the <img> next to it resolves
+                sb = match.get(id(a["sib"])) if a["sib"] is not None else None
+                ok = a["sib"] is None or (sb is not None and sb["resolved"])
+            else:
+                ok = b is not None and b["resolved"]    # srcset dropped, src resolves
+            count("srcset", "correct" if ok else "missing", gi, {"input": a["cands"][:3]})
 
     # url() in the reachable style sheets (AZW3: the writer keeps style sheets; MOBI v6 has none)
     if outb.kind == "kf8":
@@ -1531,10 +1695,13 @@ def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs, raw_file: Pa
         blocks += [(f, "\n".join(_inline_css_blocks(f.read_text("utf-8", errors="replace")))) for f in outb.docs]
         for f, css in blocks:
             for u in _css_urls(css):
-                if not u.startswith("data:") and not _has_scheme(u):
+                t = None
+                if _embed_index(u) is not None:      # left unrewritten by KindleUnpack
+                    t = _embed_file(outb, first_res, u)
+                elif not u.startswith("data:") and not _has_scheme(u):
                     t = (f.parent / unquote(u.split("#")[0].split("?")[0])).resolve()
-                    if t.is_file() and (h := outb.file_hash(t)):
-                        css_hashes.add(h)
+                if t is not None and t.is_file() and (h := outb.file_hash(t)):
+                    css_hashes.add(h)
         for base, u in book.css_info()["urls"]:
             if not u or u.startswith(("data:", "#")) or _has_scheme(u):
                 continue
@@ -1759,13 +1926,36 @@ _COLLECT_JS = r"""
   const props = args.props, anchorTags = new Set(args.anchors);
   const perr = document.getElementsByTagNameNS('*', 'parsererror').length > 0;
   const body = document.body || document.documentElement;
-  if (!body) return {perr, bodyFS: 16, baseFS: 16, els: []};
+  if (!body) return {perr, bodyFS: 16, baseFS: 16, els: [], tags: [], hid: []};
+  let mobiBase = null;
+  if (args.mobiCss != null) {
+    // MOBI v6 output: a MOBI 6 reader's defaults and the presentational markup it honours, as CSS
+    // (see MOBI_BASE_CSS, MOBI_CSS)
+    const sheet = css => {
+      const st = document.createElementNS('http://www.w3.org/1999/xhtml', 'style');
+      st.textContent = css;
+      (document.head || document.documentElement).appendChild(st);
+      return st;
+    };
+    mobiBase = sheet(args.mobiBaseCss);
+    sheet(args.mobiCss);
+    const skip = new Set(args.mobiNoBox);
+    const unit = v => /\d$/.test(v) ? v + 'px' : v;    // Calibre ensure_unit: a bare number is px
+    for (const e of body.querySelectorAll('[width], [height]')) {
+      if (skip.has((e.localName || '').toLowerCase()) || !e.style) continue;
+      const w = (e.getAttribute('width') || '').trim(), h = (e.getAttribute('height') || '').trim();
+      if (/\d/.test(w)) e.style.textIndent = unit(w);
+      if (/\d/.test(h)) e.style.marginTop = unit(h);
+    }
+  }
   const bodyFS = parseFloat(getComputedStyle(body).fontSize) || 16;
   const idx = new Map();
-  const els = [];
+  const els = [], all = [];
+  const isHidden = cs => cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse';
   const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
   for (let e = walker.currentNode; e; e = walker.nextNode()) {
     const tag = (e.localName || '').toLowerCase();
+    all.push(tag);
     if (tag === 'style' || tag === 'script' || tag === 'parsererror') continue;
     let own = '';
     for (const c of e.childNodes) if (c.nodeType === 3) own += c.data;
@@ -1774,21 +1964,67 @@ _COLLECT_JS = r"""
     const cs = getComputedStyle(e);
     const parent = e.parentElement && idx.has(e.parentElement) ? idx.get(e.parentElement) : -1;
     idx.set(e, els.length);
-    els.push([tag, own, props.map(p => cs.getPropertyValue(p)), parent, e, full]);
+    els.push([tag, own, props.map(p => cs.getPropertyValue(p)), parent, e, full, all.length - 1,
+              args.hidden && e !== body && isHidden(cs)]);
   }
   // Baseline: the same DOM with every author style sheet and style attribute removed, i.e. what
   // the UA (plus presentational HTML attributes) gives. A property "carries author CSS" when the
   // authored value differs from this baseline.
   for (const sh of Array.from(document.styleSheets)) { try { sh.disabled = true; } catch (_) {} }
+  // MOBI v6 output: the baseline is the MOBI reader's defaults (its "UA" sheet stays on)
+  if (mobiBase && mobiBase.sheet) mobiBase.sheet.disabled = false;
   for (const r of els) if (r[4].removeAttribute) r[4].removeAttribute('style');
   const baseFS = parseFloat(getComputedStyle(body).fontSize) || 16;
   for (const r of els) {
     const cs = getComputedStyle(r[4]);
+    r[7] = r[7] && !isHidden(cs);     // hidden by the author CSS, not by the UA (e.g. [hidden])
     r[4] = props.map(p => cs.getPropertyValue(p));
   }
-  return {perr, bodyFS, baseFS, els};
+  if (!args.hidden) return {perr, bodyFS, baseFS, els: els.map(r => r.slice(0, 6)), tags: [], hid: []};
+  // An element the author CSS hides goes with its whole subtree (as the MOBI writer removes it);
+  // hid: its index in `all` (every element under body, document order), for the caller's mapping
+  const gone = new Array(els.length).fill(false), newIdx = new Array(els.length).fill(-1);
+  const kept = [], hid = [];
+  els.forEach((r, k) => {
+    const up = r[3] >= 0 && gone[r[3]];
+    gone[k] = up || r[7];
+    if (r[7] && !up) hid.push(r[6]);
+    if (gone[k]) return;
+    newIdx[k] = kept.length;
+    kept.push([r[0], r[1], r[2], r[3] >= 0 ? newIdx[r[3]] : -1, r[4], r[5]]);
+  });
+  return {perr, bodyFS, baseFS, els: kept, tags: all, hid};
 }
 """
+
+# MOBI v6 output: a MOBI 6 reader's defaults (Calibre's MobiReader base CSS; `body {text-align:
+# justify}` left out, justification is a reader setting) and what it makes of the writer's
+# presentational markup (upshift_markup: align -> text-align, height -> margin-top, width ->
+# text-indent, applied by _COLLECT_JS; <font size=N> keeps the HTML legacy sizes, which are the
+# writer's own, FONT_PX 10/13/16/18/24/32/48, 3 = normal)
+MOBI_BASE_CSS = "p { margin: 0; text-indent: 1.5em }\nblockquote { margin: 0 0 0 2em }"
+# properties whose MOBI reader default differs from a browser's: not a conversion difference when
+# the input leaves them at the browser default and the output at the MOBI default
+MOBI_READER_DEFAULT_PROPS = ("margin-top", "text-indent")
+_MOBI_ALIGN_TAGS = ("p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "dd", "dt", "td", "th")
+MOBI_CSS = "\n".join([
+    *(f'{",".join(f"{t}[align={a!r} i]" for t in _MOBI_ALIGN_TAGS)} {{ text-align: {a} }}'
+      for a in ("left", "right", "center", "justify")),
+    *(f'font[size="{n}"] {{ font-size: {k} }}' for n, k in enumerate(
+        ("x-small", "small", "medium", "large", "x-large", "xx-large", "xxx-large"), 1)),
+])
+# elements whose width/height attributes are box sizes, not MOBI indents/spacing (Calibre skips
+# table, tr, td and img)
+MOBI_NO_BOX = ["img", "table", "tr", "td", "th", "col", "colgroup", "hr", "iframe", "video", "audio",
+               "object", "embed", "canvas", "input", "svg", "image"]
+# STYLE_PROPS a MOBI v6 file cannot carry (no CSS; the MobiML markup has nothing for them): left
+# out of the MOBI style score, listed in style.props_excluded_for_format. padding-left and
+# margin-bottom are not lost but folded (see _mobi_box): padding-left into the left inset that
+# margin-left measures, margin-bottom into the next block's space above (margin-top).
+MOBI_EXCLUDED_PROPS = ("display", "font-family", "font-variant", "line-height", "white-space",
+                       "margin-right", "padding-right", "padding-left", "margin-bottom")
+_WEBKIT_ALIGN = {"-webkit-center": "center", "-webkit-left": "left", "-webkit-right": "right",
+                 "-moz-center": "center"}
 
 _PX_RE = re.compile(r"(-?\d+(?:\.\d+)?)px")
 _ALL_IDX = tuple(range(len(STYLE_PROPS)))
@@ -1813,8 +2049,17 @@ def _prop_equal(prop: str, a, b) -> bool:
     return a == b
 
 
-def _collect(page, url_xhtml: str, url_html: str, xhtml_first: bool = True) -> dict:
-    args = {"props": STYLE_PROPS, "anchors": sorted(ANCHOR_TAGS)}
+def _collect(page, url_xhtml: str, url_html: str, xhtml_first: bool = True, *, hidden: bool = False,
+             mobi_out: bool = False, mobi: bool = False) -> dict:
+    """Load one document and collect the computed STYLE_PROPS of every element under <body>.
+    hidden: leave out the elements the author CSS hides (display:none, visibility:hidden|collapse)
+    with their subtrees and return `tags` (every element under body, document order) and `hid` (the
+    indexes in `tags` of the topmost hidden ones). mobi_out: apply MOBI_CSS and the width/height
+    attributes first (MOBI v6 output). mobi: text-align -webkit-center/left/right read as
+    center/left/right (the presentational align attribute's values)."""
+    args = {"props": STYLE_PROPS, "anchors": sorted(ANCHOR_TAGS), "hidden": hidden,
+            "mobiCss": MOBI_CSS if mobi_out else None, "mobiBaseCss": MOBI_BASE_CSS,
+            "mobiNoBox": MOBI_NO_BOX}
     data = None
     if xhtml_first:
         try:
@@ -1831,17 +2076,112 @@ def _collect(page, url_xhtml: str, url_html: str, xhtml_first: bool = True) -> d
         page.goto(url_html, wait_until="load", timeout=60000)
         data = page.evaluate(_COLLECT_JS, args)
         data["parsed_as"] = "html"
+    rows = data["els"]
+    if mobi:
+        rows = _mobi_box(rows)
     els = []
-    for tag, own, vals, parent, base, full in data["els"]:
+    for tag, own, vals, parent, base, full, *raw in rows:
         own_n = _norm_ws(own)
         anchored = bool(own_n) or tag in ANCHOR_TAGS
         els.append({"tag": tag, "text": own_n, "full": _norm_ws(full) if anchored else "",
                     "props": [_norm_prop(p, v, data["bodyFS"]) for p, v in zip(STYLE_PROPS, vals, strict=True)],
                     "base": [_norm_prop(p, v, data["baseFS"]) for p, v in zip(STYLE_PROPS, base, strict=True)],
-                    "raw": vals, "parent": parent,
+                    "raw": raw[0] if raw else vals, "parent": parent,
                     "inline": vals[_DISPLAY] in ("inline", "contents"),
                     "anchored": anchored})
-    return {"els": els, "parsed_as": data["parsed_as"], "body_fs": data["bodyFS"]}
+    return {"els": els, "parsed_as": data["parsed_as"], "body_fs": data["bodyFS"],
+            "tags": data["tags"], "hid": data["hid"]}
+
+
+_TA, _ML, _PL = STYLE_PROPS.index("text-align"), STYLE_PROPS.index("margin-left"), STYLE_PROPS.index("padding-left")
+_MT, _MB = STYLE_PROPS.index("margin-top"), STYLE_PROPS.index("margin-bottom")
+_VA, _TD = STYLE_PROPS.index("vertical-align"), STYLE_PROPS.index("text-decoration-line")
+
+
+def _inset_level(px: float) -> int:
+    """MOBI v6 expresses a left inset only as nested <blockquote>s of 2em (32 px) each, at most 3:
+    the writer's own rounding (none below 8 px)."""
+    return 0 if px < 8 else min(3, max(1, math.floor(px / 32 + 0.5)))
+
+
+def _mobi_box(rows: list) -> list:
+    """MOBI v6 reading of _COLLECT_JS rows [tag, own, vals, parent, base, full] (same on both
+    sides), returning [tag, own, vals, parent, base, full, raw]:
+    * text-align -webkit-center/left/right (what the align attribute computes to) reads as
+      center/left/right;
+    * margin-left becomes the left inset level (_inset_level) of margin-left + padding-left, plus
+      those of the single-child <blockquote>s directly around the element (the writer's indent
+      wrappers; such a wrapper itself counts 0), so a paragraph indented by CSS and one wrapped in a
+      <blockquote> compare equal;
+    * margin-top of a block becomes the space above it, max(margin-top, margin-bottom of the
+      previous block sibling) (non-negative margins collapse; the writer moves the space below a
+      block onto the next paragraph's height, so margin-bottom is not scored on its own);
+    * <body>/<html> margin-top/margin-left read as one constant: they are the page margins, a
+      reader setting in MOBI 6;
+    * vertical-align and text-decoration-line read as what the text shows: the first raised/lowered
+      value among the element and its inline ancestors, and the union of the decoration lines of
+      the element and its ancestors (MobiML expresses them with <sup>/<sub>/<u>/<s> wrappers that
+      can sit inside or outside the element that had the CSS).
+    `raw` keeps the px behind the level for the examples."""
+    n = len(rows)
+    kids: list[list[int]] = [[] for _ in range(n)]
+    for k, r in enumerate(rows):
+        if r[3] >= 0:
+            kids[r[3]].append(k)
+    pos = {k: i for ks in kids for i, k in enumerate(ks)}
+    wrap = [r[0] == "blockquote" and len(kids[k]) == 1 and not r[1].strip() for k, r in enumerate(rows)]
+
+    def px(v: str) -> float:
+        m = _PX_RE.fullmatch((v or "").strip())
+        return float(m.group(1)) if m else 0.0
+
+    def inline(v) -> bool:
+        return v[_DISPLAY] in ("inline", "contents")
+
+    out = [[*r[:6], None] for r in rows]
+    for side in (2, 4):
+        new = [list(r[side]) for r in rows]
+        raw = [list(r[side]) for r in rows] if side == 2 else None
+        for k, r in enumerate(rows):
+            v, nv = r[side], new[k]
+            nv[_TA] = _WEBKIT_ALIGN.get(v[_TA], v[_TA])
+            par = r[3]
+            if v[_VA] == "baseline" and inline(v) and par >= 0 and inline(rows[par][side]):
+                nv[_VA] = new[par][_VA]           # parents come first (document order)
+            lines = {t for t in v[_TD].split() if t != "none"}
+            if par >= 0:
+                lines |= {t for t in new[par][_TD].split() if t != "none"}
+            nv[_TD] = " ".join(sorted(lines)) or "none"
+            if raw is not None:
+                raw[k][_VA], raw[k][_TD] = nv[_VA], nv[_TD]
+            if r[0] in ("body", "html"):
+                nv[_ML] = nv[_MT] = "page"
+                if raw is not None:
+                    raw[k][_ML] = raw[k][_MT] = "page"
+                continue
+            inset, top = 0.0, k
+            if not wrap[k]:
+                inset = px(v[_ML]) + px(v[_PL])
+                while rows[top][3] >= 0 and wrap[rows[top][3]]:
+                    top = rows[top][3]
+                    inset += px(rows[top][side][_ML]) + px(rows[top][side][_PL])
+            nv[_ML] = f"L{_inset_level(inset)}"
+            if raw is not None:
+                raw[k][_TA] = nv[_TA]
+                raw[k][_ML] = f"{inset:g}px (L{_inset_level(inset)})"
+            par = rows[top][3]
+            if not inline(v) and par >= 0 and pos[top] > 0:
+                prev = rows[kids[par][pos[top] - 1]][side]
+                mt, mb = px(v[_MT]), px(prev[_MB])
+                if not inline(prev) and mt >= 0 and mb > mt:
+                    nv[_MT] = f"{mb:g}px"
+                    if raw is not None:
+                        raw[k][_MT] = f"{mb:g}px (collapsed)"
+        for k in range(n):
+            out[k][side] = new[k]
+            if raw is not None:
+                out[k][6] = raw[k]
+    return out
 
 
 def _authored(e: dict, idx=_ALL_IDX) -> int:
@@ -1850,7 +2190,16 @@ def _authored(e: dict, idx=_ALL_IDX) -> int:
 
 
 class _StyleAcc:
-    def __init__(self):
+    def __init__(self, excluded=(), box_only_ancestors: bool = False, reader_default=()):
+        # property indexes scored (all), compared across element kinds (inherited), and compared on
+        # the ancestors of an anchor pair (all; MOBI v6: the non-inherited box properties only, as
+        # MobiML puts the inherited formatting on the text itself, where the anchor pair checks it)
+        self.all_idx = tuple(k for k in _ALL_IDX if STYLE_PROPS[k] not in excluded)
+        self.inh_idx = tuple(k for k in _INH_IDX if STYLE_PROPS[k] not in excluded)
+        self.anc_idx = tuple(k for k in self.all_idx if not box_only_ancestors or k not in _INH_IDX)
+        # properties left at the reader's default on both sides count as agreeing (MOBI v6: the
+        # output's baseline is the MOBI reader's defaults, which differ from a browser's)
+        self.reader_default = {STYLE_PROPS.index(x) for x in reader_default}
         self.hist: dict[str, int] = {}
         self.examples: dict[str, list] = {}
         self.seen: set = set()
@@ -1859,7 +2208,9 @@ class _StyleAcc:
     def _pair(self, a: dict, b: dict, idx, key, anchor_text: str) -> tuple[int, int, int, int]:
         """(checked, equal, all_checked, all_equal) over the property indexes idx for one pair.
         `checked` counts a property only when the input's author CSS sets it (differs from the UA
-        baseline) or the two sides disagree, so shared browser defaults do not inflate the score."""
+        baseline) or the two sides disagree, so shared browser defaults do not inflate the score;
+        a `reader_default` property the input leaves at the browser's default and the output at its
+        own baseline (the MOBI reader's default) is not checked either."""
         checked = equal = all_checked = all_equal = 0
         for pi in idx:
             prop = STYLE_PROPS[pi]
@@ -1867,7 +2218,8 @@ class _StyleAcc:
             all_checked += 1
             all_equal += same
             authored = not _prop_equal(prop, a["props"][pi], a["base"][pi])
-            if not authored and same:
+            if not authored and (same or (pi in self.reader_default
+                                          and _prop_equal(prop, b["props"][pi], b["base"][pi]))):
                 continue
             checked += 1
             if same:
@@ -1902,7 +2254,7 @@ class _StyleAcc:
         a, b = ein[i], eout[j]
         anchor_text = a["text"][:40] or a["full"][:40]
         full_props = not fallback and (a["tag"] == b["tag"] or a["raw"][_DISPLAY] == b["raw"][_DISPLAY])
-        tot = list(self._pair(a, b, _ALL_IDX if full_props else _INH_IDX, (scope, i, j), anchor_text))
+        tot = list(self._pair(a, b, self.all_idx if full_props else self.inh_idx, (scope, i, j), anchor_text))
         if fallback:
             return tuple(tot)
         if a["tag"] != b["tag"] and a["inline"] != b["inline"]:
@@ -1925,7 +2277,7 @@ class _StyleAcc:
                     j = b["parent"]
                     continue
                 break
-            for n, v in enumerate(self._pair(a, b, _ALL_IDX, (scope, i, j), anchor_text)):
+            for n, v in enumerate(self._pair(a, b, self.anc_idx, (scope, i, j), anchor_text)):
                 tot[n] += v
             if a["tag"] == "body":
                 break
@@ -1982,7 +2334,7 @@ def _align_score(ein: list, eout: list, acc: _StyleAcc, scope) -> tuple[dict, in
                 c, e, _, _ = acc.compare(ein, eout, i, j, scope, fallback=True)
                 stats["matched_fallback"] += 1
             else:
-                c, e = _authored(ein[i]), 0
+                c, e = _authored(ein[i], acc.all_idx), 0
                 stats["unmatched_in"] += 1
         if c:
             contrib[i] = (c, e)
@@ -2006,10 +2358,9 @@ def _fallback(a: dict, eout: list, ao: list, order: list, pos: dict, p: int):
     return None
 
 
-def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_url: str, out_dir: Path) -> dict:
-    """Computed-style comparison of input and output (see _align_score). score = equal / checked
-    properties over the whole book (1.0 when nothing is authored or disputed); per_chapter the same
-    per spine item (None when it has no checked property)."""
+def _style_page(page, base_url: str):
+    """(context, page) of a dedicated Chromium context: JavaScript disabled, 600 x 800 screen, every
+    request that does not go to base_url's host aborted."""
     browser = page.context.browser
     if browser is None:  # persistent context: no browser handle to open a dedicated context
         raise RuntimeError("style score needs a page from browser.new_context()/new_page(), "
@@ -2029,7 +2380,45 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
     ctx.route("**/*", route)
     pg = ctx.new_page()
     pg.emulate_media(media="screen")
-    acc = _StyleAcc()
+    return ctx, pg
+
+
+def _input_urls(book: InputBook, i: int, base_url: str, out_dir: Path) -> tuple[str, str]:
+    p = book.dir / book.spine[i]["path"]
+    return _url_for(base_url, out_dir, p, "xhtml"), _url_for(base_url, out_dir, p, "html")
+
+
+def hidden_pass(book: InputBook, page, base_url: str, out_dir: Path) -> None:
+    """MOBI v6 without the style pass: load every XHTML spine item not pruned yet in the style
+    context only to find (and prune) the elements its author CSS hides."""
+    if all(s["path"] in book.hidden for s in book.spine if s["xhtml"]):
+        return
+    ctx, pg = _style_page(page, base_url)
+    try:
+        for i, s in enumerate(book.spine):
+            if s["xhtml"] and s["path"] not in book.hidden:
+                d = _collect(pg, *_input_urls(book, i, base_url, out_dir), hidden=True, mobi=True)
+                book.prune_hidden(s["path"], d["tags"], d["hid"])
+    finally:
+        try:
+            ctx.close()
+        except Exception:
+            pass
+
+
+def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_url: str, out_dir: Path) -> dict:
+    """Computed-style comparison of input and output (see _align_score). score = equal / checked
+    properties over the whole book (1.0 when nothing is authored or disputed); per_chapter the same
+    per spine item (None when it has no checked property).
+
+    MOBI v6 (no CSS in the file): the output is read with MOBI_CSS and its width/height attributes
+    applied, MOBI_EXCLUDED_PROPS are not scored, and the input elements the author CSS hides are
+    left out (the writer removes them); the same load prunes them from book's documents for the
+    text/links/images invariants (InputBook.prune_hidden)."""
+    mobi = outb.kind == "mobi7"
+    ctx, pg = _style_page(page, base_url)
+    acc = _StyleAcc(MOBI_EXCLUDED_PROPS if mobi else (), box_only_ancestors=mobi,
+                    reader_default=MOBI_READER_DEFAULT_PROPS if mobi else ())
     n = len(book.spine)
     chk, eq = [0] * n, [0] * n
     tot_in = tot_out = authored_els = 0
@@ -2044,14 +2433,15 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
         def load_in(i):
             if not book.spine[i]["xhtml"]:
                 return []   # foreign spine item (svg, image, xml, ...): not evaluated, see text.non_xhtml_handling
-            p = book.dir / book.spine[i]["path"]
-            d = _collect(pg, _url_for(base_url, out_dir, p, "xhtml"), _url_for(base_url, out_dir, p, "html"))
+            d = _collect(pg, *_input_urls(book, i, base_url, out_dir), hidden=mobi, mobi=mobi)
             parsed["input_html_fallback"] += d["parsed_as"] == "html"
+            if mobi and book.spine[i]["path"] not in book.hidden:
+                book.prune_hidden(book.spine[i]["path"], d["tags"], d["hid"])
             return d["els"]
 
         def load_out(p):
             d = _collect(pg, _url_for(base_url, out_dir, p, "xhtml"), _url_for(base_url, out_dir, p, "html"),
-                         xhtml_first=out_xhtml_first)
+                         xhtml_first=out_xhtml_first, mobi_out=mobi, mobi=mobi)
             parsed["output_html_fallback"] += d["parsed_as"] == "html" and out_xhtml_first
             return d["els"]
 
@@ -2070,7 +2460,7 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
                 contrib, ni, no, st = _align_score(ein, eout, acc, i)
                 tot_in += ni
                 tot_out += no
-                authored_els += sum(1 for e in ein if e["anchored"] and _authored(e))
+                authored_els += sum(1 for e in ein if e["anchored"] and _authored(e, acc.all_idx))
                 add_stats(st)
                 for c, e in contrib.values():
                     chk[i] += c
@@ -2085,7 +2475,7 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             for p in outb.docs:
                 eout += shifted(load_out(p), len(eout))
             contrib, tot_in, tot_out, st = _align_score(ein, eout, acc, "book")
-            authored_els = sum(1 for e in ein if e["anchored"] and _authored(e))
+            authored_els = sum(1 for e in ein if e["anchored"] and _authored(e, acc.all_idx))
             add_stats(st)
             for k, (c, e) in contrib.items():
                 chk[owner[k]] += c
@@ -2111,6 +2501,7 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             "input_css_rules_unreferenced": book.css_info()["unreferenced"],
             "output_css_rules": outb.css_rules(),
             "prop_disagreements": hist, "prop_examples": {k: acc.examples[k] for k in hist},
+            "props_excluded_for_format": list(MOBI_EXCLUDED_PROPS) if mobi else [],
             **parsed}
 
 
@@ -2145,21 +2536,44 @@ def invariants(entry: dict, out_dir: Path, fmt: str, page, base_url: str | None 
     except Exception as e:
         return {**res, "fixed_layout": None, "errors": {n: f"setup: {_err(e)}" for n in names}}
     res["fixed_layout"] = book.fixed_layout
+    mobi = outb.kind == "mobi7"
+    base = base_url or _server_for(out_dir.parent)
     jobs = {
         "text": lambda: inv_text(book, outb, mode, pairs),
         "images": lambda: inv_images(book, outb, mode, pairs, out_dir / f"{who}.{fmt}"),
         "toc": lambda: inv_toc(book, outb),
         "links": lambda: inv_links(book, outb, mode, pairs),
         "style": lambda: (None if skip_style else
-                          inv_style(book, outb, mode, pairs, page,
-                                    base_url or _server_for(out_dir.parent), out_dir)),
+                          inv_style(book, outb, mode, pairs, page, base, out_dir)),
     }
-    for n, fn in jobs.items():
+    order = list(jobs)
+    if mobi:
+        # MOBI v6 drops what the author CSS hides: the style pass (which loads every input chapter
+        # in Chromium anyway) prunes those elements from the input documents first; without it a
+        # hidden-only pass does. text/links/images then compare against the pruned input.
+        order = ["style"] + [n for n in order if n != "style"]
+    hidden_err = None
+    for n in order:
+        if mobi and n == "text" and page is not None:
+            try:
+                hidden_pass(book, page, base, out_dir)     # chapters the style pass did not prune
+            except Exception as e:
+                hidden_err = _err(e)
         try:
-            res[n] = fn()
+            res[n] = jobs[n]()
         except Exception as e:
             res[n] = None
             errors[n] = _err(e)
+    if mobi:
+        tot = {k: sum(h[k] for h in book.hidden.values()) for k in ("elements", "chars", "anchors", "unmapped")}
+        info = {"method": "chromium" if page is not None and hidden_err is None else None,
+                "items": sum(1 for h in book.hidden.values() if h["elements"]), **tot}
+        if hidden_err:
+            errors["hidden"] = hidden_err
+        if res["text"] is not None:
+            res["text"]["hidden_excluded"] = info
+        if res["links"] is not None:
+            res["links"]["hidden_anchors_excluded"] = tot["anchors"]
     if page is None and not skip_style:
         errors.pop("style", None)
         errors["style"] = "no Playwright page given"
@@ -2211,13 +2625,14 @@ def main(argv=None) -> int:
     result = {}
     pw = browser = page = None
     try:
-        if not a.gate_only and not a.no_style:
+        fmts = [f.strip() for f in a.fmt.split(",") if f.strip()]
+        if not a.gate_only and (not a.no_style or "mobi" in fmts):   # mobi: hidden_pass needs it
             from playwright.sync_api import sync_playwright
             pw = sync_playwright().start()
             browser = pw.chromium.launch()
             page = browser.new_page()
         base_url = start_out_server(out_dir.parent)
-        for fmt in [f.strip() for f in a.fmt.split(",") if f.strip()]:
+        for fmt in fmts:
             g = gate(out_dir, fmt, a.who, force=a.force)
             r = {"gate": g}
             if not a.gate_only:

@@ -250,7 +250,9 @@ def check_one(entry: dict, fmt: str, force: bool, no_style: bool) -> dict:
                 errors.append(f"gate: {e}")
             if (res["gate"].get("kindleunpack") or {}).get("ok"):
                 try:
-                    page, base_url = _worker_page(no_style)
+                    # MOBI v6 needs Chromium even without the style score: the input elements its
+                    # author CSS hides are pruned before text/links (see oracles.hidden_pass)
+                    page, base_url = _worker_page(no_style and fmt != "mobi")
                     res["invariants"] = oracles.invariants(entry, out_dir, fmt, page, base_url=base_url,
                                                            who="ours", skip_style=no_style)
                 except Exception as e:  # noqa: BLE001

@@ -143,6 +143,21 @@ view of the names.
   UTF-8 (a JSON spine item is not decoded as latin-1). They are left out of the images, links and style
   checks and of the CSS rule counts too. Category `spine-non-xhtml` (informational) keeps them visible.
 
+MOBI v6 hidden content (`fmt == "mobi"` only). MOBI 6 readers ignore CSS, so the writer removes the
+elements its author CSS hides (`display: none`, `visibility: hidden|collapse`), as Calibre's MobiML does.
+The oracle does the same to the input before `text`, `links` and `images` run: every XHTML spine document
+is loaded in the style pass's JS-disabled Chromium context (the style pass itself, which loads them
+anyway, runs first; with `--no-style` a hidden-only pass loads them), an element counts as hidden when its
+computed display/visibility hides it with the author style sheets and style attributes applied but not
+without them (so the UA's `[hidden]`, `<head>` & co. do not count), and the topmost hidden elements are
+removed from the parsed (lxml) document with their subtrees, keeping their tail text and an empty
+`<a id|name>` for every id/name inside (the writer keeps link targets the same way). Chromium's element
+sequence is mapped onto lxml's by aligning the local names (identical for XHTML). Links inside hidden
+elements are thereby out of `links.internal_total`, images inside them out of the reference counts.
+`text.hidden_excluded` = `{method: "chromium" | null (no browser), items (documents with hidden
+elements), elements, chars (visible chars removed), anchors (<a href> removed), unmapped}`,
+`links.hidden_anchors_excluded` = `anchors`. The style pass leaves the hidden input elements out as well.
+
 `images`
 - References: `img@src`, svg `image@href`, `video@poster`, `object@data`, `img@srcset`, `source@srcset`
   and CSS `url()` (outside `@font-face` and `@import`) in the style sheets reachable from the spine
@@ -150,10 +165,35 @@ view of the names.
   `refs_wrong_image` / `refs_missing` accounting; `refs_by_kind` counts them per kind (`src`, `srcset`,
   `poster`, `object`, `css`), `refs_missing_by_kind` the missing ones, `first_missing_ref` is the first
   missing one (`{item, kind, input}`).
-- `srcset` is one reference per element. It is correct when the writer dropped the attribute and the
-  `<img>`'s `src` still resolves (a dropped/removed `<source>` is fine), or when every candidate left in the
-  output resolves to a file; a candidate that is still a dangling relative path (`../images/x.png`) makes it
-  a missing reference. srcset candidates are not "referenced" images: they never feed `missing`.
+- Pairing input and output references: only elements with a primary reference (`img@src`, svg `image@href`,
+  `video@poster`, `object@data`) are paired with each other (by their text context, difflib over the
+  document-order sequences). Every `<img>`/`<image>` takes part on both sides even without a usable
+  reference: an input one whose src is a `data:` URI, remote or not in the manifest is a placeholder
+  (paired, never counted), mirroring the output side, which lists every `<img>`/`<image>` without a
+  usable src (a lost image). Otherwise the output's src-less counterpart of a `data:` image would take
+  the pairing of a real image with the same text context (e.g. an empty one: the images of a document
+  without text, or two images between the same two paragraphs); with the same elements on both sides,
+  references with equal contexts pair in document order. `srcset` references are
+  evaluated apart, in their own pairing keyed by context and tag, so a `<source>` is never paired with the
+  `<img>` next to it (they share the same text context).
+- `srcset` is one reference per element carrying candidates (`<img srcset>`, `<source srcset>`). When the
+  output keeps the attribute it is correct when every candidate resolves to a file; a candidate that is still
+  a dangling relative path (`../images/x.png`) makes it a missing reference. When the writer dropped it, it is
+  correct if the `<img>` (for a `<source>`: the `<img>` of its `<picture>`) still has a `src` that resolves
+  (a dropped `<source>` is fine), else missing. srcset candidates are not "referenced" images: they never
+  feed `missing`.
+- `kindle:embed:XXXX[?mime=...]` left in the output (KindleUnpack only rewrites `<img>`/`<image>` tags,
+  style attributes and CSS `url()`; not `video@poster`, `object@data`, `source@srcset`, ...) is resolved by
+  the harness: XXXX is base 32 (0-9, A-V), a 1-based index into the resource records from the MOBI header's
+  first-resource record on (the same `rscnames[XXXX-1]` KindleUnpack uses), and KindleUnpack names the
+  extracted file after that record (`image|cover|thumb<record:05d>.<ext>`) in `mobi8/OEBPS/Images` or
+  `mobi7/Images`. The file is hashed like any other reference. KF8 only: a MOBI v6 file has no such
+  references, so a `kindle:embed` there stays unresolved (missing). An embed that names an existing record
+  KindleUnpack did not extract (svg, ...) still counts as a resolving `src` for the srcset rule above and as
+  `unextractable` for the reference itself. The MOBI v6 analogue: KindleUnpack turns `<img recindex="NNNNN">`
+  into a `src` only for the images it extracted; an `<img>` left with a `recindex` that names an existing
+  resource record (1-based from the first-resource record) counts as a resolving `src` for the srcset rule
+  the same way.
 - Fallback: when the referenced manifest item has a `fallback` chain of images, the end of the chain is the
   expected image and any image of the chain is accepted. The foreign image itself is then not "referenced".
 - `unextractable`: referenced images that are in the AZW3/MOBI file as an unchanged raw PalmDB record but
@@ -174,6 +214,36 @@ view of the names.
   the target chapter (no fragment needed).
 
 `style`
+- MOBI v6 (`fmt == "mobi"`): the score measures what MOBI 6 markup can carry.
+  - Output semantics: before collecting, `MOBI_CSS` is added to the KindleUnpack `book.html` and its
+    attributes are applied, after Calibre's MobiReader (base CSS and `upshift_markup`):
+    `p {margin: 0; text-indent: 1.5em}`, `blockquote {margin: 0 0 0 2em}`; `align=left|right|center|justify`
+    on p/div/h1-h6/li/dd/dt/td/th -> `text-align`; `width` -> `text-indent` and `height` -> `margin-top`
+    (inline style; the writer writes them with a unit, `Npt` below 1em else `Nem`; a bare number would be
+    px, Calibre `ensure_unit`), not on img/table/tr/td/th/hr/media; `<font size=1..7>` -> x-small, small,
+    medium, large, x-large, xx-large, xxx-large (the HTML legacy sizes 10/13/16/18/24/32/48 px, which are
+    the writer's own, 3 = normal). `body {text-align: justify}` is left out (a reader setting).
+    `page.evaluate` runs with JavaScript disabled for the page. The output's baseline (see "carries
+    author CSS") keeps the reader defaults (`MOBI_BASE_CSS`: the p and blockquote rules), and
+    `margin-top`/`text-indent` left at the browser default on the input and at the MOBI default on the
+    output are not checked: an unstyled paragraph gets the target reader's look (indented, no gap),
+    which is not a conversion difference.
+  - Both sides: computed `text-align` `-webkit-center|left|right` reads as `center|left|right`;
+    `margin-left` is compared as the left inset level: margin-left + padding-left, plus those of the
+    single-child `<blockquote>`s directly around the element (which then count 0), in the writer's 2em
+    steps (`0` below 8 px, else round(px / 32), at most 3); `margin-top` of a block is the space above it,
+    max(margin-top, margin-bottom of the previous block sibling); `<body>`/`<html>` margin-top/left are
+    not compared (page margins: a reader setting in MOBI 6); `vertical-align` is what the text shows (the
+    first raised/lowered value among the element and its inline ancestors) and `text-decoration-line`
+    the union of the element's and its ancestors' lines, since the `<sup>`/`<sub>`/`<u>`/`<s>` wrappers
+    may sit inside or outside the element that carried the CSS.
+  - Not scored (`props_excluded_for_format`): display, font-family, font-variant, line-height,
+    white-space, margin-right, padding-right (no MOBI 6 markup), padding-left (folded into the inset)
+    and margin-bottom (folded into the next block's space above, where the writer puts it).
+  - Ancestors of an anchor pair are compared on the non-inherited properties only (MobiML puts font,
+    alignment and indent on the text itself, which the anchor pair compares).
+  - Hidden input elements are left out (see "MOBI v6 hidden content").
+  For AZW3 `props_excluded_for_format` is `[]` and nothing of this applies.
 - `input_css_rules`: rule blocks of the style sheets reachable from an XHTML spine document (`<link
   rel=stylesheet>` to CSS, i.e. not `.xpgt` and not another declared type; `<style>`; `@import` chains),
   `@font-face` blocks excluded (fonts are dropped by design). The same exclusion applies to
