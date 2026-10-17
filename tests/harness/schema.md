@@ -88,11 +88,15 @@ Timeouts and harness errors (`error` starting with `harness:`) are never cached.
   },
   "invariants": {
     "text":   {"spine_items": 0, "matching_items": 0,
-               "first_diff": {"item": 0, "ours_excerpt": "", "input_excerpt": ""}},
-    "images": {"input": 0, "output": 0, "matched_by_hash": 0, "dimension_mismatch": 0},
+               "first_diff": {"item": 0, "ours_excerpt": "", "input_excerpt": ""},
+               "non_xhtml_spine_items": 0,
+               "non_xhtml_handling": [{"item": 0, "type": "image/svg+xml", "output_has_img": false}]},
+    "images": {"input": 0, "output": 0, "matched_by_hash": 0, "dimension_mismatch": 0,
+               "missing": 0, "unextractable": 0, "refs_total": 0, "refs_correct": 0, "refs_missing": 0},
     "toc":    {"input_entries": 0, "output_entries": 0, "matched": 0, "depth_in": 0, "depth_out": 0},
     "links":  {"internal_total": 0, "resolved": 0},
-    "style":  {"score": 0.0, "per_chapter": [0.0]}
+    "style":  {"score": 0.0, "per_chapter": [0.0], "input_css_rules": 0,
+               "input_css_rules_unreferenced": 0, "output_css_rules": 0}
   },
   "calibre_diff": {
     "header_fields_diff": [{"field": "…", "ours": "…", "calibre": "…"}],
@@ -114,6 +118,66 @@ Rules:
 - `gate.*.ok` is false when the tool exited non-zero or produced no output tree, and null with
   `err: "timeout"` when it ran out of time (120 s + 60 s per 10 MB of input).
 - `invariants` are computed only when `gate.kindleunpack.ok`; otherwise `null`.
+
+### Invariant details (oracles.py)
+
+Input lookup. A spine/manifest href is looked up in the input zip exactly, URI-decoded, NFC- and
+NFD-normalised, and by the cp437 -> UTF-8 re-decoded member name (Python decodes names without the
+UTF-8 flag as cp437; JSZip, the app, always decodes UTF-8). A book the app converted fine is therefore
+not reported with `text.spine_missing_in_zip`. `text.app_skipped` still follows the app's own (JSZip)
+view of the names.
+
+`text`
+- Only spine items whose manifest media-type is `application/xhtml+xml` or `text/html` are compared:
+  `spine_items`/`matching_items`/`first_diff`/`chars_*` cover those only. A `text/*` (or missing)
+  media-type on a `.xhtml/.html/.htm/.xht` file is a mislabelled document and counts as XHTML (the app reads
+  it as such); every other type (`image/*` incl. svg, `application/json`, `application/xml`, mathml,
+  dtbook, octet-stream, ...) is a foreign spine item, whatever its manifest `fallback`: the app is
+  expected to follow the fallback, which is a writer matter, not a text-loss.
+- `non_xhtml_spine_items`: number of foreign spine items; `non_xhtml_handling`: one record each,
+  `{item (spine index), path, type (manifest media-type), fallback_type (media-type of the first XHTML/HTML
+  item of its manifest fallback chain, else null), app_found, output_has_img (the output chapter holds an
+  <img>), output_has_content (an <img> or any visible text)}`; the two `output_*` flags are null in
+  `concat` mode (chapters cannot be told apart) and false when the app emitted no chapter. Foreign items
+  are not parsed as markup when binary (raster images, media, fonts); other non-XHTML items are read as
+  UTF-8 (a JSON spine item is not decoded as latin-1). They are left out of the images, links and style
+  checks and of the CSS rule counts too. Category `spine-non-xhtml` (informational) keeps them visible.
+
+`images`
+- References: `img@src`, svg `image@href`, `video@poster`, `object@data`, `img@srcset`, `source@srcset`
+  and CSS `url()` (outside `@font-face` and `@import`) in the style sheets reachable from the spine
+  (AZW3 only: MOBI v6 has no style sheets). All feed the same `refs_total` / `refs_correct` /
+  `refs_wrong_image` / `refs_missing` accounting; `refs_by_kind` counts them per kind (`src`, `srcset`,
+  `poster`, `object`, `css`), `refs_missing_by_kind` the missing ones, `first_missing_ref` is the first
+  missing one (`{item, kind, input}`).
+- `srcset` is one reference per element. It is correct when the writer dropped the attribute and the
+  `<img>`'s `src` still resolves (a dropped/removed `<source>` is fine), or when every candidate left in the
+  output resolves to a file; a candidate that is still a dangling relative path (`../images/x.png`) makes it
+  a missing reference. srcset candidates are not "referenced" images: they never feed `missing`.
+- Fallback: when the referenced manifest item has a `fallback` chain of images, the end of the chain is the
+  expected image and any image of the chain is accepted. The foreign image itself is then not "referenced".
+- `unextractable`: referenced images that are in the AZW3/MOBI file as an unchanged raw PalmDB record but
+  that KindleUnpack did not extract (svg, avif, jxl, psd ...). They are not in `missing`. A reference to
+  such an image counts in `refs_unextractable` (not correct, not missing; `refs_total` includes it).
+  Category `images-unextractable` (informational).
+- `missing` = referenced images (plus cover) neither present by hash, nor present-but-changed, nor
+  unextractable.
+
+`toc`
+- Source: the EPUB 3 nav document when it has entries, else the NCX. When both exist and the nav is empty the
+  NCX wins (the one with more entries). `source` says which.
+- Labels: an anchor/label with no visible text uses the `<img alt>`, then a `title` (anchor or image),
+  then (nav anchors only) the target file's basename, as a reader would show it.
+
+`links`
+- A fragment link whose target is the target document's `<body id>` resolves when the output link lands on
+  the target chapter (no fragment needed).
+
+`style`
+- `input_css_rules`: rule blocks of the style sheets reachable from an XHTML spine document (`<link
+  rel=stylesheet>` to CSS, i.e. not `.xpgt` and not another declared type; `<style>`; `@import` chains),
+  `@font-face` blocks excluded (fonts are dropped by design). The same exclusion applies to
+  `output_css_rules`. `input_css_rules_unreferenced`: the rest of the manifest's `text/css` items.
 - `calibre_diff` is computed only when both files exist; otherwise `null`.
 
 ## Module interfaces
@@ -153,16 +217,18 @@ def write_report(results: list[dict], out_md: Path, out_json: Path, *, subset: s
 | app-clean-error | no file, verdict `error`, specific app message (not a JS runtime error, not the iCloud advice), Calibre failed too | acceptable |
 | app-timeout | app exceeded timeout | writer bug |
 | gate-mobitool / gate-kindleunpack / gate-calibre | that parser failed | writer bug |
-| text-loss | matching_items < spine_items | transform or repair, decided in report |
+| text-loss | matching_items < spine_items (XHTML/HTML spine items only) | transform or repair, decided in report |
+| spine-non-xhtml | `text.non_xhtml_spine_items` > 0: svg/image/xml/json spine items not compared as text | informational |
 | text-garbled | more U+FFFD in our text than in the input's, or CSS rules in our body text but not in the input's | writer bug |
-| images-missing | `images.missing` > 0: referenced input images (plus cover) neither present by hash nor present-but-changed | unported Calibre transform (mobi.utils / writer8 resources) |
+| images-missing | `images.missing` > 0: referenced input images (plus cover) neither present by hash, present-but-changed nor unextractable (raw record in the file) | unported Calibre transform (mobi.utils / writer8 resources) |
 | images-resized | dimension_mismatch > 0 | informational |
-| images-misreferenced | refs_total > 0 and (refs_wrong_image > 0 or refs_missing > 0) | writer bug |
+| images-unextractable | `images.unextractable` > 0: referenced image present as a raw record KindleUnpack does not extract | informational |
+| images-misreferenced | refs_total > 0 and (refs_wrong_image > 0 or refs_missing > 0), incl. dangling srcset candidates | writer bug |
 | toc-missing | input_entries > 0 and output_entries == 0 | unported transform (writer8 toc) |
 | toc-flat | depth_out < depth_in | unported transform (writer8 index NCX) |
 | toc-labels | matched < min(input, output) | writer bug |
 | links-unresolved | resolved < internal_total | unported transform (writer8 main: internal links) |
-| style-lost | style.score < 0.5, or (AZW3 only) input_css_rules > 0 and output_css_rules == 0 | unported transform (writer8 main: css flows / oeb flatcss) |
+| style-lost | style.score < 0.5, or (AZW3 only) input_css_rules (reachable sheets, no @font-face) > 0 and output_css_rules == 0 | unported transform (writer8 main: css flows / oeb flatcss) |
 | fixed-layout-unsupported | `invariants.fixed_layout`: input OPF has rendition:layout pre-paginated; the book's other categories become out of scope | out of scope |
 | calibre-header-diff | header_fields_diff non-empty beyond the ignore list | informational |
 | input-repair | app-error, a clean app error, or text-loss on a book Calibre converted fine and whose verdict is error/warning | input repair |

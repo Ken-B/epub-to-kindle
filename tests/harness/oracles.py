@@ -485,8 +485,12 @@ def _entities_to_numeric(b: bytes) -> bytes:
 _HTML_START_RE = re.compile(rb"<html\b.*?(?=<head\b|<body\b)", re.IGNORECASE | re.DOTALL)
 
 
-def _parse_doc(data: bytes):
-    """XML first (like the app's application/xhtml+xml DOMParser), lxml.html on failure."""
+_XML_DECL_RE = re.compile(r"^\s*<\?xml[^>]*\?>")
+
+
+def _parse_doc(data: bytes, utf8: bool = False):
+    """XML first (like the app's application/xhtml+xml DOMParser), lxml.html on failure.
+    `utf8`: the HTML fallback decodes the bytes as UTF-8 (when valid) instead of lxml's latin-1 guess."""
     from lxml import etree
     from lxml import html as lhtml
     try:
@@ -496,6 +500,11 @@ def _parse_doc(data: bytes):
         # libxml2's HTML parser gives up on a malformed <html ...> start tag (KindleUnpack's mobi7
         # output writes `<html xmlns=<meta http-equiv=... />"http://...">`), so normalise it first.
         data = _HTML_START_RE.sub(b"<html>", data, count=1)
+        if utf8:
+            try:
+                return lhtml.document_fromstring(_XML_DECL_RE.sub("", data.decode("utf-8"))), "html"
+            except (UnicodeDecodeError, ValueError):
+                pass
         return lhtml.document_fromstring(data), "html"
 
 
@@ -580,14 +589,14 @@ def _empty_doc():
     return lhtml.document_fromstring("<html><head></head><body></body></html>")
 
 
-def _parse_or_empty(path: Path, errors: dict, key: str):
+def _parse_or_empty(path: Path, errors: dict, key: str, utf8: bool = False):
     """Parse one document; an unreadable, empty or unparsable one becomes an empty <body> and an
     entry in `errors`, so one bad file does not void the invariants of the whole book."""
     try:
         data = Path(path).read_bytes()
         if not data.strip():
             raise ValueError("empty or whitespace-only document")
-        return _parse_doc(data)[0]
+        return _parse_doc(data, utf8)[0]
     except Exception as e:
         errors[key] = f"{type(e).__name__}: {e}"[:300]
         return _empty_doc()
@@ -595,15 +604,41 @@ def _parse_or_empty(path: Path, errors: dict, key: str):
 
 _CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 _STYLE_BLOCK_RE = re.compile(r"<style\b[^>]*>(.*?)</style>", re.DOTALL | re.IGNORECASE)
+_FONT_FACE_RE = re.compile(r"@font-face\s*\{[^{}]*\}", re.IGNORECASE)
+_CSS_IMPORT_RE = re.compile(r"""@import\s+(?:url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)|"([^"]*)"|'([^']*)')""",
+                            re.IGNORECASE)
+_CSS_URL_RE = re.compile(r"""url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]*))\s*\)""", re.IGNORECASE)
+
+
+def _css_strip(css: str) -> str:
+    """CSS without comments and without @font-face blocks (the writer drops fonts by design)."""
+    return _FONT_FACE_RE.sub("", _CSS_COMMENT_RE.sub("", css))
 
 
 def _css_rule_count(css: str) -> int:
-    """Number of rule blocks (`{`), comments removed; @media etc. count as one more."""
-    return _CSS_COMMENT_RE.sub("", css).count("{")
+    """Number of rule blocks (`{`), comments and @font-face blocks removed; @media etc. count as one more."""
+    return _css_strip(css).count("{")
+
+
+def _inline_css_blocks(markup: str) -> list[str]:
+    return [m.group(1) for m in _STYLE_BLOCK_RE.finditer(markup)]
 
 
 def _inline_css_rules(markup: str) -> int:
-    return sum(_css_rule_count(m.group(1)) for m in _STYLE_BLOCK_RE.finditer(markup))
+    return sum(_css_rule_count(b) for b in _inline_css_blocks(markup))
+
+
+def _css_imports(css: str) -> list[str]:
+    return [next(g for g in m.groups() if g is not None).strip()
+            for m in _CSS_IMPORT_RE.finditer(_CSS_COMMENT_RE.sub("", css))
+            if any(g is not None for g in m.groups())]
+
+
+def _css_urls(css: str) -> list[str]:
+    """url(...) targets outside @font-face blocks and @import rules (those are not image references)."""
+    c = _CSS_IMPORT_RE.sub("", _css_strip(css))
+    return [next(g for g in m.groups() if g is not None).strip()
+            for m in _CSS_URL_RE.finditer(c) if any(g is not None for g in m.groups())]
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -665,6 +700,37 @@ def _safe_unzip(epub: Path, dest: Path) -> None:
     marker.write_text(json.dumps(sig), encoding="utf-8")
 
 
+XHTML_TYPES = {"application/xhtml+xml", "text/html"}
+XHTML_EXT = (".xhtml", ".html", ".htm", ".xht")
+# spine items of these types hold bytes, not markup: never parsed
+_BINARY_PREFIXES = ("audio/", "video/", "font/", "application/octet-stream", "application/font",
+                    "application/vnd.ms-opentype", "application/x-font")
+
+
+def _nfc(s: str) -> str:
+    return unicodedata.normalize("NFC", s)
+
+
+def _nfd(s: str) -> str:
+    return unicodedata.normalize("NFD", s)
+
+
+def _redecode(name: str, flag_bits: int) -> str | None:
+    """JSZip's view of a zip member name that Python decoded as cp437 (UTF-8 flag bit 11 not set):
+    JSZip always decodes names as UTF-8. None when the name is flagged UTF-8 or is not valid UTF-8."""
+    if flag_bits & 0x800:
+        return None
+    try:
+        return name.encode("cp437").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return None
+
+
+def _basename(href: str) -> str:
+    h = unquote((href or "").split("#")[0].split("?")[0]).strip()
+    return posixpath.basename(h) or (href or "").strip()
+
+
 class InputBook:
     """Parsed input EPUB: spine (with the app's chapter mapping), images, TOC."""
 
@@ -673,25 +739,44 @@ class InputBook:
         self.dir = out_dir / "input"
         _safe_unzip(self.epub, self.dir)
         with zipfile.ZipFile(self.epub) as z:
-            namelist = z.namelist()
+            infos = z.infolist()
+        namelist = [i.filename for i in infos]
         self.names = set(namelist)
         self.casefold_collisions = casefold_collisions(namelist)
+        # name lookup: exact, NFC/NFD and the cp437 -> UTF-8 re-decoding (JSZip's view of the name)
+        self.true_name: dict[str, str] = {}
+        self._lookup: dict[str, str] = {}
+        for info in infos:
+            self.true_name[info.filename] = _redecode(info.filename, info.flag_bits) or info.filename
+        for n in namelist:
+            self._lookup.setdefault(n, n)
+        for n in namelist:
+            for v in (n, self.true_name[n]):
+                for k in (v, _nfc(v), _nfd(v)):
+                    self._lookup.setdefault(k, n)
+        self.app_names = set(self.true_name.values())
         self.doc_errors: dict[str, str] = {}
+        self._junk_errors: dict[str, str] = {}   # documents the oracle does not evaluate (non-XHTML)
         cont = self._xml(self.dir / "META-INF/container.xml")
         rf = next((e for e in cont.iter() if _local(e) == "rootfile" and _attr(e, "full-path")), None)
         if rf is None:
             raise RuntimeError("container.xml has no rootfile")
-        self.opf_path = _attr(rf, "full-path").lstrip("/")
+        opf_raw = _attr(rf, "full-path").lstrip("/")
+        self.opf_path = self.canon(opf_raw) or opf_raw
         opf = self._xml(self.dir / self.opf_path)
-        self.opf_dir = posixpath.dirname(self.opf_path)
+        self.opf_dir = posixpath.dirname(self.true_name.get(self.opf_path, self.opf_path))
         self.manifest: dict[str, dict] = {}
+        self.by_path: dict[str, dict] = {}
         for it in (e for e in opf.iter() if _local(e) == "item"):
             iid, href = _attr(it, "id"), _attr(it, "href")
             if iid is None or href is None:
                 continue
-            self.manifest[iid] = {"href": href, "mt": (_attr(it, "media-type") or "").strip(),
+            path = self.join(self.opf_path, href.split("#")[0])
+            self.manifest[iid] = {"id": iid, "href": href, "mt": (_attr(it, "media-type") or "").strip(),
                                   "props": _attr(it, "properties") or "",
-                                  "path": _join(self.opf_path, href.split("#")[0])}
+                                  "fallback": (_attr(it, "fallback") or "").strip() or None,
+                                  "path": path}
+            self.by_path.setdefault(path, self.manifest[iid])
         spine_el = next((e for e in opf.iter() if _local(e) == "spine"), None)
         self.spine_toc_id = _attr(spine_el, "toc") if spine_el is not None else None
         self.fixed_layout = False
@@ -703,25 +788,81 @@ class InputBook:
                     (_attr(m, "content") or "").strip().lower() in ("true", "pre-paginated"):
                 self.fixed_layout = True
         # Spine -> chapters. The app does resolve = opfDir + href.split('#')[0], tries the raw then the
-        # URI-decoded name with JSZip (no ../ normalisation), and skips files it cannot find or parse.
+        # URI-decoded name with JSZip (names decoded as UTF-8, no ../ normalisation), and skips files it
+        # cannot find or parse. The oracle finds the member NFC/NFD- and cp437-insensitively (`path`)
+        # but keeps `app_found` strict: whether the app's own lookup succeeds.
         self.spine: list[dict] = []
         for ir in (e for e in (spine_el if spine_el is not None else []) if _local(e) == "itemref"):
             it = self.manifest.get(_attr(ir, "idref") or "")
             if not it:
                 continue
             raw = (self.opf_dir + "/" if self.opf_dir else "") + it["href"].split("#")[0]
-            app_found = raw in self.names or unquote(raw) in self.names
+            app_found = raw in self.app_names or unquote(raw) in self.app_names
             present = it["path"] in self.names
-            if not present and not app_found:
+            path = it["path"] if present else (self.canon(raw) or self.canon(unquote(raw)))
+            if path is None:
                 continue  # genuinely missing from the zip: not counted
-            self.spine.append({"path": it["path"] if present else (raw if raw in self.names else unquote(raw)),
-                               "href": it["href"], "mt": it["mt"], "app_found": app_found,
-                               "linear": (_attr(ir, "linear") or "yes") != "no"})
+            self.spine.append({"path": path, "href": it["href"], "mt": it["mt"], "id": it["id"],
+                               "xhtml": self._is_xhtml(it), "fallback_type": self._fallback_type(it),
+                               "app_found": app_found, "linear": (_attr(ir, "linear") or "yes") != "no"})
         self.spine_paths = {s["path"]: i for i, s in enumerate(self.spine)}
         self.spine_missing = sum(1 for e in (spine_el if spine_el is not None else [])
                                  if _local(e) == "itemref") - len(self.spine)
         self.cover_path = self._cover_path(opf)
         self._docs: dict[str, object] = {}
+        self._css: dict | None = None
+
+    # names -------------------------------------------------------------------
+    def canon(self, path: str | None) -> str | None:
+        """The zip member name (as Python lists it) for a path, matching exactly, URI-decoded,
+        NFC/NFD-normalised, or by the cp437 -> UTF-8 re-decoded name; None when not in the zip."""
+        if not path:
+            return None
+        for cand in (path, unquote(path)):
+            for k in (cand, _nfc(cand), _nfd(cand)):
+                hit = self._lookup.get(k)
+                if hit is not None:
+                    return hit
+        return None
+
+    def join(self, base_member: str, href: str) -> str:
+        """href (URL-encoded, no fragment) resolved against a zip member; the canonical member name
+        when it exists in the zip, else the normalised path."""
+        p = _join(self.true_name.get(base_member, base_member), href)
+        return self.canon(p) or p
+
+    # manifest types ----------------------------------------------------------
+    @staticmethod
+    def _is_xhtml(it: dict) -> bool:
+        """XHTML/HTML by the manifest media-type; a missing or text/* (text/plain, legacy
+        text/x-oeb1-document) one on a .xhtml/.html file is a mislabelled document, which the app
+        still reads as XHTML."""
+        mt = it["mt"].lower()
+        if mt in XHTML_TYPES:
+            return True
+        return (not mt or mt.startswith("text/")) and it["path"].lower().endswith(XHTML_EXT)
+
+    def _fallback_chain(self, it: dict) -> list[dict]:
+        chain, seen = [], {it["id"]}
+        while it and it.get("fallback") and it["fallback"] not in seen:
+            seen.add(it["fallback"])
+            it = self.manifest.get(it["fallback"])
+            if it:
+                chain.append(it)
+        return chain
+
+    def _fallback_type(self, it: dict) -> str | None:
+        """Media type of the first XHTML/HTML item of the manifest fallback chain, else None."""
+        return next((c["mt"] for c in self._fallback_chain(it) if self._is_xhtml(c)), None)
+
+    def image_chain(self, path: str) -> list[str]:
+        """[path, its fallback image, the fallback's fallback, ...] while the fallback is an image."""
+        chain, it = [path], self.by_path.get(path)
+        for c in self._fallback_chain(it) if it else []:
+            if not c["mt"].startswith("image/") or c["path"] in chain:
+                break
+            chain.append(c["path"])
+        return chain
 
     def _cover_path(self, opf):
         """Manifest path of the cover image (EPUB 3 properties="cover-image" or EPUB 2
@@ -742,27 +883,91 @@ class InputBook:
 
     def doc(self, path: str):
         if path not in self._docs:
-            self._docs[path] = _parse_or_empty(self.dir / path, self.doc_errors, path)
+            sp = next((s for s in self.spine if s["path"] == path), None)
+            if sp is not None and not sp["xhtml"] and self.is_binary(sp):
+                self._docs[path] = _empty_doc()
+            elif sp is not None and not sp["xhtml"]:
+                # foreign spine item (svg/xml/json/...): errors are not reported, JSON & co. are UTF-8
+                self._docs[path] = _parse_or_empty(self.dir / path, self._junk_errors, path, utf8=True)
+            else:
+                self._docs[path] = _parse_or_empty(self.dir / path, self.doc_errors, path)
         return self._docs[path]
 
-    def css_rules(self) -> int:
-        """Rule blocks in the manifest's text/css items plus inline <style> in spine documents."""
-        n = 0
-        for it in self.manifest.values():
-            f = self.dir / it["path"]
-            if it["mt"] == "text/css" and it["path"] in self.names and f.is_file():
-                n += _css_rule_count(f.read_text("utf-8", errors="replace"))
-        for sp in self.spine:
-            f = self.dir / sp["path"]
-            if f.is_file():
-                n += _inline_css_rules(f.read_text("utf-8", errors="replace"))
-        return n
+    def is_binary(self, sp: dict) -> bool:
+        """Spine item whose bytes are not text (raster images, media, fonts): never parsed."""
+        mt = sp["mt"].lower()
+        return (mt.startswith("image/") and "svg" not in mt) or mt.startswith(_BINARY_PREFIXES)
 
     def mark_skipped(self, skipped: list[str]) -> None:
         """Chapters the app logged as `Skip chapter: <path> ...` produced no skeleton."""
         for s in self.spine:
-            if any(x.strip().startswith(s["path"]) for x in skipped):
+            names = {s["path"], self.true_name.get(s["path"], s["path"])}
+            if any(x.strip().startswith(n) for x in skipped for n in names):
                 s["app_found"] = False
+
+    # css ---------------------------------------------------------------------
+    def _link_is_css(self, base: str, el, href: str) -> bool:
+        ext = posixpath.splitext(href.split("#")[0].split("?")[0])[1].lower()
+        if ext == ".xpgt":
+            return False
+        t = (_attr(el, "type") or "").strip().lower()
+        if t:
+            return t.startswith("text/css")
+        mt = (self.by_path.get(self.join(base, href.split("#")[0].split("?")[0])) or {}).get("mt", "")
+        return not mt or mt == "text/css" or ext == ".css"
+
+    def css_info(self) -> dict:
+        """Style sheets reachable from a (XHTML) spine document: <link rel=stylesheet> to CSS (not .xpgt
+        or another type), <style>, and @import chains. Rule counts exclude @font-face blocks;
+        `unreferenced` counts the manifest's other text/css items. `urls` lists [base member, url()]
+        of the reachable CSS outside @font-face (image references)."""
+        if self._css is not None:
+            return self._css
+        rules: dict[str, int] = {}
+        inline = 0
+        urls: list[tuple[str, str]] = []
+
+        def follow(base: str, href: str) -> None:
+            href = (href or "").strip()
+            if not href or _has_scheme(href) or href.startswith("//"):
+                return
+            t = self.join(base, href.split("#")[0].split("?")[0])
+            if t not in rules and t in self.names and (self.dir / t).is_file():
+                css = (self.dir / t).read_text("utf-8", errors="replace")
+                rules[t] = _css_rule_count(css)
+                urls.extend((t, u) for u in _css_urls(css))
+                for imp in _css_imports(css):
+                    follow(t, imp)
+
+        for sp in self.spine:
+            if not sp["xhtml"]:
+                continue
+            doc = self.doc(sp["path"])
+            for el in _elements(doc, {"link"}):
+                if "stylesheet" in (_attr(el, "rel") or "").lower().split():
+                    href = (_attr(el, "href") or "").strip()
+                    if href and not _has_scheme(href) and self._link_is_css(sp["path"], el, href):
+                        follow(sp["path"], href)
+            for el in _elements(doc, {"style"}):
+                if (_attr(el, "type") or "text/css").strip().lower().startswith("text/css"):
+                    css = "".join(el.itertext())
+                    inline += _css_rule_count(css)
+                    urls.extend((sp["path"], u) for u in _css_urls(css))
+                    for imp in _css_imports(css):
+                        follow(sp["path"], imp)
+        unref, seen = 0, set(rules)
+        for it in self.manifest.values():
+            f = self.dir / it["path"]
+            if it["mt"] == "text/css" and it["path"] not in seen and it["path"] in self.names and f.is_file():
+                seen.add(it["path"])
+                unref += _css_rule_count(f.read_text("utf-8", errors="replace"))
+        self._css = {"referenced": sum(rules.values()) + inline, "unreferenced": unref,
+                     "urls": sorted(set(urls))}
+        return self._css
+
+    def css_rules(self) -> int:
+        """Rule blocks in style sheets reachable from a spine document (see css_info)."""
+        return self.css_info()["referenced"]
 
     # images ------------------------------------------------------------------
     def images(self) -> dict[str, dict]:
@@ -779,6 +984,8 @@ class InputBook:
 
     # toc ---------------------------------------------------------------------
     def toc(self) -> tuple[list[tuple[str, int]], str]:
+        """The TOC the writer would read: the nav document when it has entries, else the NCX (when
+        both exist and the nav is empty the NCX wins, as the longer one)."""
         ncx_entries, nav_entries = [], []
         ncx_id = self.spine_toc_id if self.spine_toc_id in self.manifest else next(
             (k for k, v in self.manifest.items() if v["mt"] == "application/x-dtbncx+xml"), None)
@@ -787,9 +994,27 @@ class InputBook:
         nav_id = next((k for k, v in self.manifest.items() if "nav" in v["props"].split()), None)
         if nav_id and (self.dir / self.manifest[nav_id]["path"]).exists():
             nav_entries = nav_toc(self.dir / self.manifest[nav_id]["path"])
-        if len(nav_entries) > len(ncx_entries):
+        if nav_entries:
             return nav_entries, "nav"
         return ncx_entries, ("ncx" if ncx_entries else "none")
+
+
+def _toc_label(label_el, href: str | None, title: str | None = None) -> str:
+    """Visible text of a TOC label; for an image-only one (nothing visible) the first <img> alt, then
+    the title, then the target's file name, as a reader would show it."""
+    txt = _visible_text(label_el) if label_el is not None else ""
+    if txt or label_el is None:
+        return txt
+    imgs = [e for e in label_el.iter() if isinstance(e.tag, str) and _local(e) in ("img", "image")]
+    for im in imgs:
+        alt = _norm_ws(_attr(im, "alt") or "")
+        if alt:
+            return alt
+    for t in [title, _attr(label_el, "title"), *(_attr(im, "title") for im in imgs)]:
+        t = _norm_ws(t or "")
+        if t:
+            return t
+    return _basename(href) if href else ""
 
 
 def ncx_toc(path: Path) -> list[tuple[str, int]]:
@@ -803,7 +1028,10 @@ def ncx_toc(path: Path) -> list[tuple[str, int]]:
                 continue
             lab = next((e for e in np.iter() if _local(e) == "navlabel"), None)
             txt = next((e for e in lab.iter() if _local(e) == "text"), None) if lab is not None else None
-            out.append((_visible_text(txt) if txt is not None else "", depth))
+            label = _visible_text(txt) if txt is not None else ""
+            if not label and lab is not None:
+                label = _toc_label(lab, None)   # an <img alt/title> label; an empty one stays empty
+            out.append((label, depth))
             walk(np, depth + 1)
     if nav_map is not None:
         walk(nav_map, 1)
@@ -821,7 +1049,8 @@ def nav_toc(path: Path) -> list[tuple[str, int]]:
             if _local(li) != "li":
                 continue
             lab = next((c for c in li if _local(c) in ("a", "span")), None)
-            out.append((_visible_text(lab) if lab is not None else "", depth))
+            out.append((_toc_label(lab, _attr(lab, "href") if lab is not None else None)
+                        if lab is not None else "", depth))
             for c in li:
                 if _local(c) == "ol":
                     walk(c, depth + 1)
@@ -926,11 +1155,38 @@ def _excerpt(a: str, b: str, ctx: int = 20, width: int = 80) -> tuple[str, str]:
 _CSS_LIKE = re.compile(r"\{[^}]{5,}(display|margin|font|visibility)[^}]{0,50}\}")
 
 
+def _non_xhtml_handling(book: InputBook, outb: OutputBook, mode: str, pairs) -> list[dict]:
+    """One record per spine item whose manifest type is not XHTML/HTML (svg, raster image, xml, json,
+    ...): not compared as text. `output_has_img`: the output chapter holds an <img>; `output_has_content`:
+    an <img> or any visible text (None in concat mode, where chapters cannot be told apart)."""
+    out = []
+    for i, s in enumerate(book.spine):
+        if s["xhtml"]:
+            continue
+        rec = {"item": i, "path": s["path"], "type": s["mt"], "fallback_type": s["fallback_type"],
+               "app_found": s["app_found"], "output_has_img": None, "output_has_content": None}
+        if mode == "aligned":
+            p = pairs[i]
+            if p is None:
+                rec["output_has_img"] = rec["output_has_content"] = False
+            else:
+                d = outb.doc(p)
+                rec["output_has_img"] = bool(_elements(_find_body(d), IMAGE_TAGS))
+                rec["output_has_content"] = rec["output_has_img"] or bool(_body_text(d))
+        out.append(rec)
+    return out
+
+
 def inv_text(book: InputBook, outb: OutputBook, mode: str, pairs) -> dict:
-    in_txt = [_body_text(book.doc(s["path"])) for s in book.spine]
+    # Only spine items whose manifest media-type is XHTML/HTML are compared as text. Others (svg,
+    # raster images, xml, json, ... whatever their fallback) are listed in non_xhtml_handling.
+    xi = [i for i, s in enumerate(book.spine) if s["xhtml"]]
+    in_txt = [_body_text(book.doc(book.spine[i]["path"])) for i in xi]
     out_docs_txt = [_body_text(outb.doc(p)) for p in outb.docs]
+    handling = _non_xhtml_handling(book, outb, mode, pairs)
     res = {"spine_items": len(in_txt), "matching_items": 0, "first_diff": None, "mode": mode,
            "output_items": len(outb.docs),
+           "non_xhtml_spine_items": len(handling), "non_xhtml_handling": handling,
            "app_skipped": sum(1 for s in book.spine if not s["app_found"]),
            "spine_missing_in_zip": book.spine_missing, "whitespace_only_diffs": 0,
            "chars_in": sum(len(t) for t in in_txt), "chars_out": sum(len(t) for t in out_docs_txt)}
@@ -940,7 +1196,7 @@ def inv_text(book: InputBook, outb: OutputBook, mode: str, pairs) -> dict:
     res["css_in_text"] = bool(_CSS_LIKE.search(all_out))
     res["css_in_text_input"] = bool(_CSS_LIKE.search(all_in))
     if mode == "aligned":
-        for i, t in enumerate(in_txt):
+        for i, t in zip(xi, in_txt, strict=True):
             o = _body_text(outb.doc(pairs[i])) if pairs[i] is not None else ""
             if t == o:
                 res["matching_items"] += 1
@@ -958,11 +1214,11 @@ def inv_text(book: InputBook, outb: OutputBook, mode: str, pairs) -> dict:
     out_ns, out_map = _strip_ws(all_out)
     in_ns = [_strip_ws(t)[0] for t in in_txt]
     pos = 0
-    for i, t in enumerate(in_txt):
+    for n, (i, t) in enumerate(zip(xi, in_txt, strict=True)):
         t_ns, t_map = _strip_ws(t)
         j = out_ns.find(t_ns, pos)
         if j >= 0 and j - pos > CONCAT_SLACK:
-            nxt = next((x[:24] for x in in_ns[i + 1:] if x), "")
+            nxt = next((x[:24] for x in in_ns[n + 1:] if x), "")
             if nxt and out_ns.find(nxt, pos, j) >= 0:
                 j = -1
         if j >= 0:
@@ -989,15 +1245,53 @@ def _strip_ws(s: str) -> tuple[str, list[int]]:
     return "".join(s[k] for k in keep), keep
 
 
-def _img_href(e):
-    if _local(e) == "img":
+# elements that carry an image reference: img@src/@srcset, svg image@href, <source srcset> (picture),
+# video@poster, object@data
+REF_TAGS = {"img", "image", "source", "video", "object"}
+
+
+def _ref_attr(e) -> str | None:
+    """The attribute holding the element's primary (single) image reference."""
+    t = _local(e)
+    if t == "img":
         return _attr(e, "src")
-    return e.get(f"{{{XLINK_NS}}}href") or _attr(e, "href")
+    if t == "image":
+        return e.get(f"{{{XLINK_NS}}}href") or _attr(e, "href")
+    if t == "video":
+        return _attr(e, "poster")
+    if t == "object":
+        return _attr(e, "data")
+    return None
+
+
+def _parse_srcset(value: str | None) -> list[str]:
+    """Candidate URLs of a srcset attribute (HTML spec tokenisation, descriptors dropped)."""
+    out: list[str] = []
+    s, i, n = value or "", 0, len(value or "")
+    while i < n:
+        while i < n and (s[i].isspace() or s[i] == ","):
+            i += 1
+        j = i
+        while j < n and not s[j].isspace():
+            j += 1
+        url = s[i:j]
+        i = j
+        if not url:
+            break
+        if url.endswith(","):
+            out.append(url.rstrip(","))
+            continue
+        out.append(url)
+        depth = 0                      # skip the descriptor up to the next comma outside parentheses
+        while i < n and not (s[i] == "," and depth == 0):
+            depth += (s[i] == "(") - (s[i] == ")")
+            i += 1
+    return [u for u in out if u]
 
 
 def _text_index(root) -> tuple[str, dict[str, int], list[tuple[int, object]]]:
     """Walk the body in document order. Returns (whitespace-free visible text, {id/name: offset of
-    the element's start in that text}, [(offset, element)] for every img / svg image)."""
+    the element's start in that text}, [(offset, element)] for every REF_TAGS element)."""
     buf: list[str] = []
     n = 0
     ids: dict[str, int] = {}
@@ -1018,7 +1312,7 @@ def _text_index(root) -> tuple[str, dict[str, int], list[tuple[int, object]]]:
             v = _attr(e, k)
             if v and v not in ids:
                 ids[v] = n
-        if _local(e) in IMAGE_TAGS:
+        if _local(e) in REF_TAGS:
             imgs.append((n, e))
         add(e.text)
         for c in e:
@@ -1029,61 +1323,119 @@ def _text_index(root) -> tuple[str, dict[str, int], list[tuple[int, object]]]:
 
 
 _CTX = 24   # chars of text before/after an image that identify its place in the text
+_KIND = {"img": "src", "image": "src", "video": "poster", "object": "object", "source": "srcset"}
 
 
-def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs) -> dict:
+def _raw_record_hashes(path: Path | None) -> set[str]:
+    """sha256 of every PalmDB record of the output file: a resource the writer stored as raw bytes
+    is in here even when KindleUnpack does not extract it."""
+    if path is None or not Path(path).is_file():
+        return set()
+    try:
+        return {hashlib.sha256(r).hexdigest() for r in _pdb_records(Path(path).read_bytes())}
+    except Exception:
+        return set()
+
+
+def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs, raw_file: Path | None = None) -> dict:
     """Image presence (by hash) and per-reference correctness.
 
-    References (img@src, svg image@xlink:href) are paired by their place in the text (the visible
-    text just before and after them, difflib over the sequence), not blindly by position, so a
-    dropped/extra reference does not shift every later pairing; data:, external and non-manifest
-    input references are left out. A pair is correct when the output reference resolves to a
-    byte-identical copy of the input image.
+    References are img@src, svg image@href, video@poster, object@data, img/source@srcset, and url()
+    in the style sheets reachable from the spine (AZW3 only: MOBI v6 has no style sheets). They are
+    paired by their place in the text (the visible text just before and after the element, difflib
+    over the sequence), not blindly by position, so a dropped/extra reference does not shift every
+    later pairing; data:, external and non-manifest input references are left out. A pair is correct
+    when the output reference resolves to a byte-identical copy of the input image. When the
+    referenced manifest item has a `fallback` image, that image (the end of the chain) is the
+    expected one, and any image of the chain is accepted.
+    srcset: one reference per element; it is correct when the writer dropped the attribute and an
+    <img>'s src still resolves (a <source> may simply go), or when every candidate left in the
+    output resolves to a file; a candidate that is still a dangling relative path (`../images/x.png`)
+    makes it a missing reference.
+    A reference to an image that is in the output file as a raw record but that KindleUnpack does
+    not extract (svg, avif, jxl, ...) is `refs_unextractable`, neither correct nor missing.
 
-    `missing` = referenced input images (plus the cover) that are neither present by hash nor
+    `missing` = referenced input images (plus the cover) that are neither present by hash,
     present-but-changed (paired by reference to an output image that is not an input image, e.g.
-    recompressed). Unreferenced manifest images do not count."""
+    recompressed) nor `unextractable` (raw record in the output file). Unreferenced manifest images
+    and srcset-only candidates do not count."""
     inp = book.images()
     outp = outb.images()
+    raw = _raw_record_hashes(raw_file)
     in_hashes = {v["sha256"] for v in inp.values()}
     res = {"input": len(inp), "output": len(outp),
            "matched_by_hash": sum(1 for v in inp.values() if v["sha256"] in outp),
            "dimension_mismatch": 0,
            "refs_total": 0, "refs_correct": 0, "refs_wrong_image": 0, "refs_missing": 0,
-           "first_wrong_ref": None}
+           "refs_unextractable": 0, "refs_by_kind": {}, "refs_missing_by_kind": {},
+           "first_wrong_ref": None, "first_missing_ref": None}
+
+    def in_rec(base: str, e):
+        """Reference record of one input element, or None when it references no manifest image."""
+        tag = _local(e)
+        prim = None
+        if tag != "source" and not (tag == "object" and any(
+                _local(c) in IMAGE_TAGS for c in e.iter() if c is not e and isinstance(c.tag, str))):
+            r = (_ref_attr(e) or "").strip()
+            if r and not r.startswith("data:") and not _has_scheme(r):
+                ip = book.join(base, r.split("#")[0].split("?")[0])
+                if ip in inp:
+                    prim = ip
+        ss = None
+        if tag in ("img", "source"):
+            cands = []
+            for u in _parse_srcset(_attr(e, "srcset")):
+                if not u.startswith("data:") and not _has_scheme(u):
+                    ip = book.join(base, u.split("#")[0].split("?")[0])
+                    if ip in inp:
+                        cands.append(ip)
+            ss = cands or None
+        return None if prim is None and ss is None else {"tag": tag, "primary": prim, "srcset": ss}
 
     def in_refs(i):
-        """[(context key, input image path)] for one spine item, plus its text length."""
+        """[(offset, record)] for one spine item, plus its text."""
         s = book.spine[i]
-        text, _, imgs = _text_index(book.doc(s["path"]))
-        out = []
-        for off, e in imgs:
-            r = (_img_href(e) or "").strip()
-            if not r or r.startswith("data:") or _has_scheme(r):
-                continue
-            ip = _join(s["path"], r.split("#")[0])
-            if ip in inp:
-                out.append((off, ip))
+        if not s["xhtml"]:
+            return "", []
+        text, _, els = _text_index(book.doc(s["path"]))
+        out = [(off, rec) for off, e in els if (rec := in_rec(s["path"], e))]
         return text, out
 
+    def out_file(p: Path, r: str):
+        f = (p.parent / unquote(r.split("#")[0].split("?")[0])).resolve()
+        if not f.is_file():
+            # KindleUnpack names a record that is both CoverOffset and ThumbOffset "thumbNNNNN"
+            # and leaves it in mobi7/Images only; the reference itself is still to that record.
+            f = outb.dir / "mobi7/Images" / f.name
+        return f if f.is_file() else None
+
+    def out_rec(p: Path, e):
+        r = (_ref_attr(e) or "").strip()
+        usable = bool(r) and not r.startswith("data:") and not _has_scheme(r)   # kindle:embed left
+        h = None                                                                  # unresolved etc.
+        if usable:
+            f = out_file(p, r)
+            h = outb.file_hash(f) if f else None
+        ss_attr = _attr(e, "srcset") if _local(e) in ("img", "source") else None
+        ss = None
+        if ss_attr is not None:
+            ss = []
+            for u in _parse_srcset(ss_attr):
+                if u.startswith("data:"):
+                    ss.append(True)
+                elif _has_scheme(u):
+                    ss.append(not u.lower().startswith("kindle:"))
+                else:
+                    ss.append(out_file(p, u) is not None)
+        # an <img>/<image> without a usable src still takes part in the pairing (as before); other
+        # element kinds only when they carry a reference of their own
+        if not usable and ss is None and not (not r and _local(e) in IMAGE_TAGS):
+            return None
+        return {"tag": _local(e), "primary": h, "has_src": usable, "srcset": ss}
+
     def out_refs(p: Path):
-        """[(offset, output image hash or None)] for one output document, plus its text."""
-        text, _, imgs = _text_index(outb.doc(p))
-        out = []
-        for off, e in imgs:
-            r = (_img_href(e) or "").strip()
-            if r.startswith("data:") or _has_scheme(r):
-                continue   # kindle:embed left unresolved etc.: not a usable reference
-            h = None
-            if r:
-                f = (p.parent / unquote(r.split("#")[0])).resolve()
-                if not f.is_file():
-                    # KindleUnpack names a record that is both CoverOffset and ThumbOffset "thumbNNNNN"
-                    # and leaves it in mobi7/Images only; the reference itself is still to that record.
-                    f = outb.dir / "mobi7/Images" / f.name
-                h = outb.file_hash(f) if f.is_file() else None
-            out.append((off, h))
-        return text, out
+        text, _, els = _text_index(outb.doc(p))
+        return text, [(off, rec) for off, e in els if (rec := out_rec(p, e))]
 
     def keyed(parts):
         """Concatenate [(text, [(offset, value)])] and key every value by its text context."""
@@ -1109,45 +1461,108 @@ def inv_images(book: InputBook, outb: OutputBook, mode: str, pairs) -> dict:
     referenced = {book.cover_path} if book.cover_path in inp else set()
     changed: set[str] = set()
     resized: set[str] = set()
+
+    def expected(ip: str):
+        """(expected image path, hashes accepted) for a referenced manifest image."""
+        chain = [q for q in book.image_chain(ip) if q in inp]
+        return chain[-1], {inp[q]["sha256"] for q in chain}
+
+    def count(kind: str, status: str, gi, desc) -> None:
+        res["refs_total"] += 1
+        res["refs_by_kind"][kind] = res["refs_by_kind"].get(kind, 0) + 1
+        if status == "correct":
+            res["refs_correct"] += 1
+        elif status == "unextractable":
+            res["refs_unextractable"] += 1
+        else:
+            res["refs_missing"] += 1
+            res["refs_missing_by_kind"][kind] = res["refs_missing_by_kind"].get(kind, 0) + 1
+            if res["first_missing_ref"] is None:
+                res["first_missing_ref"] = {"item": gi, "kind": kind, **desc}
+
     for gi, ki, vi, ko, vo in groups:
-        referenced.update(vi)
-        paired: list[tuple[int, str, str | None]] = []
+        for a in vi:
+            if a["primary"]:
+                referenced.add(expected(a["primary"])[0])
+        paired: list[tuple[int, dict, dict | None]] = []
         for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, ki, ko, autojunk=False).get_opcodes():
             if tag in ("equal", "replace"):
                 paired += [(i1 + d, vi[i1 + d], vo[j1 + d]) for d in range(min(i2 - i1, j2 - j1))]
                 paired += [(k, vi[k], None) for k in range(i1 + min(i2 - i1, j2 - j1), i2)]
             elif tag == "delete":
                 paired += [(k, vi[k], None) for k in range(i1, i2)]
-        for k, ip, got in sorted(paired):
-            res["refs_total"] += 1
-            want = inp[ip]["sha256"]
-            if got == want:
-                res["refs_correct"] += 1
+        for k, a, b in sorted(paired, key=lambda x: x[0]):
+            kind = _KIND[a["tag"]]
+            if a["primary"]:
+                ip, accept = expected(a["primary"])
+                want = inp[ip]["sha256"]
+                got = b["primary"] if b else None
+                if got is not None and got in accept:
+                    count(kind, "correct", gi, {})
+                elif got is None:
+                    unext = want in raw and want not in outp
+                    count(kind, "unextractable" if unext else "missing", gi, {"input": ip})
+                else:
+                    res["refs_total"] += 1
+                    res["refs_by_kind"][kind] = res["refs_by_kind"].get(kind, 0) + 1
+                    res["refs_wrong_image"] += 1
+                    if res["first_wrong_ref"] is None:
+                        res["first_wrong_ref"] = {
+                            "item": gi, "img_index": k, "input": ip,
+                            "output_is_input_image": next((q for q, v in inp.items() if v["sha256"] == got), None)}
+                    if got not in in_hashes:
+                        changed.add(ip)   # present, but not byte-identical (recompressed/resized)
+                        di, do = inp[ip]["dims"], (outp.get(got) or {}).get("dims")
+                        if want not in outp and di and do and di != do:
+                            resized.add(ip)
+            if a["srcset"]:
+                if b is None or b["srcset"] is None:
+                    # dropped: fine for a <source> (the writer may remove them) and for an <img>
+                    # whose src still resolves to a file
+                    ok = a["tag"] == "source" or (b is not None and b["primary"] is not None)
+                else:
+                    ok = all(b["srcset"])
+                count("srcset", "correct" if ok else "missing", gi, {"input": a["srcset"][:3]})
+
+    # url() in the reachable style sheets (AZW3: the writer keeps style sheets; MOBI v6 has none)
+    if outb.kind == "kf8":
+        css_hashes: set[str] = set()
+        blocks = [(f, f.read_text("utf-8", errors="replace")) for f in outb.oebps.rglob("*.css")]
+        blocks += [(f, "\n".join(_inline_css_blocks(f.read_text("utf-8", errors="replace")))) for f in outb.docs]
+        for f, css in blocks:
+            for u in _css_urls(css):
+                if not u.startswith("data:") and not _has_scheme(u):
+                    t = (f.parent / unquote(u.split("#")[0].split("?")[0])).resolve()
+                    if t.is_file() and (h := outb.file_hash(t)):
+                        css_hashes.add(h)
+        for base, u in book.css_info()["urls"]:
+            if not u or u.startswith(("data:", "#")) or _has_scheme(u):
                 continue
-            if got is None:
-                res["refs_missing"] += 1
+            ip0 = book.join(base, u.split("#")[0].split("?")[0])
+            if ip0 not in inp:
+                continue
+            ip, accept = expected(ip0)
+            referenced.add(ip)
+            want = inp[ip]["sha256"]
+            if accept & css_hashes:
+                count("css", "correct", None, {})
             else:
-                res["refs_wrong_image"] += 1
-                if res["first_wrong_ref"] is None:
-                    res["first_wrong_ref"] = {
-                        "item": gi, "img_index": k, "input": ip,
-                        "output_is_input_image": next((q for q, v in inp.items() if v["sha256"] == got), None)}
-                if got not in in_hashes:
-                    changed.add(ip)   # present, but not byte-identical (recompressed/resized)
-                    di, do = inp[ip]["dims"], (outp.get(got) or {}).get("dims")
-                    if want not in outp and di and do and di != do:
-                        resized.add(ip)
+                unext = want in raw and want not in outp
+                count("css", "unextractable" if unext else "missing", None, {"input": ip, "css": base})
+
     cover = book.cover_path if book.cover_path in inp else None
     if cover and inp[cover]["sha256"] not in outp and any(
             h not in in_hashes and any(("cover" in n or "thumb" in n) for n in v["names"])
             for h, v in outp.items()):
         changed.add(cover)
     present = {q for q in referenced if inp[q]["sha256"] in outp}
+    unextractable = {q for q in referenced - present - changed if inp[q]["sha256"] in raw}
     res["dimension_mismatch"] = len(resized)
     res["referenced"] = len(referenced)
     res["referenced_matched_by_hash"] = len(present)
     res["referenced_changed"] = len(changed - present)
-    res["missing"] = len(referenced - present - changed)
+    res["unextractable"] = len(unextractable)
+    res["missing"] = len(referenced - present - changed - unextractable)
     res["cover"] = cover
     return res
 
@@ -1219,13 +1634,22 @@ def inv_links(book: InputBook, outb: OutputBook, mode: str, pairs) -> dict:
     # itself: counted in broken_in_input and left out of internal_total.
     res = {"internal_total": 0, "resolved": 0, "kindle_pos_left": 0, "raw_fragment_links": 0,
            "unpaired": 0, "broken_in_input": 0, "wrong_target_text": 0, "first_unresolved": None}
-    in_anchors = [_anchors(book.doc(s["path"])) for s in book.spine]
+    in_anchors = [_anchors(book.doc(s["path"])) if s["xhtml"] else [] for s in book.spine]
     in_idx_cache: dict[int, tuple] = {}
 
     def in_index(t: int):
         if t not in in_idx_cache:
             in_idx_cache[t] = _text_index(book.doc(book.spine[t]["path"]))
         return in_idx_cache[t]
+
+    body_ids: dict[int, set[str]] = {}
+
+    def body_frag(t: int, frag: str) -> bool:
+        """Is frag the id/name of the target document's <body> (its link target is the chapter start)?"""
+        if t not in body_ids:
+            b = _find_body(book.doc(book.spine[t]["path"]))
+            body_ids[t] = {v for v in (_attr(b, "id"), _attr(b, "name")) if v}
+        return frag in body_ids[t]
 
     links = []  # (spine idx, anchor index in that doc, target spine idx, fragment)
     for i, s in enumerate(book.spine):
@@ -1234,9 +1658,9 @@ def inv_links(book: InputBook, outb: OutputBook, mode: str, pairs) -> dict:
                 continue
             path, _, frag = href.partition("#")
             if path:
-                tgt = book.spine_paths.get(_join(s["path"], path))
-                if tgt is None:
-                    continue
+                tgt = book.spine_paths.get(book.join(s["path"], path))
+                if tgt is None or not book.spine[tgt]["xhtml"]:
+                    continue    # not a spine item, or one that is not compared as XHTML
             else:
                 if not frag:
                     continue
@@ -1312,7 +1736,8 @@ def inv_links(book: InputBook, outb: OutputBook, mode: str, pairs) -> dict:
             tfile = (hit[0].parent / unquote(opath)).resolve()
             ok = (tfile.exists() and re.fullmatch(r"part\d{4}\.xhtml", tfile.name) is not None
                   and (not ofrag or unquote(ofrag) in ids(tfile))
-                  and not (frag and not ofrag))  # a fragment link must land on an anchor
+                  # a fragment link must land on an anchor (or, for <body id>, on the chapter start)
+                  and not (frag and not ofrag and not body_frag(tgt, frag)))
             if ok and mode == "aligned":         # ... in the part that holds the target chapter
                 ok = pairs[tgt] is not None and tfile == pairs[tgt].resolve()
             elif ok:                             # concat: part boundaries differ, check the text
@@ -1617,6 +2042,8 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             stats_all[k] = stats_all.get(k, 0) + v
     try:
         def load_in(i):
+            if not book.spine[i]["xhtml"]:
+                return []   # foreign spine item (svg, image, xml, ...): not evaluated, see text.non_xhtml_handling
             p = book.dir / book.spine[i]["path"]
             d = _collect(pg, _url_for(base_url, out_dir, p, "xhtml"), _url_for(base_url, out_dir, p, "html"))
             parsed["input_html_fallback"] += d["parsed_as"] == "html"
@@ -1680,7 +2107,9 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             # naive variant: fraction of all STYLE_PROPS equal over exactly matched anchors, defaults
             # included, unmatched anchors on either side counting 0 (for reference only)
             "score_all_props": round(sum(acc.all_scores.values()) / denom, 4) if denom else None,
-            "input_css_rules": book.css_rules(), "output_css_rules": outb.css_rules(),
+            "input_css_rules": book.css_rules(),
+            "input_css_rules_unreferenced": book.css_info()["unreferenced"],
+            "output_css_rules": outb.css_rules(),
             "prop_disagreements": hist, "prop_examples": {k: acc.examples[k] for k in hist},
             **parsed}
 
@@ -1718,7 +2147,7 @@ def invariants(entry: dict, out_dir: Path, fmt: str, page, base_url: str | None 
     res["fixed_layout"] = book.fixed_layout
     jobs = {
         "text": lambda: inv_text(book, outb, mode, pairs),
-        "images": lambda: inv_images(book, outb, mode, pairs),
+        "images": lambda: inv_images(book, outb, mode, pairs, out_dir / f"{who}.{fmt}"),
         "toc": lambda: inv_toc(book, outb),
         "links": lambda: inv_links(book, outb, mode, pairs),
         "style": lambda: (None if skip_style else

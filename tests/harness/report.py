@@ -14,6 +14,12 @@ treated as "unknown/false" when absent):
     result["invariants"]["text"]["css_in_text"] / ["css_in_text_input"]
                                                 CSS rules visible in our body text / in the input's
     result["invariants"]["images"]["missing"]   referenced input images absent from the output
+    result["invariants"]["images"]["unextractable"]
+                                                referenced input images present in the file as raw records
+                                                that KindleUnpack does not extract (not counted as missing)
+    result["invariants"]["text"]["non_xhtml_spine_items"]
+                                                spine items whose manifest type is not XHTML/HTML (not
+                                                compared as text; category `spine-non-xhtml`, informational)
 Without them: fixed layout is guessed from "fixed-layout"/"pre-paginated" in id/path, garbling from
 U+FFFD in `invariants.text.first_diff.ours_excerpt` (and not in `input_excerpt`), and images-missing
 from matched_by_hash < input.
@@ -40,9 +46,13 @@ TAXONOMY: dict[str, tuple[str, str]] = {
     "gate-calibre": ("Calibre's reader cannot read our output", "writer bug"),
     "text-loss": ("Spine items whose text did not survive conversion", "transform or repair"),
     "text-garbled": ("U+FFFD or CSS rules in the body text", "writer bug"),
+    "spine-non-xhtml": ("Spine items that are not XHTML/HTML (svg, image, xml, json, ...): not compared as text",
+                        "informational"),
     "images-missing": ("Input images not found (by hash) in the output",
                        "unported Calibre transform"),
     "images-resized": ("Images present but with different dimensions", "informational"),
+    "images-unextractable": (("Images stored in the file as raw records that KindleUnpack does not extract "
+                              "(svg, avif, jxl, ...)"), "informational"),
     "images-misreferenced": ("Image references in the text point at the wrong image or at none",
                              "writer bug"),
     "toc-missing": ("Input has TOC entries, output has none", "unported Calibre transform"),
@@ -187,6 +197,8 @@ def categorize(result: dict) -> list[str]:
             garbled = True
         if garbled:
             cats.add("text-garbled")
+        if (_int(t.get("non_xhtml_spine_items")) or 0) > 0:
+            cats.add("spine-non-xhtml")   # the writer gap stays visible without counting as text-loss
 
         im = _d(inv.get("images"))
         n_dim = _int(im.get("dimension_mismatch"))
@@ -200,6 +212,8 @@ def categorize(result: dict) -> list[str]:
                 cats.add("images-missing")
         if n_dim:
             cats.add("images-resized")
+        if (_int(im.get("unextractable")) or 0) > 0:
+            cats.add("images-unextractable")
         if (_int(im.get("refs_total")) or 0) > 0 and \
                 ((_int(im.get("refs_wrong_image")) or 0) > 0 or (_int(im.get("refs_missing")) or 0) > 0):
             cats.add("images-misreferenced")
@@ -221,6 +235,8 @@ def categorize(result: dict) -> list[str]:
 
         st = _d(inv.get("style"))
         sc = _int(st.get("score"))
+        # input_css_rules counts only style sheets reachable from an XHTML spine document (link, style,
+        # @import chain), without @font-face blocks; input_css_rules_unreferenced is not used here
         css_in, css_out = _int(st.get("input_css_rules")), _int(st.get("output_css_rules"))
         # MOBI v6 has no style sheets at all (Calibre's .mobi has none either): rule count is KF8 only
         css_dropped = bool(css_in) and css_out == 0 and r.get("format") != "mobi"
@@ -591,7 +607,8 @@ def _fmt_section(fmt: str, rs: list[dict], a: dict) -> list[str]:
                     [[i + 1, f"`{t['category']}`", t["books"], _pct(t["books"], a["books"]),
                       t["description"], t["kind"]] for i, t in enumerate(a["top5"])])
         L += ["", ("Informational, acceptable, harness and out-of-scope categories are not ranked here "
-              "(`calibre-header-diff`, `images-resized`, `app-clean-error`, `harness-error`, "
+              "(`calibre-header-diff`, `images-resized`, `images-unextractable`, `spine-non-xhtml`, "
+              "`app-clean-error`, `harness-error`, "
               "`fixed-layout-unsupported`), and nothing on a fixed-layout book is; "
               "they appear in the per-category breakdown and the per-book table. "
               "`text-loss` counts as `input repair` on books whose verdict is error/warning, otherwise as `writer bug`."), ""]

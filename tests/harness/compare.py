@@ -18,7 +18,7 @@ import report as R
 
 STYLE_TOL = 0.05
 MAX_ROWS = 60
-INFORMATIONAL = {"calibre-header-diff", "images-resized"}
+INFORMATIONAL = {"calibre-header-diff", "images-resized", "spine-non-xhtml", "images-unextractable"}
 
 
 def _inv(r: dict, key: str) -> dict:
