@@ -1,0 +1,676 @@
+{
+  "subset": "real-local-generated",
+  "date": "2026-10-17",
+  "total_results": 418,
+  "formats": {
+    "azw3": {
+      "books": 209,
+      "converted": 209,
+      "calibre_ok": 209,
+      "gate_evaluated": 209,
+      "gate_pass": 209,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "calibre-header-diff": 209,
+        "input-repair": 1,
+        "layout-hygiene": 17,
+        "images-misreferenced": 1
+      },
+      "actionable_category_books": {
+        "input-repair": 1,
+        "images-misreferenced": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 0,
+        "input repair": 1,
+        "writer bug": 1
+      },
+      "kind_instances": {
+        "unported Calibre transform": 0,
+        "input repair": 1,
+        "writer bug": 1
+      },
+      "kind_not_actionable": {
+        "informational": 226
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.0,
+        "input repair": 0.5,
+        "writer bug": 0.5
+      },
+      "gap_instances": 2,
+      "books_with_gap": 2,
+      "dominant_kind": "input repair",
+      "top_category_by_kind": {
+        "unported Calibre transform": null,
+        "input repair": "input-repair",
+        "writer bug": "images-misreferenced"
+      },
+      "top5": [
+        {
+          "category": "images-misreferenced",
+          "books": 1,
+          "description": "Image references in the text point at the wrong image or at none",
+          "kind": "writer bug",
+          "examples": [
+            "real/gutenberg/pg63372"
+          ]
+        },
+        {
+          "category": "input-repair",
+          "books": 1,
+          "description": "App failed or lost text on a malformed input Calibre converted anyway",
+          "kind": "input repair",
+          "examples": [
+            "generated/gen-latin1-undeclared"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "real/gutenberg/pg63372",
+          "category": "pg",
+          "tier": 1,
+          "reasons": [
+            "image refs 126/128 correct (0 wrong, 2 missing)"
+          ]
+        },
+        {
+          "id": "generated/gen-latin1-undeclared",
+          "category": "generated",
+          "tier": 3,
+          "reasons": [
+            "text 2/3 spine items match"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "generated": {
+          "calibre-header-diff": 8,
+          "input-repair": 1
+        },
+        "local": {
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "calibre-header-diff": 100,
+          "layout-hygiene": 17,
+          "images-misreferenced": 1
+        },
+        "se": {
+          "calibre-header-diff": 100
+        }
+      },
+      "corpus_category_books": {
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 209,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 207,
+      "books_not_fully_evaluated": 0,
+      "books_fixed_layout": 0,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 0,
+        "images": 0,
+        "toc": 0,
+        "links": 0,
+        "style": 0
+      },
+      "style_score_se_pg": [
+        0.9965959999999999,
+        200
+      ],
+      "style_score_page_dependent_se_pg": [
+        0.7301479999999999,
+        200
+      ],
+      "device_score_se_pg": [
+        0.9965959999999999,
+        200
+      ],
+      "visibility_pooled": {
+        "hidden_shown": 0,
+        "shown_hidden": 0,
+        "books": 209,
+        "books_over": 0
+      },
+      "device_visibility_pooled": {
+        "hidden_shown": 0,
+        "shown_hidden": 0,
+        "books": 209,
+        "books_over": 0
+      },
+      "layout_hygiene_pooled": {
+        "empty_blocks": 21,
+        "trailing_breaks": 0,
+        "whitespace_runs": 0,
+        "nbsp_indents": 9,
+        "empty_blocks_styled": 68,
+        "trailing_breaks_double": 54,
+        "nbsp_indents_ambiguous": 426,
+        "books": 209,
+        "books_nonzero": 17
+      },
+      "layout_hygiene_input_pooled": {
+        "empty_blocks": 167,
+        "trailing_breaks": 1815,
+        "whitespace_runs": 648461,
+        "nbsp_indents": 16,
+        "empty_blocks_styled": 72,
+        "trailing_breaks_double": 54,
+        "nbsp_indents_ambiguous": 467,
+        "books": 209,
+        "books_nonzero": 209
+      }
+    },
+    "mobi": {
+      "books": 209,
+      "converted": 209,
+      "calibre_ok": 209,
+      "gate_evaluated": 209,
+      "gate_pass": 209,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "layout-hygiene": 209,
+        "calibre-header-diff": 209,
+        "input-repair": 1,
+        "style-lost": 29,
+        "text-loss": 1,
+        "images-unextractable": 1,
+        "links-unresolved": 1
+      },
+      "actionable_category_books": {
+        "input-repair": 1,
+        "style-lost": 29,
+        "text-loss": 1,
+        "links-unresolved": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 29,
+        "input repair": 1,
+        "writer bug": 1
+      },
+      "kind_instances": {
+        "unported Calibre transform": 30,
+        "input repair": 1,
+        "writer bug": 1
+      },
+      "kind_not_actionable": {
+        "informational": 419
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.9666666666666667,
+        "input repair": 0.03333333333333333,
+        "writer bug": 0.03333333333333333
+      },
+      "gap_instances": 32,
+      "books_with_gap": 30,
+      "dominant_kind": "unported Calibre transform",
+      "top_category_by_kind": {
+        "unported Calibre transform": "style-lost",
+        "input repair": "input-repair",
+        "writer bug": "text-loss"
+      },
+      "top5": [
+        {
+          "category": "style-lost",
+          "books": 29,
+          "description": "Style score below 0.5, or the input has CSS rules and the output none",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "real/gutenberg/pg16113",
+            "real/gutenberg/pg19246",
+            "real/gutenberg/pg44342"
+          ]
+        },
+        {
+          "category": "text-loss",
+          "books": 1,
+          "description": "Spine items whose text did not survive conversion",
+          "kind": "transform or repair",
+          "examples": [
+            "real/gutenberg/pg63372"
+          ]
+        },
+        {
+          "category": "links-unresolved",
+          "books": 1,
+          "description": "Internal links that no longer resolve",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "real/gutenberg/pg63372"
+          ]
+        },
+        {
+          "category": "input-repair",
+          "books": 1,
+          "description": "App failed or lost text on a malformed input Calibre converted anyway",
+          "kind": "input repair",
+          "examples": [
+            "generated/gen-latin1-undeclared"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "real/standard-ebooks/noel-coward_hay-fever",
+          "category": "se",
+          "tier": 2,
+          "reasons": [
+            "style score 0.15"
+          ]
+        },
+        {
+          "id": "real/standard-ebooks/mary-p-hamlin_george-arliss_hamilton",
+          "category": "se",
+          "tier": 2,
+          "reasons": [
+            "style score 0.15"
+          ]
+        },
+        {
+          "id": "real/standard-ebooks/ring-lardner_george-s-kaufman_june-moon",
+          "category": "se",
+          "tier": 2,
+          "reasons": [
+            "style score 0.18"
+          ]
+        },
+        {
+          "id": "real/standard-ebooks/george-macdonald_if-i-had-a-father",
+          "category": "se",
+          "tier": 2,
+          "reasons": [
+            "style score 0.19"
+          ]
+        },
+        {
+          "id": "real/gutenberg/pg55919",
+          "category": "pg",
+          "tier": 2,
+          "reasons": [
+            "style score 0.19"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "generated": {
+          "layout-hygiene": 8,
+          "calibre-header-diff": 8,
+          "input-repair": 1
+        },
+        "local": {
+          "layout-hygiene": 1,
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "layout-hygiene": 100,
+          "calibre-header-diff": 100,
+          "style-lost": 17,
+          "text-loss": 1,
+          "images-unextractable": 1,
+          "links-unresolved": 1
+        },
+        "se": {
+          "layout-hygiene": 100,
+          "calibre-header-diff": 100,
+          "style-lost": 12
+        }
+      },
+      "corpus_category_books": {
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 209,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 179,
+      "books_not_fully_evaluated": 0,
+      "books_fixed_layout": 0,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 0,
+        "images": 0,
+        "toc": 0,
+        "links": 0,
+        "style": 0
+      },
+      "style_score_se_pg": [
+        0.748868,
+        200
+      ],
+      "style_score_page_dependent_se_pg": [
+        0.748868,
+        200
+      ],
+      "device_score_se_pg": [
+        null,
+        0
+      ],
+      "visibility_pooled": {
+        "hidden_shown": 0,
+        "shown_hidden": 0,
+        "books": 209,
+        "books_over": 0
+      },
+      "device_visibility_pooled": null,
+      "layout_hygiene_pooled": {
+        "empty_blocks": 241,
+        "trailing_breaks": 1436,
+        "whitespace_runs": 614347,
+        "nbsp_indents": 16,
+        "empty_blocks_styled": 0,
+        "trailing_breaks_double": 54,
+        "nbsp_indents_ambiguous": 467,
+        "books": 209,
+        "books_nonzero": 209
+      },
+      "layout_hygiene_input_pooled": {
+        "empty_blocks": 167,
+        "trailing_breaks": 1815,
+        "whitespace_runs": 648461,
+        "nbsp_indents": 16,
+        "empty_blocks_styled": 72,
+        "trailing_breaks_double": 54,
+        "nbsp_indents_ambiguous": 467,
+        "books": 209,
+        "books_nonzero": 209
+      }
+    }
+  },
+  "before_after": {
+    "formats": {
+      "azw3": {
+        "pairs": 209,
+        "categories": {
+          "images-misreferenced": {
+            "before": 1,
+            "after": 1
+          },
+          "layout-hygiene": {
+            "before": 17,
+            "after": 17
+          },
+          "calibre-header-diff": {
+            "before": 209,
+            "after": 209
+          },
+          "input-repair": {
+            "before": 1,
+            "after": 1
+          }
+        },
+        "before": {
+          "books": 209,
+          "converted": 209,
+          "gate_pass": 209,
+          "gate_evaluated": 209,
+          "style_se_pg": 0.9970975,
+          "style_se_pg_n": 200,
+          "style_old_se_pg": 0.7303855,
+          "style_old_se_pg_n": 200,
+          "device_se_pg": 0.9970975,
+          "device_se_pg_n": 200,
+          "hygiene": {
+            "empty_blocks": 21,
+            "trailing_breaks": 0,
+            "whitespace_runs": 0,
+            "nbsp_indents": 9,
+            "empty_blocks_styled": 68,
+            "trailing_breaks_double": 54,
+            "nbsp_indents_ambiguous": 426,
+            "books": 209,
+            "books_nonzero": 17
+          },
+          "visibility": {
+            "hidden_shown": 0,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 0
+          },
+          "device_visibility": {
+            "hidden_shown": 0,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 0
+          },
+          "links": [
+            29021,
+            29021
+          ],
+          "image_refs": [
+            3568,
+            3570
+          ],
+          "images_hash": [
+            3085,
+            3085
+          ],
+          "text": [
+            4366,
+            4367
+          ],
+          "toc": [
+            8928,
+            8928
+          ]
+        },
+        "after": {
+          "books": 209,
+          "converted": 209,
+          "gate_pass": 209,
+          "gate_evaluated": 209,
+          "style_se_pg": 0.9965959999999999,
+          "style_se_pg_n": 200,
+          "style_old_se_pg": 0.7301479999999999,
+          "style_old_se_pg_n": 200,
+          "device_se_pg": 0.9965959999999999,
+          "device_se_pg_n": 200,
+          "hygiene": {
+            "empty_blocks": 21,
+            "trailing_breaks": 0,
+            "whitespace_runs": 0,
+            "nbsp_indents": 9,
+            "empty_blocks_styled": 68,
+            "trailing_breaks_double": 54,
+            "nbsp_indents_ambiguous": 426,
+            "books": 209,
+            "books_nonzero": 17
+          },
+          "visibility": {
+            "hidden_shown": 0,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 0
+          },
+          "device_visibility": {
+            "hidden_shown": 0,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 0
+          },
+          "links": [
+            29021,
+            29021
+          ],
+          "image_refs": [
+            3568,
+            3570
+          ],
+          "images_hash": [
+            3085,
+            3085
+          ],
+          "text": [
+            4366,
+            4367
+          ],
+          "toc": [
+            8928,
+            8928
+          ]
+        },
+        "regressions": []
+      },
+      "mobi": {
+        "pairs": 209,
+        "categories": {
+          "text-loss": {
+            "before": 1,
+            "after": 1
+          },
+          "images-unextractable": {
+            "before": 1,
+            "after": 1
+          },
+          "links-unresolved": {
+            "before": 1,
+            "after": 1
+          },
+          "style-lost": {
+            "before": 29,
+            "after": 29
+          },
+          "visibility-changed": {
+            "before": 77,
+            "after": 0
+          },
+          "layout-hygiene": {
+            "before": 209,
+            "after": 209
+          },
+          "calibre-header-diff": {
+            "before": 209,
+            "after": 209
+          },
+          "input-repair": {
+            "before": 1,
+            "after": 1
+          }
+        },
+        "before": {
+          "books": 209,
+          "converted": 209,
+          "gate_pass": 209,
+          "gate_evaluated": 209,
+          "style_se_pg": 0.7474875,
+          "style_se_pg_n": 200,
+          "style_old_se_pg": 0.7474875,
+          "style_old_se_pg_n": 200,
+          "device_se_pg": null,
+          "device_se_pg_n": 0,
+          "hygiene": {
+            "empty_blocks": 241,
+            "trailing_breaks": 1436,
+            "whitespace_runs": 614888,
+            "nbsp_indents": 16,
+            "empty_blocks_styled": 0,
+            "trailing_breaks_double": 54,
+            "nbsp_indents_ambiguous": 467,
+            "books": 209,
+            "books_nonzero": 209
+          },
+          "visibility": {
+            "hidden_shown": 3876,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 77
+          },
+          "device_visibility": null,
+          "links": [
+            28987,
+            28991
+          ],
+          "image_refs": [
+            3423,
+            3531
+          ],
+          "images_hash": [
+            3001,
+            3085
+          ],
+          "text": [
+            4353,
+            4367
+          ],
+          "toc": [
+            8928,
+            8928
+          ]
+        },
+        "after": {
+          "books": 209,
+          "converted": 209,
+          "gate_pass": 209,
+          "gate_evaluated": 209,
+          "style_se_pg": 0.748868,
+          "style_se_pg_n": 200,
+          "style_old_se_pg": 0.748868,
+          "style_old_se_pg_n": 200,
+          "device_se_pg": null,
+          "device_se_pg_n": 0,
+          "hygiene": {
+            "empty_blocks": 241,
+            "trailing_breaks": 1436,
+            "whitespace_runs": 614347,
+            "nbsp_indents": 16,
+            "empty_blocks_styled": 0,
+            "trailing_breaks_double": 54,
+            "nbsp_indents_ambiguous": 467,
+            "books": 209,
+            "books_nonzero": 209
+          },
+          "visibility": {
+            "hidden_shown": 0,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 0
+          },
+          "device_visibility": null,
+          "links": [
+            28987,
+            28991
+          ],
+          "image_refs": [
+            3423,
+            3531
+          ],
+          "images_hash": [
+            3001,
+            3085
+          ],
+          "text": [
+            4353,
+            4367
+          ],
+          "toc": [
+            8928,
+            8928
+          ]
+        },
+        "regressions": []
+      }
+    },
+    "unpaired_before": 0,
+    "unpaired_after": 0
+  }
+}

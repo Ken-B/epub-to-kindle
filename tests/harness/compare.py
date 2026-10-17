@@ -12,7 +12,8 @@ device score dropped by more than STYLE_TOL; or a new gap category (other than i
 appeared; or the characters of text that changed visibility (hidden in the input and shown in the output,
 or the reverse; preservation or device render) rose. A baseline written before a field existed (no
 device_score, no layout_hygiene, no style.visibility) shows "n/a"
-and is not compared on it.
+and is not compared on it. style.score is page-neutral for AZW3 since score_page_dependent exists; a baseline
+without that field is old-style, so its score is compared with the new result's score_page_dependent.
 """
 from __future__ import annotations
 
@@ -79,10 +80,12 @@ def _metrics(rs: list[dict]) -> dict:
     gate_known = [r for r in conv if R._gate_pass(r) is not None]
     ms, ns = R.mean_score(rs, R._score)
     md, nd = R.mean_score(rs, R._device_score)
+    mo, no = R.mean_score(rs, R._score_page_dependent)
     return {
         "books": len(rs), "converted": len(conv),
         "gate_pass": sum(1 for r in gate_known if R._gate_pass(r)), "gate_evaluated": len(gate_known),
         "style_se_pg": ms, "style_se_pg_n": ns,
+        "style_old_se_pg": mo, "style_old_se_pg_n": no,
         "device_se_pg": md, "device_se_pg_n": nd,
         "hygiene": R.hygiene_pooled(rs),
         "visibility": R.visibility_pooled(rs),
@@ -111,7 +114,11 @@ def _regression_reasons(b: dict, a: dict, cb: list[str], ca: list[str]) -> list[
         vb, va = _num(_inv(b, sec).get(key)), _num(_inv(a, sec).get(key))
         if vb is not None and va is not None and va < vb:
             why.append((label, f"{label} {vb} -> {va}"))
-    sb, sa = _num(_inv(b, "style").get("score")), _num(_inv(a, "style").get("score"))
+    # score is page-neutral since score_page_dependent exists: a baseline without it is old-style, so compare
+    # it with the page-dependent number of the new result (like with like)
+    sb, sa = _num(R._d(_inv(b, "style")).get("score")), _num(R._d(_inv(a, "style")).get("score"))
+    if "score_page_dependent" not in R._d(_inv(b, "style")) and "score_page_dependent" in R._d(_inv(a, "style")):
+        sa = _num(_inv(a, "style").get("score_page_dependent"))
     if sb is not None and sa is not None and sa < sb - STYLE_TOL:
         why.append(("style score", f"style score {sb:.2f} -> {sa:.2f}"))
     db, da = R._device_score(b), R._device_score(a)
@@ -199,7 +206,10 @@ def render(cmp: dict, before_label: str) -> str:
             ("books with an output file", f"{b['converted']}/{b['books']}", f"{a['converted']}/{a['books']}"),
             ("gate pass (all three parsers)", _frac((b["gate_pass"], b["gate_evaluated"])),
              _frac((a["gate_pass"], a["gate_evaluated"]))),
-            ("mean style score, se+pg books", style(b), style(a)),
+            ("mean style score, se+pg books (AZW3: page-neutral; a baseline written before that is old-style)",
+             style(b), style(a)),
+            ("mean style score, page-dependent (old definition), se+pg books",
+             style(b, "style_old_se_pg"), style(a, "style_old_se_pg")),
             ("mean device score, se+pg books", style(b, "device_se_pg"), style(a, "device_se_pg")),
             ("layout hygiene, pooled (empty blocks / trailing breaks / whitespace runs / nbsp indents)",
              R.hygiene_str(b.get("hygiene")), R.hygiene_str(a.get("hygiene"))),

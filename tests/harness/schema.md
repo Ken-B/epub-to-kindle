@@ -95,7 +95,7 @@ Timeouts and harness errors (`error` starting with `harness:`) are never cached.
                "missing": 0, "unextractable": 0, "refs_total": 0, "refs_correct": 0, "refs_missing": 0},
     "toc":    {"input_entries": 0, "output_entries": 0, "matched": 0, "depth_in": 0, "depth_out": 0},
     "links":  {"internal_total": 0, "resolved": 0},
-    "style":  {"score": 0.0, "per_chapter": [0.0], "input_css_rules": 0,
+    "style":  {"score": 0.0, "score_page_dependent": 0.0, "page_neutral": true, "per_chapter": [0.0], "input_css_rules": 0,
                "input_css_rules_unreferenced": 0, "output_css_rules": 0,
                "device_score": 0.0, "device_per_chapter": [0.0], "device_checked_props": 0,
                "device_equal_props": 0, "device_prop_disagreements": {"text-indent": 0},
@@ -158,12 +158,17 @@ view of the names.
   checks and of the CSS rule counts too. Category `spine-non-xhtml` (informational) keeps them visible.
 
 MOBI v6 hidden content (`fmt == "mobi"` only). MOBI 6 readers ignore CSS, so the writer removes the
-elements its author CSS hides (`display: none`, `visibility: hidden|collapse`), as Calibre's MobiML does.
+elements its author CSS hides (`display: none`, `visibility: hidden|collapse`), the elements with the `hidden`
+attribute (unless the author sets a display), and the `position: absolute|fixed` elements moved off the page or
+clipped away (a declared left/top/right/bottom of -500px or less, `clip: rect()` with every side at most 1px,
+`clip-path: inset(>= 50%)` / `circle(0)`, a declared width or height of at most 1px with `overflow: hidden|clip`;
+read from `computedStyleMap`, since `getComputedStyle` resolves `bottom: auto` to a px value), as Calibre's MobiML does.
 The oracle does the same to the input before `text`, `links` and `images` run: every XHTML spine document
 is loaded in the style pass's JS-disabled Chromium context (the style pass itself, which loads them
 anyway, runs first; with `--no-style` a hidden-only pass loads them), an element counts as hidden when its
 computed display/visibility hides it with the author style sheets and style attributes applied but not
-without them (so the UA's `[hidden]`, `<head>` & co. do not count), and the topmost hidden elements are
+without them (so the UA's `<head>` & co., `<rp>` do not count; the `hidden` attribute does), or the
+position patterns above hold, and the topmost hidden elements are
 removed from the parsed (lxml) document with their subtrees, keeping their tail text and an empty
 `<a id|name>` for every id/name inside (the writer keeps link targets the same way). Chromium's element
 sequence is mapped onto lxml's by aligning the local names (identical for XHTML). Links inside hidden
@@ -258,6 +263,29 @@ elements), elements, chars (visible chars removed), anchors (<a href> removed), 
     alignment and indent on the text itself, which the anchor pair compares).
   - Hidden input elements are left out (see "MOBI v6 hidden content").
   For AZW3 `props_excluded_for_format` is `[]` and nothing of this applies.
+- Page-neutral preservation score (AZW3): the writer zeroes the `<html>`/`<body>` side margins and paddings
+  on purpose (the Kindle owns the page margins), so comparing them, or percentage widths/margins that
+  resolve against a wider content box, would penalise every book. `score` therefore aligns the output
+  (loaded as it is, without the device model) against the page-neutral input reference of the device pass
+  (the second input load served with `device.INPUT_PAGE_CSS`, loaded once and shared by both scores) and
+  does not compare margin-top/bottom/left/right and padding-left/right of `<html>`/`<body>` (`_StyleAcc`
+  `page_box_free`). `page_neutral` is true when every chapter used that reference, false when the device
+  pass failed for some chapter and the plain input was used instead. `score_page_dependent` is the old
+  number (plain input, page margins counted), for reference and for comparing with results written before
+  this field existed (their `score` is the old definition; `compare.py` pairs it with the new result's
+  `score_page_dependent`). `prop_disagreements`, `prop_examples`, `per_chapter`, `checked_props`,
+  `equal_props` and `score_all_props` belong to the page-neutral score.
+- Alignment key and unrendered elements (both scores): anchors are aligned on their full textContent with ALL
+  whitespace removed (NFC, soft hyphen/ZWSP/BOM dropped), so the writer's whitespace hygiene (newline after
+  `<br/>`, trimmed runs) does not unmatch a heading (`XVII<br/>\n<span>` equals `XVII<br/><span>`); the
+  difflib order alignment, `(key, tag)` first then key alone, and the fallback window are unchanged, so
+  repeated texts still pair in document order. An element pair is skipped (no property checked, nothing
+  counted) when `display:none` holds on the element or an ancestor on BOTH sides (`hid` in the element
+  record): its computed style is noise (line-height of two hidden headings). An unmatched input anchor that
+  is itself hidden scores nothing instead of 0. One side hidden and the other shown is still compared (a
+  `display` disagreement, e.g. Standard Ebooks' `@supports` un-hide dropped by the Kindle profile);
+  the visibility oracle covers the text itself. MOBI v6 is unchanged:
+  `score_page_dependent == score`, `page_neutral` false.
 - Device score (AZW3 only; `device_score: null` for MOBI, and with `device_error` when the pass
   failed): what a Kindle would show, not what a browser shows. Every output part is loaded a second
   time in its own JS-disabled context whose requests are answered through `device.py` (Playwright
@@ -284,7 +312,8 @@ elements), elements, chars (visible chars removed), anchors (<a href> removed), 
   (whose writer zeroes them on purpose). UTF-16/32 inputs or ones without `</body>`/`</html>` are
   loaded unchanged (`device_css_removed.input_page_not_injected`). margin-*/padding-* of
   `<html>`/`<body>` are not compared (page margins belong to the device). The preservation `score`
-  uses the first, unmodified input load as before. `device_score` = equal / checked over the
+  reuses this same input load (see "Page-neutral preservation score"); only `score_page_dependent`
+  uses the first, unmodified input load. `device_score` = equal / checked over the
   book, `device_per_chapter` per spine item, `device_prop_disagreements` / `device_prop_examples`
   as for `prop_disagreements`. It runs whenever the style pass runs (`--no-style` skips both).
 - Visibility (`visibility`, and for AZW3 `device_visibility`): the style pass records, per element with

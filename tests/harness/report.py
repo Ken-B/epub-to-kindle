@@ -341,6 +341,14 @@ def _score(r: dict):
     return _int(_d(_d(r.get("invariants")).get("style")).get("score"))
 
 
+def _score_page_dependent(r: dict):
+    """The old preservation score (html/body page margins counted, plain input). Results written before
+    score_page_dependent existed only have the old-definition `score`, which is what it falls back to."""
+    st = _d(_d(r.get("invariants")).get("style"))
+    v = _int(st.get("score_page_dependent"))
+    return v if v is not None else _int(st.get("score"))
+
+
 def _device_score(r: dict):
     return _int(_d(_d(r.get("invariants")).get("style")).get("device_score"))
 
@@ -618,6 +626,7 @@ def _aggregate(rs: list[dict]) -> dict:
         "books_fixed_layout": fixed, "books_harness_error": harness,
         "invariants_not_evaluated": {k: not_eval[k] for k in INVARIANTS},
         "style_score_se_pg": mean_score(rs, _score),
+        "style_score_page_dependent_se_pg": mean_score(rs, _score_page_dependent),
         "device_score_se_pg": mean_score(rs, _device_score),
         "visibility_pooled": visibility_pooled(rs),
         "device_visibility_pooled": visibility_pooled(rs, "device_visibility"),
@@ -674,8 +683,11 @@ def _summary_paragraph(fmt: str, a: dict) -> str:
                 if a["books_fixed_layout"] else "") + ".")
     ms, ns = a.get("style_score_se_pg") or (None, 0)
     md, nd = a.get("device_score_se_pg") or (None, 0)
+    mp, _np = a.get("style_score_page_dependent_se_pg") or (None, 0)
     if ms is not None or md is not None:
         s.append(f"Mean style score on se+pg books: preservation {'n/a' if ms is None else f'{ms:.3f} (n={ns})'}"
+                 + (f" (page-neutral; old page-dependent definition {mp:.3f})"
+                    if fmt != "mobi" and ms is not None and mp is not None and abs(mp - ms) > 5e-4 else "")
                  + (f", Kindle device model {'n/a' if md is None else f'{md:.3f} (n={nd})'}" if fmt != "mobi" else "")
                  + ".")
     vp, dvp = a.get("visibility_pooled"), a.get("device_visibility_pooled")

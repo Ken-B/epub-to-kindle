@@ -1998,6 +1998,25 @@ _COLLECT_JS = r"""
     return false;
   };
   const isHidden = cs => cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse';
+  // MOBI v6 hidden set (the writer's cssHiddenOffPage, only for position absolute|fixed): a side moved
+  // 500 px or more off the page, clip: rect() with every side <= 1 px, clip-path inset(>= 50 %) or
+  // circle(0), a width or height <= 1 px with overflow hidden|clip
+  const writerHidden = (e, cs) => {
+    if (cs.position !== 'absolute' && cs.position !== 'fixed') return false;
+    // computed values (computedStyleMap), not the resolved ones getComputedStyle gives a positioned
+    // element: `bottom: auto` resolves to a negative px far down a long page
+    const sm = e.computedStyleMap();
+    const px = k => {
+      const v = sm.get(k);
+      return v instanceof CSSUnitValue ? (v.unit === 'px' ? v.value : v.unit === 'percent' ? v.value * 6 : NaN) : NaN;
+    };
+    if (['left', 'top', 'right', 'bottom'].some(k => px(k) <= -500)) return true;
+    const clip = /^rect\(([^)]*)\)$/i.exec((cs.clip || '').trim());
+    if (clip && clip[1].split(/[\s,]+/).filter(Boolean).every(v => /^auto$/i.test(v) ? false : parseFloat(v) <= 1)) return true;
+    const cp = (cs.clipPath || '').trim().toLowerCase();
+    if (/^inset\(\s*(?:5\d|[6-9]\d|100)(?:\.\d+)?%/.test(cp) || /^circle\(\s*0(?:px|%)?\s*(?:at\b|\))/.test(cp)) return true;
+    return (px('width') <= 1 || px('height') <= 1) && /^(hidden|clip)$/i.test(cs.overflowX) && /^(hidden|clip)$/i.test(cs.overflowY);
+  };
   const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
   for (let e = walker.currentNode; e; e = walker.nextNode()) {
     const tag = (e.localName || '').toLowerCase();
@@ -2012,7 +2031,7 @@ _COLLECT_JS = r"""
     const parent = e.parentElement && idx.has(e.parentElement) ? idx.get(e.parentElement) : -1;
     idx.set(e, els.length);
     els.push([tag, own, props.map(p => cs.getPropertyValue(p)), parent, e, full, all.length - 1,
-              args.hidden && e !== body && isHidden(cs)]);
+              args.hidden && e !== body && (isHidden(cs) || writerHidden(e, cs))]);
   }
   // Baseline: the same DOM with every author style sheet and style attribute removed, i.e. what
   // the UA (plus presentational HTML attributes) gives. A property "carries author CSS" when the
@@ -2024,7 +2043,8 @@ _COLLECT_JS = r"""
   const baseFS = parseFloat(getComputedStyle(body).fontSize) || 16;
   for (const r of els) {
     const cs = getComputedStyle(r[4]);
-    r[7] = r[7] && !isHidden(cs);     // hidden by the author CSS, not by the UA (e.g. [hidden])
+    // hidden by the author CSS (or the hidden attribute, which the writer removes too), not by another UA rule
+    r[7] = r[7] && (!isHidden(cs) || r[4].hasAttribute('hidden'));
     r[4] = props.map(p => cs.getPropertyValue(p));
   }
   if (!args.hidden) return {perr, bodyFS, baseFS, els: els.map(r => r.slice(0, 6)), tags: [], hid: [], vt};
@@ -2130,7 +2150,13 @@ def _collect(page, url_xhtml: str, url_html: str, xhtml_first: bool = True, *, h
     for tag, own, vals, parent, base, full, *raw in rows:
         own_n = _norm_ws(own)
         anchored = bool(own_n) or tag in ANCHOR_TAGS
-        els.append({"tag": tag, "text": own_n, "full": _norm_ws(full) if anchored else "",
+        full_n = _norm_ws(full) if anchored else ""
+        # not rendered: display:none on the element or an ancestor (parents come first)
+        hid = vals[_DISPLAY] == "none" or (parent >= 0 and els[parent]["hid"])
+        els.append({"tag": tag, "text": own_n, "full": full_n,
+                    # alignment key: the full text without any whitespace, so the writer's whitespace
+                    # hygiene (newline after <br/>, trimmed runs) does not unmatch an anchor
+                    "key": "".join(full_n.split()), "hid": hid,
                     "props": [_norm_prop(p, v, data["bodyFS"]) for p, v in zip(STYLE_PROPS, vals, strict=True)],
                     "base": [_norm_prop(p, v, data["baseFS"]) for p, v in zip(STYLE_PROPS, base, strict=True)],
                     "raw": raw[0] if raw else vals, "parent": parent,
@@ -2361,6 +2387,8 @@ class _StyleAcc:
         a `reader_default` property the input leaves at the browser's default and the output at its
         own baseline (the MOBI reader's default) is not checked either."""
         checked = equal = all_checked = all_equal = 0
+        if a["hid"] and b["hid"]:    # not rendered on either side: its computed style is noise
+            return 0, 0, 0, 0
         page = self.page_box_free and (a["tag"] in ("html", "body") or b["tag"] in ("html", "body"))
         for pi in idx:
             if page and pi in _PAGE_BOX_IDX:
@@ -2442,7 +2470,7 @@ def _anchor_key(e: dict) -> str:
         return "\x00img"       # pictures align by position among the text anchors
     if e["tag"] == "hr":
         return "\x00hr"
-    return e["full"]
+    return e["key"]
 
 
 def _align_score(ein: list, eout: list, acc: _StyleAcc, scope) -> tuple[dict, int, int, dict]:
@@ -2486,7 +2514,7 @@ def _align_score(ein: list, eout: list, acc: _StyleAcc, scope) -> tuple[dict, in
                 c, e, _, _ = acc.compare(ein, eout, i, j, scope, fallback=True)
                 stats["matched_fallback"] += 1
             else:
-                c, e = _authored(ein[i], acc.all_idx), 0
+                c, e = (0 if ein[i]["hid"] else _authored(ein[i], acc.all_idx)), 0
                 stats["unmatched_in"] += 1
         if c:
             contrib[i] = (c, e)
@@ -2503,9 +2531,9 @@ def _fallback(a: dict, eout: list, ao: list, order: list, pos: dict, p: int):
     hi = pos[order[k]] if k < len(order) else len(ao) - 1
     hi = min(hi, lo + _FALLBACK_WINDOW)
     cand = list(range(lo, hi + 1)) + list(range(lo - 1, max(-1, lo - 21), -1))
-    needle = a["full"]
+    needle = a["key"]
     for y in cand:
-        if 0 <= y < len(ao) and needle in eout[ao[y]]["full"]:
+        if 0 <= y < len(ao) and needle in eout[ao[y]]["key"]:
             return ao[y]
     return None
 
@@ -2609,6 +2637,13 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
     properties over the whole book (1.0 when nothing is authored or disputed); per_chapter the same
     per spine item (None when it has no checked property).
 
+    AZW3 score is page-neutral: the output (as authored, no device model) is aligned against the
+    device pass's input reference (html/body side margins/paddings zeroed, see below) and html/body
+    box properties (margins, side paddings) are not compared, as the writer leaves the page margins to
+    the Kindle; `page_neutral` is False when the reference was unavailable (device pass failed) and the
+    plain input was used. score_page_dependent is the old number (plain input, page margins counted).
+    MOBI v6 is unchanged (score == score_page_dependent).
+
     MOBI v6 (no CSS in the file): the output is read with MOBI_CSS and its width/height attributes
     applied, MOBI_EXCLUDED_PROPS are not scored, and the input elements the author CSS hides are
     left out (the writer removes them); the same load prunes them from book's documents for the
@@ -2626,8 +2661,14 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
     srv_root = _SERVERS.get(base_url, out_dir.resolve().parent)
     # the plain context serves files as they are, except the device pass's input reference (devin=1)
     ctx, pg = _style_page(page, base_url, {**dev, "rewrite": False}, srv_root)
+    # AZW3: page-neutral (html/body box properties skipped, input = the device pass's zeroed-margin
+    # reference); `accp` is the old page-dependent comparison over the plain input, kept for
+    # score_page_dependent. MOBI v6 has no page-margin zeroing: its score is unchanged.
     acc = _StyleAcc(MOBI_EXCLUDED_PROPS if mobi else (), box_only_ancestors=mobi,
-                    reader_default=MOBI_READER_DEFAULT_PROPS if mobi else ())
+                    reader_default=MOBI_READER_DEFAULT_PROPS if mobi else (), page_box_free=not mobi)
+    accp = _StyleAcc()
+    pchk = peq = 0
+    neutral_basis = {"zeroed": 0, "plain": 0}   # chapters whose reference was the zeroed input / the plain one
     n = len(book.spine)
     chk, eq = [0] * n, [0] * n
     dacc = _StyleAcc(page_box_free=True)
@@ -2716,7 +2757,14 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
                 vt["out"] = []
                 eout = load_out(p) if p is not None else []
                 vis_add(vis, vin, vt["out"])
-                contrib, ni, no, st = _align_score(ein, eout, acc, i)
+                eind = load_in_dev(i) if dev["on"] else None
+                # AZW3: the primary score reads the page-neutral input reference (the device pass's
+                # zeroed-margin load); the plain load only feeds score_page_dependent
+                if eind is None:
+                    neutral_basis["plain"] += 1
+                else:
+                    neutral_basis["zeroed"] += 1
+                contrib, ni, no, st = _align_score(ein if eind is None else eind, eout, acc, i)
                 tot_in += ni
                 tot_out += no
                 authored_els += sum(1 for e in ein if e["anchored"] and _authored(e, acc.all_idx))
@@ -2724,8 +2772,11 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
                 for c, e in contrib.values():
                     chk[i] += c
                     eq[i] += e
+                if not mobi:
+                    for c, e in _align_score(ein, eout, accp, i)[0].values():
+                        pchk += c
+                        peq += e
                 if dev["on"]:
-                    eind = load_in_dev(i)
                     vt["dev"] = []
                     edev = (load_dev(p) if p is not None else []) if eind is not None else None
                     if edev is not None:
@@ -2747,12 +2798,6 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
                 eout += shifted(load_out(p), len(eout))
                 vout += vt["out"]
             vis_add(vis, vin, vout)
-            contrib, tot_in, tot_out, st = _align_score(ein, eout, acc, "book")
-            authored_els = sum(1 for e in ein if e["anchored"] and _authored(e, acc.all_idx))
-            add_stats(st)
-            for k, (c, e) in contrib.items():
-                chk[owner[k]] += c
-                eq[owner[k]] += e
             eind, downer = [], []
             for i in range(n):
                 d = load_in_dev(i) if dev["on"] else None
@@ -2760,6 +2805,18 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
                     break
                 eind += shifted(d, len(eind))
                 downer += [i] * len(d)
+            neutral = dev["on"]
+            neutral_basis["zeroed" if neutral else "plain"] += n
+            contrib, tot_in, tot_out, st = _align_score(eind if neutral else ein, eout, acc, "book")
+            authored_els = sum(1 for e in ein if e["anchored"] and _authored(e, acc.all_idx))
+            add_stats(st)
+            for k, (c, e) in contrib.items():
+                chk[(downer if neutral else owner)[k]] += c
+                eq[(downer if neutral else owner)[k]] += e
+            if not mobi:
+                for c, e in _align_score(ein, eout, accp, "book")[0].values():
+                    pchk += c
+                    peq += e
             if dev["on"]:
                 edev = []
                 vdev = []
@@ -2804,7 +2861,12 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
         }
         if dev["errors"]:
             device_res["device_route_errors"] = dev["errors"][:3]
+    if mobi:
+        pchk, peq = checked, equal
     return {"score": round(equal / checked, 4) if checked else 1.0,
+            # the old comparison (html/body page margins counted, plain input): AZW3 only differs from score
+            "score_page_dependent": round(peq / pchk, 4) if pchk else 1.0,
+            "page_neutral": (not mobi) and not neutral_basis["plain"],
             "per_chapter": [round(eq[i] / chk[i], 4) if chk[i] else None for i in range(n)],
             "mode": mode, "elements_in": tot_in, "elements_out": tot_out,
             "elements_with_authored_css": authored_els,
