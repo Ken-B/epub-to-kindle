@@ -1,0 +1,707 @@
+{
+  "subset": "core-real-generated-local",
+  "date": "2026-10-17",
+  "total_results": 1772,
+  "formats": {
+    "azw3": {
+      "books": 886,
+      "converted": 876,
+      "calibre_ok": 834,
+      "gate_evaluated": 876,
+      "gate_pass": 876,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "calibre-header-diff": 833,
+        "fixed-layout-unsupported": 88,
+        "spine-non-xhtml": 41,
+        "images-unextractable": 6,
+        "app-error": 4,
+        "app-clean-error": 6,
+        "toc-labels": 3,
+        "input-repair": 1
+      },
+      "actionable_category_books": {
+        "app-error": 4,
+        "toc-labels": 3,
+        "input-repair": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 0,
+        "input repair": 1,
+        "writer bug": 7
+      },
+      "kind_instances": {
+        "unported Calibre transform": 0,
+        "input repair": 1,
+        "writer bug": 7
+      },
+      "kind_not_actionable": {
+        "informational": 880,
+        "out of scope": 88,
+        "acceptable": 6
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.0,
+        "input repair": 0.125,
+        "writer bug": 0.875
+      },
+      "gap_instances": 8,
+      "books_with_gap": 8,
+      "dominant_kind": "writer bug",
+      "top_category_by_kind": {
+        "unported Calibre transform": null,
+        "input repair": "input-repair",
+        "writer bug": "app-error"
+      },
+      "top5": [
+        {
+          "category": "app-error",
+          "books": 4,
+          "description": "App produced no file and the input is not expected to fail",
+          "kind": "writer bug",
+          "examples": [
+            "core/02-w3c-conformance/pub-foreign_bad-fallback",
+            "core/03-epubcheck-other/cli__20-severity-tester",
+            "core/03-epubcheck-other/ocf-zip-unreadable-empty-fatal"
+          ]
+        },
+        {
+          "category": "toc-labels",
+          "books": 3,
+          "description": "TOC entries whose labels/targets do not match the input",
+          "kind": "writer bug",
+          "examples": [
+            "core/03-epubcheck-invalid/epub3_B-external-identifiers__xml-external-identifier-disallowed-error",
+            "core/03-epubcheck-valid/epub2__ncx-label-empty-valid",
+            "core/03-epubcheck-valid/epub3_08-navigation-document__nav-cfi-valid"
+          ]
+        },
+        {
+          "category": "input-repair",
+          "books": 1,
+          "description": "App failed or lost text on a malformed input Calibre converted anyway",
+          "kind": "input repair",
+          "examples": [
+            "generated/gen-latin1-undeclared"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "generated/gen-latin1-undeclared",
+          "category": "generated",
+          "tier": 3,
+          "reasons": [
+            "text 2/3 spine items match"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "idpf": {
+          "calibre-header-diff": 25,
+          "fixed-layout-unsupported": 4,
+          "spine-non-xhtml": 2
+        },
+        "w3c": {
+          "calibre-header-diff": 173,
+          "spine-non-xhtml": 12,
+          "fixed-layout-unsupported": 48,
+          "images-unextractable": 2,
+          "app-error": 1
+        },
+        "epubcheck-invalid": {
+          "calibre-header-diff": 206,
+          "fixed-layout-unsupported": 16,
+          "app-clean-error": 3,
+          "images-unextractable": 3,
+          "spine-non-xhtml": 8,
+          "toc-labels": 1
+        },
+        "epubcheck-other": {
+          "app-error": 2,
+          "calibre-header-diff": 30,
+          "app-clean-error": 3,
+          "fixed-layout-unsupported": 5
+        },
+        "epubcheck-valid": {
+          "calibre-header-diff": 149,
+          "fixed-layout-unsupported": 14,
+          "toc-labels": 2,
+          "app-error": 1,
+          "images-unextractable": 1,
+          "spine-non-xhtml": 14
+        },
+        "epubcheck-warnings": {
+          "calibre-header-diff": 41,
+          "fixed-layout-unsupported": 1,
+          "spine-non-xhtml": 5
+        },
+        "generated": {
+          "calibre-header-diff": 8,
+          "input-repair": 1
+        },
+        "local": {
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "calibre-header-diff": 100
+        },
+        "se": {
+          "calibre-header-diff": 100
+        }
+      },
+      "corpus_category_books": {
+        "idpf": 27,
+        "w3c": 182,
+        "epubcheck-invalid": 222,
+        "epubcheck-other": 35,
+        "epubcheck-valid": 169,
+        "epubcheck-warnings": 42,
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 788,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 781,
+      "books_not_fully_evaluated": 9,
+      "books_fixed_layout": 88,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 12,
+        "images": 12,
+        "toc": 13,
+        "links": 12,
+        "style": 12
+      }
+    },
+    "mobi": {
+      "books": 886,
+      "converted": 876,
+      "calibre_ok": 833,
+      "gate_evaluated": 876,
+      "gate_pass": 876,
+      "gate_pass_rate": 1.0,
+      "gate_failures_by_parser": {
+        "mobitool": 0,
+        "kindleunpack": 0,
+        "calibre_reader": 0
+      },
+      "category_books": {
+        "style-lost": 69,
+        "calibre-header-diff": 833,
+        "fixed-layout-unsupported": 88,
+        "images-misreferenced": 2,
+        "spine-non-xhtml": 41,
+        "images-unextractable": 15,
+        "app-error": 4,
+        "app-clean-error": 6,
+        "toc-labels": 3,
+        "input-repair": 1
+      },
+      "actionable_category_books": {
+        "style-lost": 58,
+        "app-error": 4,
+        "toc-labels": 3,
+        "images-misreferenced": 1,
+        "input-repair": 1
+      },
+      "kind_books": {
+        "unported Calibre transform": 58,
+        "input repair": 1,
+        "writer bug": 8
+      },
+      "kind_instances": {
+        "unported Calibre transform": 58,
+        "input repair": 1,
+        "writer bug": 8
+      },
+      "kind_not_actionable": {
+        "informational": 889,
+        "out of scope": 100,
+        "acceptable": 6
+      },
+      "kind_shares": {
+        "unported Calibre transform": 0.8656716417910447,
+        "input repair": 0.014925373134328358,
+        "writer bug": 0.11940298507462686
+      },
+      "gap_instances": 67,
+      "books_with_gap": 67,
+      "dominant_kind": "unported Calibre transform",
+      "top_category_by_kind": {
+        "unported Calibre transform": "style-lost",
+        "input repair": "input-repair",
+        "writer bug": "app-error"
+      },
+      "top5": [
+        {
+          "category": "style-lost",
+          "books": 58,
+          "description": "Style score below 0.5, or the input has CSS rules and the output none",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "core/01-idpf-samples/childrens-literature",
+            "core/01-idpf-samples/childrens-media-query",
+            "core/01-idpf-samples/cole-voyage-of-life"
+          ]
+        },
+        {
+          "category": "app-error",
+          "books": 4,
+          "description": "App produced no file and the input is not expected to fail",
+          "kind": "writer bug",
+          "examples": [
+            "core/02-w3c-conformance/pub-foreign_bad-fallback",
+            "core/03-epubcheck-other/cli__20-severity-tester",
+            "core/03-epubcheck-other/ocf-zip-unreadable-empty-fatal"
+          ]
+        },
+        {
+          "category": "toc-labels",
+          "books": 3,
+          "description": "TOC entries whose labels/targets do not match the input",
+          "kind": "writer bug",
+          "examples": [
+            "core/03-epubcheck-invalid/epub3_B-external-identifiers__xml-external-identifier-disallowed-error",
+            "core/03-epubcheck-valid/epub2__ncx-label-empty-valid",
+            "core/03-epubcheck-valid/epub3_08-navigation-document__nav-cfi-valid"
+          ]
+        },
+        {
+          "category": "images-misreferenced",
+          "books": 1,
+          "description": "Image references in the text point at the wrong image or at none",
+          "kind": "writer bug",
+          "examples": [
+            "core/03-epubcheck-warnings/epub3_07-content-documents__content-xhtml-img-fragment-non-svg-warning"
+          ]
+        },
+        {
+          "category": "input-repair",
+          "books": 1,
+          "description": "App failed or lost text on a malformed input Calibre converted anyway",
+          "kind": "input repair",
+          "examples": [
+            "generated/gen-latin1-undeclared"
+          ]
+        }
+      ],
+      "worst5": [
+        {
+          "id": "core/03-epubcheck-warnings/epub3_07-content-documents__content-xhtml-img-fragment-non-svg-warning",
+          "category": "epubcheck-warnings",
+          "tier": 1,
+          "reasons": [
+            "image refs 1/2 correct (0 wrong, 1 missing)"
+          ]
+        },
+        {
+          "id": "core/01-idpf-samples/cole-voyage-of-life",
+          "category": "idpf",
+          "tier": 2,
+          "reasons": [
+            "style score 0.00"
+          ]
+        },
+        {
+          "id": "core/01-idpf-samples/quiz-bindings",
+          "category": "idpf",
+          "tier": 2,
+          "reasons": [
+            "style score 0.00"
+          ]
+        },
+        {
+          "id": "core/02-w3c-conformance/nav-spine_in-spine-no-list-style",
+          "category": "w3c",
+          "tier": 2,
+          "reasons": [
+            "style score 0.00"
+          ]
+        },
+        {
+          "id": "core/02-w3c-conformance/ocf-url_link-leaking-relative",
+          "category": "w3c",
+          "tier": 2,
+          "reasons": [
+            "style score 0.00"
+          ]
+        }
+      ],
+      "by_corpus_category": {
+        "idpf": {
+          "style-lost": 18,
+          "calibre-header-diff": 25,
+          "fixed-layout-unsupported": 4,
+          "images-misreferenced": 1,
+          "spine-non-xhtml": 2,
+          "images-unextractable": 1
+        },
+        "w3c": {
+          "calibre-header-diff": 173,
+          "spine-non-xhtml": 12,
+          "images-unextractable": 4,
+          "style-lost": 19,
+          "fixed-layout-unsupported": 48,
+          "app-error": 1
+        },
+        "epubcheck-invalid": {
+          "calibre-header-diff": 206,
+          "fixed-layout-unsupported": 16,
+          "app-clean-error": 3,
+          "images-unextractable": 4,
+          "spine-non-xhtml": 8,
+          "toc-labels": 1
+        },
+        "epubcheck-other": {
+          "app-error": 2,
+          "calibre-header-diff": 30,
+          "app-clean-error": 3,
+          "fixed-layout-unsupported": 5
+        },
+        "epubcheck-valid": {
+          "calibre-header-diff": 149,
+          "fixed-layout-unsupported": 14,
+          "toc-labels": 2,
+          "app-error": 1,
+          "images-unextractable": 5,
+          "spine-non-xhtml": 14,
+          "style-lost": 3
+        },
+        "epubcheck-warnings": {
+          "calibre-header-diff": 41,
+          "fixed-layout-unsupported": 1,
+          "spine-non-xhtml": 5,
+          "images-misreferenced": 1
+        },
+        "generated": {
+          "calibre-header-diff": 8,
+          "input-repair": 1
+        },
+        "local": {
+          "calibre-header-diff": 1
+        },
+        "pg": {
+          "calibre-header-diff": 100,
+          "style-lost": 17,
+          "images-unextractable": 1
+        },
+        "se": {
+          "calibre-header-diff": 100,
+          "style-lost": 12
+        }
+      },
+      "corpus_category_books": {
+        "idpf": 27,
+        "w3c": 182,
+        "epubcheck-invalid": 222,
+        "epubcheck-other": 35,
+        "epubcheck-valid": 169,
+        "epubcheck-warnings": 42,
+        "generated": 8,
+        "local": 1,
+        "pg": 100,
+        "se": 100
+      },
+      "systemic_categories": {},
+      "systemic_eval_books": 788,
+      "kind_books_excl_systemic": null,
+      "books_with_gap_excl_systemic": null,
+      "books_with_no_gap": 722,
+      "books_not_fully_evaluated": 9,
+      "books_fixed_layout": 88,
+      "books_harness_error": 0,
+      "invariants_not_evaluated": {
+        "text": 12,
+        "images": 12,
+        "toc": 13,
+        "links": 12,
+        "style": 12
+      }
+    }
+  },
+  "before_after": {
+    "formats": {
+      "azw3": {
+        "pairs": 886,
+        "categories": {
+          "app-error": {
+            "before": 4,
+            "after": 4
+          },
+          "app-clean-error": {
+            "before": 6,
+            "after": 6
+          },
+          "spine-non-xhtml": {
+            "before": 41,
+            "after": 41
+          },
+          "images-unextractable": {
+            "before": 6,
+            "after": 6
+          },
+          "images-misreferenced": {
+            "before": 5,
+            "after": 0
+          },
+          "toc-labels": {
+            "before": 3,
+            "after": 3
+          },
+          "fixed-layout-unsupported": {
+            "before": 88,
+            "after": 88
+          },
+          "calibre-header-diff": {
+            "before": 833,
+            "after": 833
+          },
+          "input-repair": {
+            "before": 1,
+            "after": 1
+          }
+        },
+        "before": {
+          "books": 886,
+          "converted": 876,
+          "gate_pass": 876,
+          "gate_evaluated": 876,
+          "style_se_pg": 1.0,
+          "style_se_pg_n": 200,
+          "links": [
+            35046,
+            35046
+          ],
+          "image_refs": [
+            3753,
+            3764
+          ],
+          "images_hash": [
+            3309,
+            3341
+          ],
+          "text": [
+            5581,
+            5582
+          ],
+          "toc": [
+            10478,
+            10481
+          ]
+        },
+        "after": {
+          "books": 886,
+          "converted": 876,
+          "gate_pass": 876,
+          "gate_evaluated": 876,
+          "style_se_pg": 1.0,
+          "style_se_pg_n": 200,
+          "links": [
+            35046,
+            35046
+          ],
+          "image_refs": [
+            3758,
+            3764
+          ],
+          "images_hash": [
+            3309,
+            3341
+          ],
+          "text": [
+            5581,
+            5582
+          ],
+          "toc": [
+            10478,
+            10481
+          ]
+        },
+        "regressions": []
+      },
+      "mobi": {
+        "pairs": 886,
+        "categories": {
+          "app-error": {
+            "before": 4,
+            "after": 4
+          },
+          "app-clean-error": {
+            "before": 6,
+            "after": 6
+          },
+          "spine-non-xhtml": {
+            "before": 41,
+            "after": 41
+          },
+          "images-unextractable": {
+            "before": 15,
+            "after": 15
+          },
+          "images-misreferenced": {
+            "before": 7,
+            "after": 2
+          },
+          "toc-labels": {
+            "before": 3,
+            "after": 3
+          },
+          "links-unresolved": {
+            "before": 223,
+            "after": 0
+          },
+          "style-lost": {
+            "before": 320,
+            "after": 69
+          },
+          "fixed-layout-unsupported": {
+            "before": 88,
+            "after": 88
+          },
+          "calibre-header-diff": {
+            "before": 833,
+            "after": 833
+          },
+          "input-repair": {
+            "before": 1,
+            "after": 1
+          }
+        },
+        "before": {
+          "books": 886,
+          "converted": 876,
+          "gate_pass": 876,
+          "gate_evaluated": 876,
+          "style_se_pg": 0.009378,
+          "style_se_pg_n": 200,
+          "links": [
+            0,
+            35046
+          ],
+          "image_refs": [
+            3618,
+            3749
+          ],
+          "images_hash": [
+            3170,
+            3341
+          ],
+          "text": [
+            5581,
+            5582
+          ],
+          "toc": [
+            10478,
+            10481
+          ]
+        },
+        "after": {
+          "books": 886,
+          "converted": 876,
+          "gate_pass": 876,
+          "gate_evaluated": 876,
+          "style_se_pg": 0.747572,
+          "style_se_pg_n": 200,
+          "links": [
+            35009,
+            35009
+          ],
+          "image_refs": [
+            3593,
+            3719
+          ],
+          "images_hash": [
+            3170,
+            3341
+          ],
+          "text": [
+            5581,
+            5582
+          ],
+          "toc": [
+            10478,
+            10481
+          ]
+        },
+        "regressions": [
+          {
+            "id": "real/gutenberg/pg44342",
+            "category": "pg",
+            "reasons": [
+              [
+                "image refs correct",
+                "image refs correct 47 -> 23"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg69052",
+            "category": "pg",
+            "reasons": [
+              [
+                "image refs correct",
+                "image refs correct 7 -> 6"
+              ]
+            ]
+          },
+          {
+            "id": "core/02-w3c-conformance/nav-spine_in-spine-no-list-style",
+            "category": "w3c",
+            "reasons": [
+              [
+                "style score",
+                "style score 1.00 -> 0.00"
+              ],
+              [
+                "new category",
+                "new categories: style-lost"
+              ]
+            ]
+          },
+          {
+            "id": "real/gutenberg/pg74064",
+            "category": "pg",
+            "reasons": [
+              [
+                "image refs correct",
+                "image refs correct 14 -> 13"
+              ]
+            ]
+          },
+          {
+            "id": "core/02-w3c-conformance/css-epub-writing-mode",
+            "category": "w3c",
+            "reasons": [
+              [
+                "style score",
+                "style score 0.43 -> 0.33"
+              ]
+            ]
+          },
+          {
+            "id": "core/01-idpf-samples/cole-voyage-of-life-tol",
+            "category": "idpf",
+            "reasons": [
+              [
+                "image refs correct",
+                "image refs correct 9 -> 5"
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    "unpaired_before": 0,
+    "unpaired_after": 0
+  }
+}

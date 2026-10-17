@@ -107,7 +107,7 @@
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.11 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
+  · v1.0.12 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
 </footer>
 
@@ -115,7 +115,7 @@
 <script>
 'use strict';
 
-const APP_VERSION = 'v1.0.11';
+const APP_VERSION = 'v1.0.12';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -803,7 +803,7 @@ function utf8Len(s, from = 0, to = s.length) {
 //   @font-face {src:url(…)}   → dropped: fonts are not embedded (yet), so the src can't
 //                               resolve; the font-family then falls back to the default.
 // Only sheets actually referenced (by a chapter or an @import) are written; identical
-// sheets share one flow. MOBI v6 has no flows and keeps parseEpub's hidden-rules `css`.
+// sheets share one flow. MOBI v6 has no flows: its CSS is flattened (mobiMarkup).
 
 const CSS_URL = String.raw`url\(\s*(?:"([^"]*)"|'([^']*)'|([^'")\s]*))\s*\)`;
 const CSS_URL_RE = new RegExp(CSS_URL, 'gi');
@@ -949,7 +949,9 @@ function spineKind(item) {
   return 'other';
 }
 
-async function parseEpub(buf) {
+/** opts.mobi (default true): also prepare the MOBI v6 markup (chapter.mobiContent). */
+async function parseEpub(buf, opts = {}) {
+  const mobi = opts.mobi !== false;
   const zip = await JSZip.loadAsync(buf, {decodeFileName: decodeZipName});
 
   // Zip entries by normalised name (normPath, Unicode NFC): hrefs are matched
@@ -1054,9 +1056,11 @@ async function parseEpub(buf) {
   const spineHrefs = spineItems.map(it => it.href).filter(Boolean);
 
   // CSS. KF8: every stylesheet is read in full and written as its own flow
-  // (makeCssFlows, below). MOBI v6 has no flows and no real CSS support, so for it
-  // we keep only the critical visibility rules (display:none, visibility:hidden)
-  // that hide publisher watermarks; convertToAzw3 inlines those in its <head>.
+  // (makeCssFlows, below). MOBI v6 has no flows and no real CSS support: the CSS is
+  // flattened into markup per chapter (mobiMarkup, which also removes hidden elements)
+  // and `css` (inlined in the MOBI <head>) ends up holding only the hiding rules the
+  // cascade could not match (see the end). Without opts.mobi it keeps the old fallback:
+  // the display:none / visibility:hidden rules of the manifest sheets.
   let css = '';
   const cssFiles = new Map();  // normalised zip path → stylesheet text (KF8 flows)
   for (const item of Object.values(manifest)) {
@@ -1182,6 +1186,7 @@ async function parseEpub(buf) {
   const cssFlows = makeCssFlows(cssFiles, imageByPath);
   const links = new Map();
   const spinePaths = new Set(spineHrefs.map(h => resolve(h)));
+  const mobiRules = new Map();  // MOBI cascade: parsed rules per stylesheet (mobiCssRules)
 
   const chapters = [];
   for (const item of spineItems) {
@@ -1209,7 +1214,7 @@ async function parseEpub(buf) {
         ? new DOMParser().parseFromString(xhtml, 'text/html')
         : doc;
       const ch = extractContent(parsed, imageIndex, chapterDir,
-        {path, cssFlows, links, spinePaths, imageResources, imageByPath});
+        {path, cssFlows, links, spinePaths, imageResources, imageByPath, cssFiles, mobi, mobiRules});
       if (kind === 'svg') ch.svgPage = true;
       // TOC entries name the spine item itself; when it was replaced by its
       // fallback (or became an image/SVG page) they still map here (resolveToc)
@@ -1236,6 +1241,9 @@ async function parseEpub(buf) {
     }
   });
   const toc = resolveToc(tocTree, chapters, tocChapterOf) || resolveToc(tocAlt, chapters, tocChapterOf);
+  // MOBI v6 <style>: the MOBI markup already dropped every hidden element the cascade could
+  // match; what is left are hiding rules whose selector querySelectorAll rejects
+  if (mobi) css = [...new Set(chapters.flatMap(ch => ch.mobiHidden || []))].map(r => r + '\n').join('');
   return {metadata, chapters, css, stylesheets: cssFlows.flows, links, imageResources, toc};
 }
 
@@ -1371,6 +1379,31 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
     headContent = `<title>${(chapterTitle || htmlTitle).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n`;
   }
 
+  // MOBI v6: match the author CSS against the untouched DOM (see mobiMarkup); the
+  // markup is rewritten at the end, after the KF8 content has been serialised.
+  let mobiCss = null;
+  if (ctx.mobi) {
+    const sheets = [];
+    for (const el of doc.querySelectorAll('link, style')) {
+      if (!(el.namespaceURI == null || el.namespaceURI === XHTML_NS)) continue;
+      if (el.hasAttribute('media') && !mobiMediaOk(el.getAttribute('media'))) continue;
+      let key, text, base;
+      if (el.localName.toLowerCase() === 'link') {
+        const rel = (el.getAttribute('rel') || '').toLowerCase().split(/\s+/);
+        if (!rel.includes('stylesheet') || rel.includes('alternate')) continue;
+        key = joinPath(dir, (el.getAttribute('href') || '').trim().split(/[?#]/)[0]);
+        if (!ctx.cssFiles?.has(key)) continue;
+        text = ctx.cssFiles.get(key); base = dirOf(key);
+      } else {
+        text = el.textContent.replace(/<!\[CDATA\[|\]\]>|<!--|-->/g, ''); base = dir; key = base + '\0' + text;
+      }
+      const cache = ctx.mobiRules || (ctx.mobiRules = new Map());
+      if (!cache.has(key)) cache.set(key, mobiCssRules(text, base, ctx.cssFiles, new Set([key])));
+      sheets.push(cache.get(key));
+    }
+    mobiCss = mobiCascade(doc, sheets);
+  }
+
   // Stylesheets → KF8 flows, linked from the skeleton <head> in document order:
   // <link rel=stylesheet> to a manifest sheet, and every XHTML <style> (head or
   // body; a body <style> is removed so no CSS text stays in the chunk, and its
@@ -1470,6 +1503,19 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
       const ref = imageRef(v.getAttribute('poster'));
       if (ref) v.setAttribute('poster', ref); else v.removeAttribute('poster');
     }
+    // <object data> of an image (raster or SVG) without an image fallback inside → <img
+    // src>, resolved like any other <img>: readers do not resolve object data.
+    for (const o of [...body.querySelectorAll('object[data]')]) {
+      if (!o.isConnected || o.querySelector('img, image')) continue;
+      const ref = imageRef(o.getAttribute('data'));
+      if (!ref) continue;
+      const img = doc.createElementNS(o.namespaceURI || XHTML_NS, 'img');
+      for (const a of ['id', 'class', 'style', 'title', 'width', 'height'])
+        if (o.hasAttribute(a)) img.setAttribute(a, o.getAttribute(a));
+      img.setAttribute('src', ref);
+      img.setAttribute('alt', o.textContent.replace(/\s+/g, ' ').trim());
+      o.replaceWith(img);
+    }
     // SVG <image xlink:href> (or SVG 2 plain href), e.g. the svg-wrapped covers of
     // Gutenberg/Calibre books: same lookup, written as Calibre does,
     // kindle:embed:XXXX?mime=… (writer8/main.py replace_resource_links). The
@@ -1523,7 +1569,494 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
   }
 
   const content = body ? body.innerHTML : '';
-  return {skelHead, skelTail, content, firstAid, title: chapterTitle, path: ctx.path, ids};
+  // MOBI v6 serialisation (changes the DOM, so strictly after the KF8 one)
+  const mobiContent = mobiCss && body ? mobiMarkup(doc, body, mobiCss.decl) : undefined;
+  return {skelHead, skelTail, content, firstAid, title: chapterTitle, path: ctx.path, ids,
+          mobiContent, mobiHidden: mobiCss?.hidden};
+}
+
+// ─── MOBI v6 markup ("MobiML lite") ──────────────────────────────────────────
+//
+// Old Kindles (MOBI 6) render HTML 3.2-style markup and ignore nearly all CSS, so for
+// the MOBI v6 output the author CSS is flattened into markup, as Calibre's MobiMLizer
+// (ebooks/mobi/mobiml.py) does, but in place on the chapter DOM (no re-flow into <p>s):
+//   font-weight ≥ 600 → <b>, italic/oblique → <i>, underline → <u>, line-through → <s>,
+//   font-size → <font size="1..7"> (3 = normal), color → <font color>, vertical-align
+//   super/sub → <sup>/<sub>; a <b>/<strong>/<i>/<em>/<u>/<s>… whose look the CSS cancels
+//   becomes a <span>. Wrappers go around runs of inline content, never around blocks.
+//   text-align → align="…" on p/div/h1-h6/li/td/th/dd/dt (margin-left and -right auto:
+//   center); text-indent → width="Nem", vertical margins → height="Nem" (≤ 2em) on the
+//   paragraphs that hold text: a block's margin-bottom and the next one's margin-top
+//   collapse onto the next paragraph, as Calibre's vspace; margin-left + padding-left →
+//   one <blockquote> per ~2em (≤ 3); page-break-before/after → <mbp:pagebreak/> (not at
+//   the chapter start: chapters are already separated by one); display:none and
+//   visibility:hidden → element removed (an empty <a aid> keeps a link/TOC target).
+//   Headings keep their tags. Everything else (line-height, small-caps, white-space,
+//   …) has no MOBI 6 markup and is dropped.
+// The cascade: a DOMParser document is never rendered (no getComputedStyle), so the
+// chapter's stylesheets (<link>/<style>, @import, @media all/screen/amzn-mobi, @supports
+// as CSS.supports says, @layer) are parsed into rules, every selector is matched with
+// querySelectorAll ("ns|attr" → "*|attr"; one that throws is skipped, and if it hides
+// something it goes into the MOBI <style> instead), and declarations win by
+// !important, specificity (id > class/attr/pseudo > type), source order, then the
+// style attribute. Inherited properties are resolved top-down. extractContent matches
+// the selectors before it changes the DOM and rewrites it after the KF8 content has
+// been serialised, so KF8 output does not depend on any of this.
+
+const XHTML_NS = 'http://www.w3.org/1999/xhtml';
+const MOBI_PROPS = new Set(['display', 'visibility', 'font-weight', 'font-style', 'font-size',
+  'text-decoration-line', 'text-align', 'text-indent', 'margin-top', 'margin-bottom', 'margin-left',
+  'margin-right', 'padding-left', 'page-break-before', 'page-break-after', 'color', 'vertical-align']);
+const MOBI_BLOCK = new Set([...BLOCKS, 'dl', 'dt', 'dd', 'center', 'address', 'hgroup', 'details',
+  'summary', 'fieldset', 'form', 'menu', 'caption', 'thead', 'tbody', 'tfoot', 'hr', 'noscript']);
+const MOBI_PARA = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'dd', 'dt']);
+const MOBI_ALIGN = new Set([...MOBI_PARA, 'td', 'th']);
+const MOBI_QUOTE = new Set(['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'section', 'article',
+  'aside', 'header', 'footer', 'figure', 'figcaption', 'nav', 'main', 'address', 'center', 'pre', 'dl']);
+// containers whose children are rows/items, not text: inline wrappers go inside the children
+const MOBI_NO_TEXT = new Set(['ul', 'ol', 'dl', 'menu', 'table', 'thead', 'tbody', 'tfoot', 'tr',
+  'colgroup', 'select', 'picture', 'video', 'audio', 'object']);
+const MOBI_VOID = new Set(['img', 'br', 'hr', 'wbr', 'col', 'input', 'area', 'source', 'track', 'embed', 'param']);
+const MOBI_BOLD = new Set(['b', 'strong', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'th']);
+const MOBI_ITALIC = new Set(['i', 'em', 'cite', 'var', 'dfn', 'address']);
+const MOBI_SIZE = {h1: 2, h2: 1.5, h3: 1.17, h4: 1, h5: 0.83, h6: 0.67, small: 0.83, big: 1.2, sub: 0.83, sup: 0.83};
+const MOBI_DECO = {u: 'u', ins: 'u', s: 's', strike: 's', del: 's'};
+const FONT_PX = [0, 10, 13, 16, 18, 24, 32, 48];  // <font size=N> (HTML 3.2), 3 = 16px normal
+const FONT_KW = {'xx-small': 9, 'x-small': 10, small: 13, medium: 16, large: 18, 'x-large': 24,
+  'xx-large': 32, 'xxx-large': 48};
+const CSS_COLORS = {black: '000000', white: 'ffffff', gray: '808080', grey: '808080', silver: 'c0c0c0',
+  red: 'ff0000', maroon: '800000', green: '008000', lime: '00ff00', blue: '0000ff', navy: '000080',
+  purple: '800080', teal: '008080', olive: '808000', yellow: 'ffff00', fuchsia: 'ff00ff', aqua: '00ffff',
+  orange: 'ffa500', brown: 'a52a2a', darkgray: 'a9a9a9', darkgrey: 'a9a9a9', dimgray: '696969',
+  dimgrey: '696969', lightgray: 'd3d3d3', lightgrey: 'd3d3d3', darkred: '8b0000', darkblue: '00008b',
+  darkgreen: '006400'};
+
+/** Split s on sep outside (), [] and strings. */
+function cssSplit(s, sep) {
+  const out = [];
+  let depth = 0, q = null, start = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (q) { if (c === '\\') i++; else if (c === q) q = null; continue; }
+    if (c === '"' || c === "'") q = c;
+    else if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth--;
+    else if (c === sep && depth <= 0) { out.push(s.slice(start, i)); start = i + 1; }
+  }
+  out.push(s.slice(start));
+  return out;
+}
+
+/** Top-level statements of a (comment-free) sheet: [{prelude, body}], body null for "@x …;". */
+function cssBlocks(css) {
+  const out = [], n = css.length;
+  const skipStr = j => { const q = css[j]; for (j++; j < n && css[j] !== q; j++) if (css[j] === '\\') j++; return j + 1; };
+  let i = 0, start = 0;
+  while (i < n) {
+    const c = css[i];
+    if (c === '"' || c === "'") { i = skipStr(i); continue; }
+    if (c === ';') { const p = css.slice(start, i).trim(); if (p) out.push({prelude: p, body: null}); start = ++i; continue; }
+    if (c === '}') { start = ++i; continue; }
+    if (c === '{') {
+      let depth = 1, j = i + 1;
+      while (j < n && depth) {
+        const d = css[j];
+        if (d === '"' || d === "'") { j = skipStr(j); continue; }
+        if (d === '{') depth++; else if (d === '}') depth--;
+        j++;
+      }
+      out.push({prelude: css.slice(start, i).trim(), body: css.slice(i + 1, depth ? j : j - 1)});
+      i = start = j;
+      continue;
+    }
+    i++;
+  }
+  return out;
+}
+
+/** Declarations the MOBI cascade uses: [[prop, value, important]]; shorthands expanded. */
+function mobiDecls(body) {
+  const out = [];
+  for (const d of cssSplit(body || '', ';')) {
+    const k = d.indexOf(':');
+    if (k < 0) continue;
+    const prop = d.slice(0, k).trim().toLowerCase();
+    let v = d.slice(k + 1).trim();
+    const imp = /!\s*important\s*$/i.test(v);
+    if (imp) v = v.replace(/!\s*important\s*$/i, '').trim();
+    if (!v) continue;
+    const add = (p, x) => out.push([p, x, imp]);
+    if (prop === 'margin') {
+      const [t, r = t, b = t, l = r] = v.split(/\s+/);
+      add('margin-top', t); add('margin-right', r); add('margin-bottom', b); add('margin-left', l);
+    } else if (prop === 'padding') {
+      const t = v.split(/\s+/);
+      add('padding-left', t[3] ?? t[1] ?? t[0]);
+    } else if (prop === 'text-decoration') add('text-decoration-line', v);
+    else if (prop === 'break-before' || prop === 'break-after') {
+      if (/^(page|always|left|right|recto|verso)$/i.test(v)) add('page-' + prop, 'always');
+    } else if (prop === 'font') {
+      if (/^(caption|icon|menu|message-box|small-caption|status-bar|inherit|initial|unset)$/i.test(v)) continue;
+      let style = 'normal', weight = 'normal';
+      for (const t of v.replace(/\s*\/\s*/g, '/').split(/\s+/)) {
+        const sz = t.split('/')[0];
+        if (!/^[1-9]00$/.test(sz) && /^(?:[\d.]+[a-z%]*|(?:xx?x?-)?(?:small|large)|medium|smaller|larger)$/i.test(sz)) {
+          add('font-style', style); add('font-weight', weight); add('font-size', sz);
+          break;
+        }
+        if (/^(italic|oblique)$/i.test(t)) style = 'italic';
+        else if (/^(bold|bolder|lighter|[1-9]00)$/i.test(t)) weight = t;
+      }
+    } else if (MOBI_PROPS.has(prop)) add(prop, v);
+  }
+  return out;
+}
+
+/** Specificity of one selector as a number: ids × 1e6 + classes/attributes/pseudo-classes × 1e3 + types. */
+function mobiSpecificity(sel) {
+  let a = 0, b = 0;
+  const s = sel.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, '""')
+    .replace(/\[[^\]]*\]/g, () => { b++; return ' '; })
+    .replace(/#(?:[\w-]|\\.)+/g, () => { a++; return ' '; })
+    .replace(/\.(?:[\w-]|\\.)+/g, () => { b++; return ' '; })
+    .replace(/:(?:not|is|matches|where|has)\(/gi, ' (')
+    .replace(/:[\w-]+(?:\([^)]*\))?/g, () => { b++; return ' '; });
+  return a * 1e6 + b * 1e3 + (s.match(/(?:^|[\s>+~(])[a-zA-Z][\w-]*/g) || []).length;
+}
+
+/** Length in px (em: em px, %: of pct px), or null when not a length. */
+function cssPx(v, em, pct) {
+  const m = /^(-?(?:\d+\.?\d*|\.\d+))([a-z%]*)$/i.exec((v || '').trim());
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  switch (m[2].toLowerCase()) {
+    case '': return n === 0 ? 0 : null;
+    case 'px': return n;
+    case 'pt': return n * 4 / 3;
+    case 'pc': return n * 16;
+    case 'em': return n * em;
+    case 'rem': return n * 16;
+    case 'ex': case 'ch': return n * em / 2;
+    case '%': return pct == null ? null : n * pct / 100;
+    case 'in': return n * 96;
+    case 'cm': return n * 96 / 2.54;
+    case 'mm': return n * 96 / 25.4;
+    case 'vw': return n * 6;   // a 600 × 800 px page
+    case 'vh': return n * 8;
+  }
+  return null;
+}
+
+/** '#rrggbb', or undefined when the value is not understood. */
+function cssColor(v) {
+  v = v.trim().toLowerCase();
+  let m;
+  if ((m = /^#([0-9a-f]{3,4})$/.exec(v))) return '#' + [...m[1].slice(0, 3)].map(c => c + c).join('');
+  if ((m = /^#([0-9a-f]{6})(?:[0-9a-f]{2})?$/.exec(v))) return '#' + m[1];
+  if ((m = /^rgba?\(\s*([\d.]+%?)[\s,]+([\d.]+%?)[\s,]+([\d.]+%?)/.exec(v)))
+    return '#' + [m[1], m[2], m[3]].map(x => Math.max(0, Math.min(255, Math.round(
+      x.endsWith('%') ? parseFloat(x) * 2.55 : parseFloat(x)))).toString(16).padStart(2, '0')).join('');
+  return CSS_COLORS[v] ? '#' + CSS_COLORS[v] : undefined;
+}
+
+/** Does a media query list apply to a MOBI 6 reader (a 600 × 800 screen, light)? */
+function mobiMediaOk(q) {
+  q = (q || '').trim().toLowerCase();
+  if (!q) return true;
+  return cssSplit(q, ',').some(mq => mq.trim().replace(/^only\s+/, '').split(/\s+and\s+/).every((p, k) => {
+    if (k === 0 && /^[a-z-]+$/.test(p)) return /^(all|screen|amzn-mobi)$/.test(p);
+    const f = /^\(\s*([\w-]+)\s*(?::\s*(.+?))?\s*\)$/.exec(p);
+    if (!f) return false;
+    const v = f[2] || '', px = cssPx(v, 16, null);
+    switch (f[1]) {
+      case 'prefers-color-scheme': return v !== 'dark';
+      case 'min-width': return px != null && px <= 600;
+      case 'max-width': return px != null && px >= 600;
+      case 'min-height': return px != null && px <= 800;
+      case 'max-height': return px != null && px >= 800;
+      case 'orientation': return v === 'portrait';
+    }
+    return false;
+  }));
+}
+function mobiSupportsOk(cond) {
+  try { return typeof CSS !== 'undefined' && CSS.supports(cond.trim()); } catch(e) { return false; }
+}
+
+/** Rules of one stylesheet for the MOBI cascade, in source order: [{sels: [{q, raw, spec}],
+ *  decls, hide}]; @import (through cssFiles), @media/@supports/@layer blocks inlined when they apply. */
+function mobiCssRules(css, baseDir, cssFiles, seen = new Set()) {
+  const out = [];
+  const add = text => {
+    for (const {prelude, body} of cssBlocks(text)) {
+      if (prelude.startsWith('@')) {
+        const m = /^@([\w-]+)\s*([\s\S]*)$/.exec(prelude);
+        if (!m) continue;
+        const name = m[1].toLowerCase(), rest = m[2].trim();
+        if (body != null) {
+          if (name === 'media' ? mobiMediaOk(rest) : name === 'supports' ? mobiSupportsOk(rest) : name === 'layer') add(body);
+        } else if (name === 'import') {
+          const im = /^(?:url\(\s*)?["']?([^"')\s]+)["']?\s*\)?\s*(.*)$/.exec(rest);
+          if (!im || !mobiMediaOk(im[2])) continue;
+          const path = joinPath(baseDir, im[1].split(/[?#]/)[0]);
+          if (seen.has(path) || !cssFiles?.has(path)) continue;
+          seen.add(path);
+          out.push(...mobiCssRules(cssFiles.get(path), dirOf(path), cssFiles, seen));
+        }
+        continue;
+      }
+      if (body == null) continue;
+      const decls = mobiDecls(body);
+      if (!decls.length) continue;
+      const sels = [];
+      for (let s of cssSplit(prelude, ',')) {
+        s = s.trim();
+        if (!s || /::|:(?:before|after|first-line|first-letter|marker|selection)\b/i.test(s)) continue;
+        sels.push({q: s.replace(/\[\s*[\w-]*\|(?!=)/g, '[*|'), raw: s, spec: mobiSpecificity(s)});
+      }
+      if (sels.length) out.push({sels, decls, hide: decls.some(([p, v]) =>
+        p === 'display' && /^none$/i.test(v) || p === 'visibility' && /^(hidden|collapse)$/i.test(v))});
+    }
+  };
+  add(css.replace(/\/\*[\s\S]*?\*\//g, ''));
+  return out;
+}
+
+/** Winning declarations per element: {decl: Map<Element, Map<prop, [value, important, spec]>>,
+ *  hidden: ["selector{display:none}"] for hiding rules whose selector querySelectorAll rejects}. */
+function mobiCascade(doc, sheets) {
+  const decl = new Map(), hidden = [];
+  const put = (el, list, spec) => {
+    let m = decl.get(el);
+    if (!m) decl.set(el, m = new Map());
+    for (const [p, v, imp] of list) {
+      const cur = m.get(p);
+      if (!cur || imp > cur[1] || (imp === cur[1] && spec >= cur[2])) m.set(p, [v, imp, spec]);
+    }
+  };
+  for (const rules of sheets) for (const r of rules) for (const s of r.sels) {
+    let els;
+    try { els = doc.querySelectorAll(s.q); }
+    catch(e) {
+      if (r.hide) hidden.push(`${s.raw}{${r.decls.filter(([p]) => p === 'display' || p === 'visibility')
+        .map(([p, v]) => `${p}:${v}`).join(';')}}`);
+      continue;
+    }
+    for (const el of els) put(el, r.decls, s.spec);
+  }
+  for (const el of doc.querySelectorAll('[style]')) put(el, mobiDecls(el.getAttribute('style')), 1e9);
+  return {decl, hidden};
+}
+
+/** Computed MOBI-relevant style of an element from its declarations d and its parent's p. */
+function mobiComputed(tag, d, p) {
+  const val = prop => {
+    const x = d?.get(prop);
+    const v = x ? x[0].trim().toLowerCase() : null;
+    return v === 'unset' ? null : v;
+  };
+  const c = {};
+  let v = val('font-size'), size = null;
+  if (v === 'inherit') size = p.size;
+  else if (v === 'initial') size = 16;
+  else if (v) size = FONT_KW[v] ?? (v === 'smaller' ? p.size / 1.2 : v === 'larger' ? p.size * 1.2 : cssPx(v, p.size, p.size));
+  c.size = size ?? p.size * (MOBI_SIZE[tag] || 1);
+
+  v = val('font-weight');
+  c.weight = v === 'inherit' ? p.weight : v === 'bold' ? 700 : (v === 'normal' || v === 'initial') ? 400 :
+    v === 'bolder' ? (p.weight < 600 ? 700 : 900) : v === 'lighter' ? (p.weight < 600 ? 100 : 400) :
+    /^\d+$/.test(v || '') ? +v : MOBI_BOLD.has(tag) ? 700 : p.weight;
+  v = val('font-style');
+  c.italic = v === 'inherit' ? p.italic : (v === 'italic' || v === 'oblique') ? true :
+    (v === 'normal' || v === 'initial') ? false : MOBI_ITALIC.has(tag) || p.italic;
+  v = val('text-decoration-line');
+  const own = v && v !== 'inherit' ? {u: v.includes('underline'), s: v.includes('line-through')}
+                                    : {u: MOBI_DECO[tag] === 'u', s: MOBI_DECO[tag] === 's'};
+  c.u = p.u || own.u;
+  c.s = p.s || own.s;
+  v = val('text-align');
+  c.align = v === 'initial' ? null : v === 'start' || v === 'left' ? 'left' : v === 'end' || v === 'right' ? 'right' :
+    v === 'center' || v === '-webkit-center' || v === '-moz-center' ? 'center' : v === 'justify' ? 'justify' : p.align;
+  v = val('text-indent');
+  c.indent = v === 'inherit' || !v ? p.indent : v === 'initial' ? 0 : cssPx(v, c.size, 600) ?? p.indent;
+  v = val('color');
+  const col = v === 'initial' ? null : !v || v === 'inherit' || v === 'currentcolor' ? undefined : cssColor(v);
+  c.color = col === undefined ? p.color : col === '#000000' ? null : col;
+  v = val('visibility');
+  c.vis = v === 'hidden' || v === 'collapse' ? true : v === 'visible' ? false : p.vis;
+  c.hidden = val('display') === 'none' || c.vis;
+  // not inherited
+  const len = prop => { const x = val(prop); return x && x !== 'auto' && x !== 'inherit' ? cssPx(x, c.size, 600) : null; };
+  c.mt = len('margin-top');
+  c.mb = len('margin-bottom');
+  const ml = len('margin-left'), pl = len('padding-left');
+  c.ml = ml == null && pl == null ? null : (ml || 0) + (pl || 0);
+  c.center = val('margin-left') === 'auto' && val('margin-right') === 'auto';
+  c.pbBefore = /^(always|left|right|page)$/.test(val('page-break-before') || '');
+  c.pbAfter = /^(always|left|right|page)$/.test(val('page-break-after') || '');
+  v = val('vertical-align');
+  const vl = v ? cssPx(v, c.size, c.size) : null;
+  c.valign = /^(super|top|text-top)$/.test(v || '') || vl > 0 ? 'sup' :
+    /^(sub|bottom|text-bottom)$/.test(v || '') || vl < 0 ? 'sub' : null;
+  return c;
+}
+
+/** <font size> class (1..7) nearest to a px size. */
+function mobiFontN(px) {
+  let best = 3;
+  for (let n = 1; n <= 7; n++)
+    if (Math.abs(Math.log(px / FONT_PX[n])) < Math.abs(Math.log(px / FONT_PX[best]))) best = n;
+  return best;
+}
+/** width/height attribute value for a px length (Calibre mobimlize_measure: pt below 1em). */
+function mobiMeasure(px) {
+  return px < 0.5 ? '0pt' : px < 16 ? `${Math.round(px * 0.75)}pt` : `${Math.round(px / 16)}em`;
+}
+
+const MOBI_PAGEBREAK = 'epub2mobi:pagebreak';  // comment placeholder, becomes <mbp:pagebreak/>
+
+/**
+ * Rewrite the chapter body into MOBI 6 markup using cascade.decl (see the section comment)
+ * and return its serialisation. Changes the DOM: call it after the KF8 content is taken.
+ */
+function mobiMarkup(doc, body, decl) {
+  const mk = tag => doc.createElementNS(XHTML_NS, tag);
+  const isXhtml = n => n.namespaceURI === XHTML_NS || n.namespaceURI == null;
+  const isBlock = n => n.nodeType === 1 && isXhtml(n) && MOBI_BLOCK.has(n.localName.toLowerCase());
+  const hasInline = el => [...el.childNodes].some(n =>
+    n.nodeType === 3 ? /\S/.test(n.data) : n.nodeType === 1 && !isBlock(n));
+  const rename = (el, tag) => {
+    const n = mk(tag);
+    for (const a of [...el.attributes]) n.setAttributeNS(a.namespaceURI, a.name, a.value);
+    while (el.firstChild) n.appendChild(el.firstChild);
+    el.replaceWith(n);
+    return n;
+  };
+  // A hidden element goes; its link/TOC targets (aid + id/name) stay as empty anchors (an
+  // empty text node keeps the XML serialiser from writing <a/>, which HTML reads as open)
+  const hide = el => {
+    for (const e of [el, ...el.getElementsByTagName('*')]) {
+      if (!e.hasAttribute('aid') || !(e.hasAttribute('id') || e.hasAttribute('name'))) continue;
+      const a = mk('a');
+      a.setAttribute('aid', e.getAttribute('aid'));
+      a.appendChild(doc.createTextNode(''));
+      el.parentNode.insertBefore(a, el);
+    }
+    el.remove();
+  };
+  const wrapRuns = (el, wr, wrapped) => {
+    let run = [];
+    const flush = () => {
+      if (run.some(n => n.nodeType === 1 || (n.nodeType === 3 && /\S/.test(n.data)))) {
+        let outer = null, inner = null;
+        for (const [t, attrs] of wr) {
+          const w = mk(t);
+          made.push(w);
+          for (const k in attrs || {}) w.setAttribute(k, attrs[k]);
+          if (inner) inner.appendChild(w); else outer = w;
+          inner = w;
+        }
+        el.insertBefore(outer, run[0]);
+        for (const n of run) { inner.appendChild(n); wrapped.add(n); }
+      }
+      run = [];
+    };
+    for (const n of [...el.childNodes]) { if (isBlock(n)) flush(); else run.push(n); }
+    flush();
+  };
+
+  const made = [];  // inline wrappers created (see the end)
+  let pendV = 0, pendVA = false, pendBreak = false, seen = false;
+  // c: computed style of el; ms: what the markup around el already shows
+  const content = (el, tag, c, ms) => {
+    const block = MOBI_BLOCK.has(tag);
+    let outer = el;
+    if (block && el !== body) {
+      if (c.center) c.align = 'center';
+      // MOBI has no hanging indent: a negative text-indent is taken off the left margin
+      // (Calibre: indent < 0 and |indent| < left → left += indent, indent = 0)
+      let ml = c.ml, indent = c.indent;
+      if (indent != null && indent < 0) { if (ml) ml = Math.max(0, ml + indent); indent = 0; }
+      if (c.pbBefore && seen) pendBreak = true;
+      if (c.mt != null) { pendV = Math.max(pendV, c.mt); pendVA = true; }
+      if (MOBI_ALIGN.has(tag) && c.align) el.setAttribute('align', c.align);
+      if (hasInline(el)) {   // a paragraph: it takes the pending vertical space
+        if (MOBI_PARA.has(tag)) {
+          if (pendVA) el.setAttribute('height', mobiMeasure(Math.min(pendV, 32)));
+          if (indent != null) el.setAttribute('width', mobiMeasure(Math.min(indent, 160)));
+        }
+        pendV = 0; pendVA = false;
+      }
+      if (MOBI_QUOTE.has(tag) && ml != null && ml >= 8) {
+        for (let k = Math.min(3, Math.max(1, Math.round(ml / 32))); k > 0; k--) {
+          const bq = mk('blockquote');
+          outer.parentNode.insertBefore(bq, outer);
+          bq.appendChild(outer);
+          outer = bq;
+        }
+      }
+      if (pendBreak) { outer.parentNode.insertBefore(doc.createComment(MOBI_PAGEBREAK), outer); pendBreak = false; }
+    }
+    // inline formatting the markup does not show yet, outer → inner
+    const wr = [], inner = {...ms};
+    if (!block && c.valign && tag !== 'sup' && tag !== 'sub') { wr.push([c.valign]); inner.size *= 0.83; }
+    const n = mobiFontN(c.size), font = {};
+    if (n !== mobiFontN(inner.size)) { font.size = String(n); inner.size = FONT_PX[n]; }
+    if (c.color && c.color !== inner.color) { font.color = c.color; inner.color = c.color; }
+    if (font.size || font.color) wr.push(['font', font]);
+    if (c.weight >= 600 && !inner.bold) { wr.push(['b']); inner.bold = true; }
+    if (c.italic && !inner.italic) { wr.push(['i']); inner.italic = true; }
+    if (c.u && !inner.u) { wr.push(['u']); inner.u = true; }
+    if (c.s && !inner.s) { wr.push(['s']); inner.s = true; }
+    const kids = [...el.childNodes], wrapped = new Set();
+    if (wr.length && !MOBI_NO_TEXT.has(tag) && !MOBI_VOID.has(tag)) wrapRuns(el, wr, wrapped);
+    for (const k of kids) {
+      if (k.nodeType === 3) { if (/\S/.test(k.data)) seen = true; }
+      else if (k.nodeType === 1) visit(k, c, wrapped.has(k) ? inner : ms);
+    }
+    if (block) {
+      if (c.mb != null) { pendV = Math.max(pendV, c.mb); pendVA = true; }
+      if (c.pbAfter && seen) pendBreak = true;
+    }
+  };
+  const visit = (el, pc, ms) => {
+    if (!isXhtml(el)) { seen = true; return; }   // svg, math: as is
+    let tag = el.localName.toLowerCase();
+    const c = mobiComputed(tag, decl.get(el), pc);
+    if (c.hidden) { hide(el); return; }
+    // the style attribute is flattened like the sheets: a reader that still applies it (Calibre's
+    // MOBI reader does) would add its margins/padding to the markup's (e.g. a second indent)
+    el.removeAttribute('style');
+    if (tag === 'img') seen = true;
+    // a tag whose look the CSS cancels becomes a <span>
+    if (((tag === 'b' || tag === 'strong') && c.weight < 600 && !ms.bold) ||
+        (MOBI_ITALIC.has(tag) && tag !== 'address' && !c.italic && !ms.italic) ||
+        (MOBI_DECO[tag] === 'u' && !c.u) || (MOBI_DECO[tag] === 's' && !c.s)) {
+      el = rename(el, 'span');
+      tag = 'span';
+    }
+    const mt = {...ms, size: ms.size * (MOBI_SIZE[tag] || 1)};
+    if (MOBI_BOLD.has(tag)) mt.bold = true;
+    if (MOBI_ITALIC.has(tag)) mt.italic = true;
+    if (MOBI_DECO[tag]) mt[MOBI_DECO[tag]] = true;
+    if (tag === 'font') {
+      const s = el.getAttribute('size'), col = el.getAttribute('color');
+      if (/^[1-7]$/.test(s || '')) mt.size = FONT_PX[+s];
+      if (col && cssColor(col)) mt.color = cssColor(col);
+    }
+    content(el, tag, c, mt);
+  };
+
+  const root = {size: 16, weight: 400, italic: false, u: false, s: false, align: null, indent: null,
+                color: null, vis: false};
+  const html = doc.documentElement;
+  const bodyC = mobiComputed('body', decl.get(body), mobiComputed('html', decl.get(html), root));
+  content(body, 'body', bodyC, {bold: false, italic: false, u: false, s: false, size: 16, color: null});
+  // a wrapper whose run lost all its content (hidden elements removed after wrapping) goes
+  for (const w of made.reverse()) {
+    if (w.isConnected && !w.firstElementChild && !/\S/.test(w.textContent)) w.replaceWith(...w.childNodes);
+  }
+  return body.innerHTML.replaceAll(`<!--${MOBI_PAGEBREAK}-->`, '<mbp:pagebreak/>');
 }
 
 // ─── Internal links → kindle:pos:fid ─────────────────────────────────────────
@@ -1531,7 +2064,8 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
 const LINK_PLACEHOLDER = 'kindle:pos:fid:0000:off:';  // + 10 decimal digits
 const LINK_PLACEHOLDER_RE = /kindle:pos:fid:0000:off:\d{10}/g;
 
-/** Put the original hrefs back (MOBI v6, and KF8 links whose target chapter was skipped). */
+/** Put the original hrefs back (links whose target chapter was skipped; any placeholder
+ *  the MOBI v6 filepos rewrite did not reach). */
 function restoreLinks(content, links, onlyUnresolved = false) {
   if (!content.includes(LINK_PLACEHOLDER)) return content;
   return content.replace(LINK_PLACEHOLDER_RE, ph => {
@@ -1688,16 +2222,46 @@ function convertToAzw3(epub, format='azw3') {
       return `<img recindex="${recindex(ref[1])}"` +
         (w ? ` width="${w[1]}"` : '') + (h ? ` height="${h[1]}"` : '') + '/>';
     });
-    const toMobi6 = html => svgImageToImg(html).replace(/<[a-zA-Z](?:[^>"]|"[^"]*")*>/g, tag => tag
-      .replace(/\ssrc="kindle:embed:([0-9A-Va-v]+)"/, (_, n) => ` recindex="${recindex(n)}"`)
-      .replace(/\said="\d+"/, ''));
+    // Every attribute that may hold a kindle:embed URL (img src, video poster, svg image
+    // xlink:href, object data) becomes recindex; a <video> becomes an <img> of its
+    // poster (v6 readers cannot play video), or its fallback content without one.
+    const embedAttrRe = /\s(?:src|poster|data|(?:[\w-]+:)?href)="kindle:embed:([0-9A-Va-v]+)(?:\?[^"]*)?"/g;
+    const videoToImg = html => !html.includes('<video') ? html :
+      html.replace(/<video\b((?:[^>"]|"[^"]*")*)>([\s\S]*?)<\/video>/g, (m, attrs, inner) => {
+        const ref = /\sposter="kindle:embed:([0-9A-Va-v]+)[^"]*"/.exec(attrs);
+        return ref ? `<img recindex="${recindex(ref[1])}" alt=""/>`
+                   : inner.replace(/<source\b(?:[^>"]|"[^"]*")*>(?:<\/source>)?/g, '');
+      });
+    const toMobi6 = html => videoToImg(svgImageToImg(html)).replace(/<[a-zA-Z](?:[^>"]|"[^"]*")*>/g, tag => {
+      let first = true;
+      return tag.replace(embedAttrRe, (_, n) => first ? (first = false, ` recindex="${recindex(n)}"`) : '')
+        .replace(/\said="\d+"/, '');
+    });
     const pagebreak = '<mbp:pagebreak/>';
     const pagebreakB = enc.encode(pagebreak).length;
-    // Internal links keep their original href (no kindle:pos in MOBI v6). An SVG
-    // spine page (parseEpub svgPage) is left empty: old readers have no SVG; the
-    // chapter itself stays so chapter indices (NCX) match the KF8 ones.
+    // Internal links (Calibre writer2/serializer.py): <a filepos="NNNNNNNNNN">, the
+    // 10-digit decimal byte offset in the flat text of the target element's start tag
+    // (KindleUnpack inserts <a id="fileposN"/> exactly there; a link without fragment
+    // points at the chapter start, after its page break). The href placeholder first
+    // becomes filepos="<link number, 10 digits>", so every body already has its final
+    // length; markAids/takeAidMarks then measure the targets on the final strings and
+    // the numbers are replaced by the offsets below (same length: nothing moves). Links
+    // to a skipped chapter get their original href back. The bodies are the MOBI markup
+    // (chapter.mobiContent, see mobiMarkup) when parseEpub prepared it. An SVG spine
+    // page (parseEpub svgPage) is left empty: old readers have no SVG; the chapter
+    // itself stays so chapter indices (NCX) match the KF8 ones.
+    const links = epub.links || new Map();
+    const linkAid = l => (l.chapter >= 0 && l.frag && chapters[l.chapter].ids?.get(l.frag)) || null;
+    const wanted = tocAids.map(s => new Set(s));
+    for (const l of links.values()) { const a = linkAid(l); if (a) wanted[l.chapter].add(a); }
+    const A_TAG_RE = /<a(?=[\s>/])(?:[^>"]|"[^"]*")*>/g;
+    const toFilepos = html => !html.includes(LINK_PLACEHOLDER) ? html : html.replace(A_TAG_RE, tag =>
+      tag.replace(/\shref="(kindle:pos:fid:0000:off:(\d{10}))"/, (m, ph, n) => {
+        const l = links.get(ph);
+        return !l ? m : l.chapter < 0 ? ` href="${escAttr(l.href)}"` : ` filepos="${n}"`;
+      }));
     const marked = chapters.map((ch, i) => ch.svgPage ? {html: '', offsets: new Map()} :
-      takeAidMarks(toMobi6(markAids(restoreLinks(ch.content, epub.links), tocAids[i]))));
+      takeAidMarks(toMobi6(markAids(restoreLinks(toFilepos(ch.mobiContent ?? ch.content), links), wanted[i]))));
     const bodies = marked.map(m => m.html);
     tocOffsets = marked.map(m => m.offsets);
 
@@ -1719,7 +2283,14 @@ function convertToAzw3(epub, format='azw3') {
     });
     tocTextEnd = bodyOffset;  // end of the last chapter's content (Calibre: body_end_offset)
 
-    fullText = docHead + bodies.join(pagebreak) + docTail;
+    // filepos: link number → target offset in the flat text
+    const filepos = l => idxParts[l.chapter].flowStart + ((linkAid(l) && tocOffsets[l.chapter].get(linkAid(l))) || 0);
+    const finalBodies = bodies.map(b => !b.includes(' filepos="') ? b : b.replace(A_TAG_RE, tag =>
+      tag.replace(/\sfilepos="(\d{10})"/, (m, n) => {
+        const l = links.get(LINK_PLACEHOLDER + n);
+        return l && l.chapter >= 0 ? ` filepos="${String(filepos(l)).padStart(10, '0')}"` : m;
+      })));
+    fullText = docHead + finalBodies.join(pagebreak) + docTail;
     htmlByteLen = enc.encode(fullText).length;
     fdstEntries = [{start: 0, end: htmlByteLen}];  // unused for mobi6 but kept for symmetry
 
@@ -1919,6 +2490,7 @@ async function handleFile(file) {
     // Normal-size files that fail to parse are genuinely corrupt → fail fast.
     let buf = await file.arrayBuffer();
     let epub = null;
+    const fmt = document.querySelector('input[name="fmt"]:checked')?.value || 'azw3';
     const couldBeICloudStub = file.size < 500;
     const MAX_RETRIES = couldBeICloudStub ? 8 : 0;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -1931,7 +2503,7 @@ async function handleFile(file) {
           await new Promise(r => setTimeout(r, delay));
           buf = await file.arrayBuffer();
         }
-        epub = await parseEpub(buf);
+        epub = await parseEpub(buf, {mobi: fmt === 'mobi'});
         break; // success
       } catch(parseErr) {
         // JSZip throws different errors depending on how the file is broken:
@@ -1958,7 +2530,6 @@ async function handleFile(file) {
     setProgress(60);
     showStatus(`Converting "${epub.metadata.title}"…`, 'info');
     await new Promise(r => setTimeout(r, 20));
-    const fmt = document.querySelector('input[name="fmt"]:checked')?.value || 'azw3';
     const azw3 = convertToAzw3(epub, fmt);
     setProgress(95);
     const blob = new Blob([azw3], {type:'application/vnd.amazon.ebook'});
