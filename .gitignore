@@ -7,3 +7,9 @@
 .DS_Store
 __pycache__/
 *.pyc
+
+# Quality harness corpus, tools and outputs (large, untrusted downloads)
+tests/corpus/
+
+# Corpus archives (large downloads)
+epubs/
