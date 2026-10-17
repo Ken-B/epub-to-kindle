@@ -107,15 +107,38 @@
 </div>
 <footer>
   <a href="https://github.com/Ken-B/epub-to-kindle" target="_blank" rel="noopener">GitHub</a>
-  · v1.0.12 · GPL v3 · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
   · <span id="appVersion"></span>
+  · <a href="https://github.com/Ken-B/epub-to-kindle/blob/main/LICENSE" target="_blank" rel="noopener">GPL v3</a>
+  · KF8 logic from <a href="https://calibre-ebook.com" target="_blank" rel="noopener">Calibre</a>
 </footer>
 
 <script src="jszip.min.js"></script>
 <script>
+/*
+ * EPUB → AZW3 / MOBI converter (https://github.com/Ken-B/epub-to-kindle).
+ * Licensed under the GNU General Public License v3; see LICENSE in the repository:
+ * https://github.com/Ken-B/epub-to-kindle/blob/main/LICENSE
+ *
+ * Parts of this file are ported (translated from Python) from calibre,
+ * © Kovid Goyal and contributors, GNU GPL v3 (https://github.com/kovidgoyal/calibre):
+ *   - src/calibre/ebooks/mobi/writer8/index.py: TAGX/INDX records, skeleton, chunk and
+ *     NCX indices (buildTagx, buildIndxRecords, buildSkeletonIndex, buildChunkIndex,
+ *     buildNcxIndex)
+ *   - src/calibre/ebooks/mobi/utils.py: encint, CNCX records, create_text_record
+ *     (encint, buildCncxRecords, buildTextRecords)
+ *   - src/calibre/ebooks/mobi/writer8/main.py and skeleton.py: CSS and SVG flows,
+ *     resource links, kindle:pos internal links (makeCssFlows, extractContent,
+ *     resolveInternalLinks)
+ *   - src/calibre/ebooks/mobi/writer2/main.py and serializer.py: MOBI 6 header,
+ *     filepos links, recindex images (buildRecord0, convertToAzw3)
+ *   - src/calibre/ebooks/mobi/mobiml.py (MobiMLizer): CSS flattened into MOBI 6 markup
+ *     (mobiComputed, mobiMarkup, mobiMeasure)
+ * kf8-rs (https://github.com/codetheweb/kf8-rs, © its authors; no licence declared in
+ * the repository) was used as a format reference for the KF8 serialisation.
+ */
 'use strict';
 
-const APP_VERSION = 'v1.0.12';
+const APP_VERSION = 'v1.0.13';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -294,9 +317,10 @@ const TEXT_RECORD_SIZE = 4096;
  * multibyte trailing entry (extra_data_flags bit 0): overlap bytes + 1 byte
  * holding len(overlap). The overlap bytes also start the next record (duplicated).
  * With no overlap the trailing entry is a single 0x00 byte.
+ * text: a string or its UTF-8 bytes.
  */
 function buildTextRecords(text, compress) {
-  const bytes = enc.encode(text);
+  const bytes = typeof text === 'string' ? enc.encode(text) : text;
   const records = [];
   for (let pos = 0; pos < bytes.length; pos += TEXT_RECORD_SIZE) {
     const end = Math.min(pos + TEXT_RECORD_SIZE, bytes.length);
@@ -469,35 +493,14 @@ function buildSkeletonIndex(parts) {
 const CHUNK_TAGS = [{num:2,vpe:1,mask:1},{num:3,vpe:1,mask:2},{num:4,vpe:1,mask:4},{num:6,vpe:2,mask:8}];
 
 /**
- * Build CNCX record for chunk entries.
- * Each entry is VLQ-length-prefixed UTF-8 string.
- * Format per Calibre: "P-//*[@aid='AID_VALUE']"
- * Returns {record: Uint8Array, offsets: number[]}
- *
- * Calibre reads these as: cncx[cncx_offset] → aidtext
- * Then: aidtext = idtext[12:-2] → aid value (used only in fallback insert-pos calculation)
- */
-function buildCncx(selectors) {
-  const parts = [];
-  const offsets = [];
-  let byteOff = 0;
-  for (const sel of selectors) {
-    const sb = enc.encode(sel);
-    offsets.push(byteOff);
-    parts.push(encint(sb.length), sb);
-    byteOff += encint(sb.length).length + sb.length;
-  }
-  return { record: align4(concat(...parts)), offsets };
-}
-
-/**
  * parts: [{skelHeadByteLen, skelTailByteLen, contentByteLen, flowStart, chapterIndex, firstAid}]
  */
 function buildChunkIndex(parts) {
-  // Build CNCX selector strings: "P-//*[@aid='N']"
-  // Used by Calibre to find insert position in skeleton (fallback only)
+  // CNCX selector strings, one per chunk, format per Calibre: "P-//*[@aid='N']".
+  // Calibre reads cncx[cncx_offset] → aidtext, then idtext[12:-2] → the aid (used only in
+  // its fallback insert-position calculation). Written in chunk order, not de-duplicated.
   const selectors = parts.map(p => `P-//*[@aid='${p.firstAid}']`);
-  const { record: cncxRecord, offsets } = buildCncx(selectors);
+  const { records: cncxRecord, offsets } = buildCncxRecords(selectors, false);
 
   const entries = parts.map((p, i) => {
     // insertPos must be GLOBAL (absolute byte offset in full text) so each
@@ -556,27 +559,30 @@ const NCX_TAGS_MOBI6 = NCX_TAGS.filter(t => t.num !== 6);
 /**
  * CNCX records for index labels (Calibre mobi/utils.py CNCX): each string is
  * <encint(byte length)><UTF-8>, truncated to 500 characters, identical strings stored
- * once; a record holds at most 0x10000 - 1024 bytes and a string's offset is
- * record number * 0x10000 + offset in that record.
- * @returns {{records: Uint8Array[], offsetOf: Map<string, number>}}
+ * once (unless dedup is false); a record holds at most 0x10000 - 1024 bytes and a
+ * string's offset is record number * 0x10000 + offset in that record.
+ * @returns {{records: Uint8Array[], offsetOf: Map<string, number>, offsets: number[]}}
+ *          offsets[i]: offset of strings[i]
  */
-function buildCncxRecords(strings) {
-  const records = [], offsetOf = new Map();
+function buildCncxRecords(strings, dedup = true) {
+  const records = [], offsetOf = new Map(), offsets = [];
   const LIMIT = 0x10000 - 1024;
   let buf = [], used = 0;
   for (const s of strings) {
-    if (offsetOf.has(s)) continue;
+    if (dedup && offsetOf.has(s)) { offsets.push(offsetOf.get(s)); continue; }
     const cps = [...s];
     const b = enc.encode(cps.length > 500 ? cps.slice(0, 500).join('') : s);
     const raw = concat(encint(b.length), b);
     if (used + raw.length > LIMIT && used) {
       records.push(align4(concat(...buf))); buf = []; used = 0;
     }
-    offsetOf.set(s, records.length * 0x10000 + used);
+    const off = records.length * 0x10000 + used;
+    if (!offsetOf.has(s)) offsetOf.set(s, off);
+    offsets.push(off);
     buf.push(raw); used += raw.length;
   }
   if (used) records.push(align4(concat(...buf)));
-  return {records, offsetOf};
+  return {records, offsetOf, offsets};
 }
 
 /**
@@ -593,17 +599,28 @@ function buildNcxIndex(toc, textEnd, mobi6) {
   const indexOf = new Array(toc.length);
   order.forEach((ti, i) => { indexOf[ti] = i; });
 
-  // length: up to the nearest later offset among entries at the same or a shallower depth
+  // length: up to the nearest later offset among entries at the same or a shallower depth.
+  // One sweep by decreasing offset: the stack holds the candidates (entries with a larger
+  // offset) not dominated by a nearer, no deeper one, so from the top down their depths
+  // decrease and their offsets increase; an entry takes the topmost one no deeper than it.
+  // Entries with equal offsets are looked up before any of them is pushed (strictly later).
   const nextStart = new Array(toc.length).fill(textEnd);
-  const maxDepth = Math.max(...toc.map(e => e.depth));
-  for (let d = 0; d <= maxDepth; d++) {
-    const offs = toc.filter(e => e.depth <= d).map(e => e.offset).sort((a, b) => a - b);
-    toc.forEach((e, i) => {
-      if (e.depth !== d) return;
-      let lo = 0, hi = offs.length;  // first offset > e.offset
-      while (lo < hi) { const mid = (lo + hi) >> 1; if (offs[mid] > e.offset) hi = mid; else lo = mid + 1; }
-      if (lo < offs.length) nextStart[i] = offs[lo];
-    });
+  const byOffset = toc.map((_, i) => i).sort((a, b) => toc[b].offset - toc[a].offset);
+  const stack = [];  // [{offset, depth}], top = last
+  for (let g = 0; g < byOffset.length; ) {
+    let h = g;
+    while (h < byOffset.length && toc[byOffset[h]].offset === toc[byOffset[g]].offset) h++;
+    for (let k = g; k < h; k++) {
+      const i = byOffset[k];
+      for (let s = stack.length - 1; s >= 0; s--)
+        if (stack[s].depth <= toc[i].depth) { nextStart[i] = stack[s].offset; break; }
+    }
+    for (let k = g; k < h; k++) {
+      const e = toc[byOffset[k]];
+      while (stack.length && stack[stack.length - 1].depth >= e.depth) stack.pop();
+      stack.push({offset: e.offset, depth: e.depth});
+    }
+    g = h;
   }
 
   const {records: cncxRecords, offsetOf} = buildCncxRecords(toc.map(e => e.label));
@@ -726,11 +743,14 @@ function buildPalmDoc(title, records) {
 
 // ─── Language encoding ────────────────────────────────────────────────────────
 
-const LANG = {'af':54,'ar':1,'bg':2,'ca':3,'zh':4,'cs':5,'da':6,'nl':19,
+/** Object without prototype: lookups by book strings ('constructor', '__proto__') miss. */
+const dict = o => Object.assign(Object.create(null), o);
+
+const LANG = dict({'af':54,'ar':1,'bg':2,'ca':3,'zh':4,'cs':5,'da':6,'nl':19,
   'en':9,'et':37,'fi':11,'fr':12,'de':7,'el':8,'he':13,'hi':57,
   'hu':14,'id':33,'it':16,'ja':17,'ko':18,'lv':38,'lt':39,'ms':62,
   'no':20,'pl':21,'pt':22,'ro':24,'ru':25,'sr':26,'sk':27,'sl':36,
-  'es':10,'sv':29,'th':30,'tr':31,'uk':34,'vi':42};
+  'es':10,'sv':29,'th':30,'tr':31,'uk':34,'vi':42});
 
 function langCode(tag) { return LANG[(tag||'en').toLowerCase().split('-')[0]] || 9; }
 
@@ -774,6 +794,16 @@ function joinPath(dir, url) { return normPath(url.startsWith('/') ? url : dir + 
 function escAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+/** Escaped as element text (& and <). */
+function escText(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+/** Value of a serialised attribute (innerHTML escapes &, ", < and > or a subset, and &nbsp;). */
+function unescAttr(s) {
+  return s.replace(/&(?:(amp|quot|apos|lt|gt|nbsp)|#(\d+)|#x([0-9a-f]+));/gi, (m, name, dec, hex) => {
+    if (name) return {amp: '&', quot: '"', apos: "'", lt: '<', gt: '>', nbsp: '\u00a0'}[name.toLowerCase()];
+    const cp = dec ? +dec : parseInt(hex, 16);
+    return cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+  });
+}
 
 /** UTF-8 byte length of s[from:to] (same result as enc.encode(...).length, no allocation;
  *  a lone surrogate counts 3 bytes, as TextEncoder writes U+FFFD for it). */
@@ -805,15 +835,19 @@ function utf8Len(s, from = 0, to = s.length) {
 // Only sheets actually referenced (by a chapter or an @import) are written; identical
 // sheets share one flow. MOBI v6 has no flows: its CSS is flattened (mobiMarkup).
 
-const CSS_URL = String.raw`url\(\s*(?:"([^"]*)"|'([^']*)'|([^'")\s]*))\s*\)`;
+// Whitespace after the value only after a non-empty value: "\s*<empty>\s*" would make
+// `url(` + a long run of spaces without ")" quadratic.
+const CSS_URL = String.raw`url\(\s*(?:(?:"([^"]*)"|'([^']*)'|([^'")\s]+))\s*)?\)`;
 const CSS_URL_RE = new RegExp(CSS_URL, 'gi');
+// CDATA / HTML-comment wrappers around the text of a <style> (no-ops in CSS)
+const CSS_WRAPPER_RE = /<!\[CDATA\[|\]\]>|<!--|-->/g;
 const CSS_IMPORT_RE = new RegExp(String.raw`@import\s+(?:${CSS_URL}|"([^"]*)"|'([^']*)')([^;]*);`, 'gi');
 
 /**
  * @param {Map<string,string>} cssFiles - normalised zip path → stylesheet text
  * @param {Map<string,{idx:number,mt:string}>} imageByPath - normalised zip path → image resource
  * @returns {{flows: string[], sheet(path): number|null, inline(css, baseDir): number|null,
- *            svg(path, text): number|null}}
+ *            svg(path, bytes): number|null}}
  *          flows[k] is KF8 flow k+1 (stylesheets and SVG images); sheet()/inline()/svg()
  *          return the flow number to link
  */
@@ -859,8 +893,9 @@ function makeCssFlows(cssFiles, imageByPath) {
   // kindle:embed. TODO: inline <svg> in XHTML stays inline (Calibre moves it into
   // a flow too).
   const svgByPath = new Map();
-  function svg(path, text) {
+  function svg(path, bytes) {
     if (svgByPath.has(path)) return svgByPath.get(path);
+    const text = decodeText(bytes);
     let n = null;
     if (/<(?:[\w-]+:)?svg\b/.test(text)) {
       const markup = text.replace(/(<(?:[\w-]+:)?image\b[^>]*?\s(?:[\w-]+:)?href\s*=\s*)(["'])([^"']*)\2/g,
@@ -878,6 +913,11 @@ function makeCssFlows(cssFiles, imageByPath) {
   return { flows, sheet, inline: add, svg };
 }
 
+/** Stand-in for makeCssFlows when only MOBI v6 is written (it has no flows): no sheet is
+ *  linked, and an SVG image gets a dummy flow reference, which toMobi6 replaces by the
+ *  image's alt text (old readers cannot show SVG). */
+const NO_CSS_FLOWS = Object.freeze({flows: [], sheet: () => null, inline: () => null, svg: () => 1});
+
 // ─── Text decoding ───────────────────────────────────────────────────────────
 //
 // Text files are read as bytes and decoded by their declared charset (JSZip's
@@ -886,9 +926,11 @@ function makeCssFlows(cssFiles, imageByPath) {
 // else @charset (CSS), else <meta charset> / http-equiv content charset in the
 // first 1024 bytes, else UTF-8. A label TextDecoder does not know means UTF-8.
 // Undeclared or mis-declared Latin-1: when the UTF-8 result contains U+FFFD that
-// the bytes do not (no EF BF BD sequence) and the bytes are valid windows-1252
-// (none of its five undefined bytes), windows-1252 is used instead. No other
-// guessing (no statistical charset detection).
+// the bytes do not (no EF BF BD sequence), the bytes are valid windows-1252 (none of
+// its five undefined bytes) and they are not UTF-8 with a few stray bytes (there is no
+// valid multibyte UTF-8 sequence, or the invalid ones outnumber the valid ones more than
+// twice), windows-1252 is used instead. Otherwise the UTF-8 result stands, U+FFFD for
+// each invalid sequence. No other guessing (no statistical charset detection).
 
 function sniffCharset(b) {
   if (b[0] === 0xef && b[1] === 0xbb && b[2] === 0xbf) return 'utf-8';
@@ -915,6 +957,14 @@ function decodeText(bytes) {
     if (c === 0x81 || c === 0x8d || c === 0x8f || c === 0x90 || c === 0x9d) return text;
     if (c === 0xef && bytes[i + 1] === 0xbf && bytes[i + 2] === 0xbd) return text;  // real U+FFFD
   }
+  // Every U+FFFD is now an invalid sequence; every other non-ASCII character a valid one
+  let invalid = 0, valid = 0;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    if (c === 0xfffd) invalid++;
+    else if (c >= 0x80 && (c < 0xdc00 || c > 0xdfff)) valid++;  // a surrogate pair counts once
+  }
+  if (valid && invalid <= 2 * valid) return text;
   return new TextDecoder('windows-1252').decode(bytes);
 }
 
@@ -949,9 +999,24 @@ function spineKind(item) {
   return 'other';
 }
 
-/** opts.mobi (default true): also prepare the MOBI v6 markup (chapter.mobiContent). */
+/** RFC 4122 version 4 UUID (crypto.randomUUID needs iOS 15.4+ / a secure context). */
+function uuid4() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    try { return crypto.randomUUID(); } catch(e) {}
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 3) | 8).toString(16);
+  });
+}
+
+/** opts.mobi (default true): also prepare the MOBI v6 markup (chapter.mobiContent).
+ *  opts.kf8 (default true): also prepare the KF8 stylesheet/SVG flows (stylesheets);
+ *  without it the result is only good for convertToAzw3(…, 'mobi'). */
 async function parseEpub(buf, opts = {}) {
   const mobi = opts.mobi !== false;
+  const kf8 = opts.kf8 !== false;
+  _aid = 1;  // aids are assigned while parsing (extractContent), per book from 1
   const zip = await JSZip.loadAsync(buf, {decodeFileName: decodeZipName});
 
   // Zip entries by normalised name (normPath, Unicode NFC): hrefs are matched
@@ -998,13 +1063,12 @@ async function parseEpub(buf, opts = {}) {
     language: g('language') || 'en',
     description: g('description'),
     date:     g('date') || new Date().toISOString().slice(0,10),
-    identifier: g('identifier') || crypto.randomUUID(),
-    coverImage: null,  // filled below: {bytes: Uint8Array, mt: string}
+    identifier: g('identifier') || uuid4(),
   };
 
   // Manifest (ids, idrefs and fallbacks are XML IDs: surrounding whitespace is not
-  // part of them)
-  const manifest = {};
+  // part of them). No prototype: ids such as "constructor" or "__proto__" are plain keys.
+  const manifest = Object.create(null);
   for (const item of opf.querySelectorAll('manifest item'))
     manifest[(item.getAttribute('id') || '').trim()] = {
       href: (item.getAttribute('href') || '').trim(),
@@ -1013,28 +1077,15 @@ async function parseEpub(buf, opts = {}) {
       fallback: (item.getAttribute('fallback') || '').trim(),
     };
 
-  // Cover image — EPUB2: <meta name="cover" content="item-id">
-  //               EPUB3: manifest item with properties="cover-image"
-  {
-    let coverId = null;
-    for (const meta of opf.querySelectorAll('meta')) {
-      if (meta.getAttribute('name') === 'cover') { coverId = meta.getAttribute('content')?.trim(); break; }
-    }
-    // EPUB3 fallback
-    if (!coverId) {
-      for (const [id, item] of Object.entries(manifest)) {
-        if (item.properties.includes('cover-image')) { coverId = id; break; }
-      }
-    }
-    if (coverId && manifest[coverId]) {
-      const coverPath = resolve(manifest[coverId].href);
-      const coverFile = zipFile(coverPath);
-      if (coverFile) {
-        try {
-          const bytes = await coverFile.async('uint8array');
-          metadata.coverImage = { bytes, mt: manifest[coverId].mt || 'image/jpeg' };
-        } catch(e) { console.warn('Could not load cover:', e); }
-      }
+  // Cover image id — EPUB2: <meta name="cover" content="item-id">;
+  //                  EPUB3: manifest item with properties="cover-image"
+  let coverId = null;
+  for (const meta of opf.querySelectorAll('meta')) {
+    if (meta.getAttribute('name') === 'cover') { coverId = meta.getAttribute('content')?.trim(); break; }
+  }
+  if (!coverId) {
+    for (const [id, item] of Object.entries(manifest)) {
+      if (item.properties.includes('cover-image')) { coverId = id; break; }
     }
   }
 
@@ -1053,40 +1104,24 @@ async function parseEpub(buf, opts = {}) {
     // tocHref: the NCX/nav entry names the spine item itself, not its fallback
     if (item || first) spineItems.push({...(item || first), tocHref: first.href});
   }
-  const spineHrefs = spineItems.map(it => it.href).filter(Boolean);
+  // Link targets: a spine document, or the original item a fallback replaced (links name it)
+  const spinePaths = new Set(spineItems.flatMap(it => [it.href, it.tocHref])
+    .filter(Boolean).map(h => resolve(h)));
 
   // CSS. KF8: every stylesheet is read in full and written as its own flow
   // (makeCssFlows, below). MOBI v6 has no flows and no real CSS support: the CSS is
   // flattened into markup per chapter (mobiMarkup, which also removes hidden elements)
-  // and `css` (inlined in the MOBI <head>) ends up holding only the hiding rules the
-  // cascade could not match (see the end). Without opts.mobi it keeps the old fallback:
-  // the display:none / visibility:hidden rules of the manifest sheets.
-  let css = '';
-  const cssFiles = new Map();  // normalised zip path → stylesheet text (KF8 flows)
+  // and `css` (inlined in the MOBI <head>) holds only the hiding rules the cascade could
+  // not match (see the end).
+  const cssFiles = new Map();  // normalised zip path → stylesheet text
   for (const item of Object.values(manifest)) {
-    if (item.mt === 'text/css') {
-      const f = zipFile(resolve(item.href));
-      if (f) try {
-        const sheet = await readText(f);
-        cssFiles.set(resolve(item.href), sheet);
-        // Extract rules that contain display:none or visibility:hidden
-        // These prevent publisher watermarks from showing as gibberish
-        const criticalRules = [];
-        const ruleRe = /([^{}]+)\{([^}]*)\}/g;
-        let m;
-        while ((m = ruleRe.exec(sheet)) !== null) {
-          const decls = m[2];
-          if (/display\s*:\s*none|visibility\s*:\s*hidden/i.test(decls)) {
-            criticalRules.push(`${m[1].trim()}{${decls.trim()}}`);
-          }
-        }
-        if (criticalRules.length) css += criticalRules.join('\n') + '\n';
-      } catch(e){}
-    }
+    if (item.mt !== 'text/css') continue;
+    const f = zipFile(resolve(item.href));
+    if (f) try { cssFiles.set(resolve(item.href), await readText(f)); } catch(e) {}
   }
   // A chapter may <link> a sheet the manifest omits or lists with another
   // media-type (e.g. text/html); readers load it anyway, so every other *.css in
-  // the zip is read too (KF8 flows only; makeCssFlows writes only linked sheets).
+  // the zip is read too (only linked sheets become KF8 flows or MOBI cascade rules).
   for (const [name, entry] of zipByName) {
     if (!/\.css$/i.test(name) || cssFiles.has(name)) continue;
     try { cssFiles.set(name, await readText(entry)); } catch(e) {}
@@ -1097,19 +1132,8 @@ async function parseEpub(buf, opts = {}) {
   // (where XXXX is 1-indexed base-32). This is ~33% smaller than base64 in HTML
   // and required for correct image display on old Kindles (MOBI v6).
   const imageResources = [];   // [{bytes, mt, href}] in order
-  const imageIndex = {};       // href/filename → index in imageResources
+  const imageIndex = Object.create(null);  // href/filename → index in imageResources
   let coverResourceIdx = -1;
-
-  // Detect cover image ID first (EPUB2 meta or EPUB3 properties)
-  let coverId = null;
-  for (const meta of opf.querySelectorAll('meta')) {
-    if (meta.getAttribute('name') === 'cover') { coverId = meta.getAttribute('content')?.trim(); break; }
-  }
-  if (!coverId) {
-    for (const [id, item] of Object.entries(manifest)) {
-      if (item.properties.includes('cover-image')) { coverId = id; break; }
-    }
-  }
 
   for (const item of Object.values(manifest)) {
     if (!item.mt.startsWith('image/')) continue;
@@ -1149,9 +1173,7 @@ async function parseEpub(buf, opts = {}) {
     imageByPath.set(resolve(item.href), hit);
     imageIndex[item.href] = imageIndex[item.href.split('/').pop()] = hit.idx;
   }
-  // Keep coverImage on metadata for backwards compat (now points into imageResources)
-  metadata.coverImage = null;  // no longer needed separately
-  metadata.coverResourceIdx = coverResourceIdx;
+  metadata.coverResourceIdx = coverResourceIdx;  // index of the cover in imageResources (-1: none)
 
   // Table of contents: the full tree (order, nesting, labels, href#fragment targets)
   // from the EPUB3 nav, or the NCX when it has more entries (some navs are truncated).
@@ -1177,15 +1199,16 @@ async function parseEpub(buf, opts = {}) {
       } catch(e) { console.warn('Could not read TOC:', item.href, e); }
     }
   }
+  // (recursion depth: the parsers cap the tree at TOC_MAX_DEPTH levels)
   const countToc = nodes => nodes.reduce((n, t) => n + 1 + countToc(t.children), 0);
   const [tocTree, tocAlt] = countToc(tocNodes.ncx) > countToc(tocNodes.nav)
     ? [tocNodes.ncx, tocNodes.nav] : [tocNodes.nav, tocNodes.ncx];
 
-  // KF8 context shared by all chapters: stylesheet flows, and internal links
-  // (placeholder → {path, frag, href}; resolved to kindle:pos in convertToAzw3).
-  const cssFlows = makeCssFlows(cssFiles, imageByPath);
+  // Context shared by all chapters: KF8 stylesheet flows (none for a MOBI-only parse),
+  // and internal links (placeholder → {path, frag, href}; resolved to kindle:pos or
+  // filepos in convertToAzw3).
+  const cssFlows = kf8 ? makeCssFlows(cssFiles, imageByPath) : NO_CSS_FLOWS;
   const links = new Map();
-  const spinePaths = new Set(spineHrefs.map(h => resolve(h)));
   const mobiRules = new Map();  // MOBI cascade: parsed rules per stylesheet (mobiCssRules)
 
   const chapters = [];
@@ -1228,22 +1251,22 @@ async function parseEpub(buf, opts = {}) {
     const n = opf.querySelectorAll('spine itemref').length;
     throw new Error(`No readable chapters found in the EPUB spine (${n} spine item${n === 1 ? '' : 's'}, none could be opened)`);
   }
-  // Link targets → chapter index (-1: spine item was skipped; the link keeps its href)
-  const chapterOf = new Map(chapters.map((ch, i) => [ch.path, i]));
-  for (const l of links.values()) l.chapter = chapterOf.get(l.path) ?? -1;
-  // TOC targets → chapter: by the chapter's path or by the ORIGINAL spine item's path
-  // (tocPath: an item replaced by its fallback), matched NFC-normalised.
-  const tocChapterOf = new Map();
+  // Link and TOC targets → chapter index: by the chapter's path or by the ORIGINAL spine
+  // item's path (tocPath: an item replaced by its fallback), matched NFC-normalised; a
+  // document in the spine twice resolves to its first copy. -1: the spine item was
+  // skipped (a link then keeps its href).
+  const chapterOf = new Map();
   chapters.forEach((ch, i) => {
     for (const p of [ch.path, ch.tocPath]) {
       const k = p?.normalize('NFC');
-      if (k != null && !tocChapterOf.has(k)) tocChapterOf.set(k, i);
+      if (k != null && !chapterOf.has(k)) chapterOf.set(k, i);
     }
   });
-  const toc = resolveToc(tocTree, chapters, tocChapterOf) || resolveToc(tocAlt, chapters, tocChapterOf);
+  for (const l of links.values()) l.chapter = chapterOf.get(l.path.normalize('NFC')) ?? -1;
+  const toc = resolveToc(tocTree, chapters, chapterOf) || resolveToc(tocAlt, chapters, chapterOf);
   // MOBI v6 <style>: the MOBI markup already dropped every hidden element the cascade could
   // match; what is left are hiding rules whose selector querySelectorAll rejects
-  if (mobi) css = [...new Set(chapters.flatMap(ch => ch.mobiHidden || []))].map(r => r + '\n').join('');
+  const css = mobi ? [...new Set(chapters.flatMap(ch => ch.mobiHidden || []))].map(r => r + '\n').join('') : '';
   return {metadata, chapters, css, stylesheets: cssFlows.flows, links, imageResources, toc};
 }
 
@@ -1260,6 +1283,9 @@ const tocLabel = el => {
   return norm(el?.textContent) || norm(img?.getAttribute('alt'));
 };
 const tocKids = (el, name) => [...el.children].filter(c => c.localName.toLowerCase() === name);
+// TOC levels kept (deeper entries are dropped: no reader shows them, and the tree walkers
+// recurse once per level)
+const TOC_MAX_DEPTH = 64;
 
 /** Target of a TOC href, relative to the TOC document: {path, frag} (path normalised). */
 function tocTarget(href, tocPath) {
@@ -1278,23 +1304,23 @@ function parseNavToc(doc, tocPath) {
   const nav = navs.find(n => (n.getAttribute('epub:type') ||
       n.getAttributeNS('http://www.idpf.org/2007/ops', 'type') || '').split(/\s+/).includes('toc')) || navs[0];
   const ol = nav && [...nav.getElementsByTagName('*')].find(e => e.localName.toLowerCase() === 'ol');
-  const walk = list => tocKids(list, 'li').map(li => {
+  const walk = (list, depth) => tocKids(list, 'li').map(li => {
     const lab = [...li.children].find(c => /^(a|span)$/i.test(c.localName));
     return {label: tocLabel(lab), ...tocTarget(lab?.getAttribute('href'), tocPath),
-            children: tocKids(li, 'ol').flatMap(walk)};
+            children: depth + 1 < TOC_MAX_DEPTH ? tocKids(li, 'ol').flatMap(l => walk(l, depth + 1)) : []};
   });
-  return ol ? walk(ol) : [];
+  return ol ? walk(ol, 0) : [];
 }
 
 /** EPUB2 NCX: navMap → nested navPoint (navLabel/text, content@src). */
 function parseNcxToc(doc, tocPath) {
   const navMap = [...doc.getElementsByTagName('*')].find(e => e.localName.toLowerCase() === 'navmap');
-  const walk = el => tocKids(el, 'navpoint').map(np => ({
+  const walk = (el, depth) => tocKids(el, 'navpoint').map(np => ({
     label: tocLabel(tocKids(np, 'navlabel')[0] && tocKids(tocKids(np, 'navlabel')[0], 'text')[0]),
     ...tocTarget(tocKids(np, 'content')[0]?.getAttribute('src'), tocPath),
-    children: walk(np),
+    children: depth + 1 < TOC_MAX_DEPTH ? walk(np, depth + 1) : [],
   }));
-  return navMap ? walk(navMap) : [];
+  return navMap ? walk(navMap, 0) : [];
 }
 
 /**
@@ -1317,7 +1343,7 @@ function resolveToc(tree, chapters, chapterOf) {
       const aid = chapter >= 0 && n.frag ? chapters[chapter].ids?.get(n.frag) || null : null;
       out.push({label: n.label, chapter, aid, depth, parent, children: []});
       if (parent >= 0) out[parent].children.push(i);
-      walk(n.children, depth + 1, i);
+      if (depth + 1 < TOC_MAX_DEPTH) walk(n.children, depth + 1, i);
     }
   };
   walk(tree, 0, -1);
@@ -1351,14 +1377,24 @@ function skelAttrs(el, names = SKEL_ATTRS) {
 }
 
 /**
- * @param {Document} doc - parsed chapter DOM
- * @param {Object} imageIndex - map of image href/filename → index in imageResources
+ * One chapter: KF8 skeleton and content (aids, kindle:embed / kindle:flow resources,
+ * link placeholders) and, with ctx.mobi, the MOBI v6 markup (mobiMarkup). The MOBI part
+ * is optional: when it fails, the chapter keeps only the KF8 content (convertToAzw3 then
+ * uses that for MOBI too), it is never dropped.
+ * @param {Document} doc - parsed chapter DOM (changed)
+ * @param {Object} imageIndex - prototype-less map of image href/filename → index in imageResources
  * @param {string} chapterDir - chapter's directory prefix for resolving relative img src
- * @param {Object} ctx - {path: normalised zip path of this chapter, cssFlows: makeCssFlows()
- *                        result, links: Map placeholder → link target (filled here),
+ * @param {Object} ctx - {path: normalised zip path of this chapter,
+ *                        cssFlows: makeCssFlows() result (or NO_CSS_FLOWS),
+ *                        links: Map placeholder → link target (filled here),
  *                        spinePaths: Set of normalised spine document paths,
- *                        imageResources: parseEpub's [{bytes, mt, href}] (mime of svg refs)}
- * @returns {{skelHead, skelTail, content, firstAid, title, path, ids: Map<id, aid>}}
+ *                        imageResources: parseEpub's [{bytes, mt, href, path}],
+ *                        imageByPath: Map normalised path → {idx, mt},
+ *                        cssFiles: Map normalised path → stylesheet text,
+ *                        mobi: prepare the MOBI markup,
+ *                        mobiRules: Map sheet key → mobiCssRules() (cache, shared)}
+ * @returns {{skelHead, skelTail, content, firstAid, title, path, ids: Map<id, aid>,
+ *            mobiContent?: string, mobiHidden?: string[]}}
  */
 function extractContent(doc, imageIndex, chapterDir, ctx) {
   const head = doc.head || doc.querySelector('head');
@@ -1376,56 +1412,51 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
     const t = head.querySelector('title');
     const htmlTitle = t ? t.textContent.trim() : '';
     if (!chapterTitle) chapterTitle = htmlTitle;
-    headContent = `<title>${(chapterTitle || htmlTitle).replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n`;
+    headContent = `<title>${escText(chapterTitle || htmlTitle)}</title>\n`;
   }
 
-  // MOBI v6: match the author CSS against the untouched DOM (see mobiMarkup); the
-  // markup is rewritten at the end, after the KF8 content has been serialised.
-  let mobiCss = null;
-  if (ctx.mobi) {
-    const sheets = [];
-    for (const el of doc.querySelectorAll('link, style')) {
-      if (!(el.namespaceURI == null || el.namespaceURI === XHTML_NS)) continue;
-      if (el.hasAttribute('media') && !mobiMediaOk(el.getAttribute('media'))) continue;
-      let key, text, base;
-      if (el.localName.toLowerCase() === 'link') {
-        const rel = (el.getAttribute('rel') || '').toLowerCase().split(/\s+/);
-        if (!rel.includes('stylesheet') || rel.includes('alternate')) continue;
-        key = joinPath(dir, (el.getAttribute('href') || '').trim().split(/[?#]/)[0]);
-        if (!ctx.cssFiles?.has(key)) continue;
-        text = ctx.cssFiles.get(key); base = dirOf(key);
-      } else {
-        text = el.textContent.replace(/<!\[CDATA\[|\]\]>|<!--|-->/g, ''); base = dir; key = base + '\0' + text;
-      }
-      const cache = ctx.mobiRules || (ctx.mobiRules = new Map());
-      if (!cache.has(key)) cache.set(key, mobiCssRules(text, base, ctx.cssFiles, new Set([key])));
-      sheets.push(cache.get(key));
-    }
-    mobiCss = mobiCascade(doc, sheets);
-  }
-
-  // Stylesheets → KF8 flows, linked from the skeleton <head> in document order:
-  // <link rel=stylesheet> to a manifest sheet, and every XHTML <style> (head or
-  // body; a body <style> is removed so no CSS text stays in the chunk, and its
-  // link follows the head ones, as in the cascade). See makeCssFlows.
+  // Stylesheets, in document order: <link rel=stylesheet> and every XHTML <style> (head or
+  // body; SVG <style>s stay in their SVG).
+  // KF8: each becomes a flow (makeCssFlows) linked from the skeleton <head>; a body
+  // <style>'s link follows the head ones, as in the cascade, and no CSS text stays in the
+  // chunk. MOBI v6: the sheets whose media apply are matched against the untouched DOM
+  // (mobiCascade; the elements are removed only after that), and the markup is rewritten
+  // at the end, after the KF8 content has been serialised (mobiMarkup).
   let cssLinks = '';
-  for (const el of [...doc.querySelectorAll('link, style')]) {
-    if (el.namespaceURI && el.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue; // SVG <style>
-    let n = null;
+  const sheetEls = [], mobiSheets = [];
+  for (const el of doc.querySelectorAll('link, style')) {
+    if (el.namespaceURI && el.namespaceURI !== XHTML_NS) continue;  // SVG <style>
+    const media = el.getAttribute('media');
+    let path = null, text = null;
     if (el.localName.toLowerCase() === 'link') {
       const rel = (el.getAttribute('rel') || '').toLowerCase().split(/\s+/);
       if (!rel.includes('stylesheet') || rel.includes('alternate')) continue;
-      n = ctx.cssFlows.sheet(joinPath(dir, (el.getAttribute('href') || '').trim().split(/[?#]/)[0]));
+      path = joinPath(dir, (el.getAttribute('href') || '').trim().split(/[?#]/)[0]);
     } else {
       // CDATA / HTML-comment wrappers are no-ops in CSS, but readers turn a flow
       // containing "[CDATA[" into an inline <style> instead of a .css file
-      n = ctx.cssFlows.inline(el.textContent.replace(/<!\[CDATA\[|\]\]>|<!--|-->/g, ''), dir);
+      text = el.textContent.replace(CSS_WRAPPER_RE, '');
     }
-    el.remove();
-    const media = el.getAttribute('media');
+    sheetEls.push(el);
+    const n = path != null ? ctx.cssFlows.sheet(path) : ctx.cssFlows.inline(text, dir);
     if (n) cssLinks += `<link rel="stylesheet" type="text/css" href="${kindleFlowCss(n)}"` +
       (media ? ` media="${escAttr(media)}"` : '') + '/>\n';
+    if (ctx.mobi && (media == null || mobiMediaOk(media))) {
+      if (path == null) mobiSheets.push({key: dir + '\0' + text, text, base: dir});
+      else if (ctx.cssFiles?.has(path)) mobiSheets.push({key: path, text: ctx.cssFiles.get(path), base: dirOf(path)});
+    }
   }
+  let mobiCss = null;
+  if (ctx.mobi) {
+    try {
+      const cache = ctx.mobiRules;
+      mobiCss = mobiCascade(doc, mobiSheets.map(({key, text, base}) => {
+        if (!cache.has(key)) cache.set(key, mobiCssRules(text, base, ctx.cssFiles, new Set([key])));
+        return cache.get(key);
+      }));
+    } catch(e) { console.warn('MOBI styles skipped:', ctx.path, e); }
+  }
+  for (const el of sheetEls) el.remove();
 
   // html/body attributes the author CSS may select on (epub:type needs its namespace)
   const htmlAttrs = skelAttrs(doc.documentElement, new Set(['class', 'lang', 'xml:lang', 'dir']));
@@ -1463,7 +1494,7 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
       if (idx === undefined) return null;
       const r = ctx.imageResources[idx];
       if (r.mt === 'image/svg+xml') {
-        const n = ctx.cssFlows.svg(r.path ?? '', decodeText(r.bytes));
+        const n = ctx.cssFlows.svg(r.path ?? '', r.bytes);
         return n ? kindleFlowSvg(n) : null;
       }
       return `kindle:embed:${kindleEmbed(idx + 1)}` + (mime ? `?mime=${r.mt}` : '');
@@ -1570,7 +1601,11 @@ function extractContent(doc, imageIndex, chapterDir, ctx) {
 
   const content = body ? body.innerHTML : '';
   // MOBI v6 serialisation (changes the DOM, so strictly after the KF8 one)
-  const mobiContent = mobiCss && body ? mobiMarkup(doc, body, mobiCss.decl) : undefined;
+  let mobiContent;
+  if (mobiCss && body) {
+    try { mobiContent = mobiMarkup(doc, body, mobiCss.decl); }
+    catch(e) { console.warn('MOBI markup skipped:', ctx.path, e); }
+  }
   return {skelHead, skelTail, content, firstAid, title: chapterTitle, path: ctx.path, ids,
           mobiContent, mobiHidden: mobiCss?.hidden};
 }
@@ -1619,17 +1654,17 @@ const MOBI_NO_TEXT = new Set(['ul', 'ol', 'dl', 'menu', 'table', 'thead', 'tbody
 const MOBI_VOID = new Set(['img', 'br', 'hr', 'wbr', 'col', 'input', 'area', 'source', 'track', 'embed', 'param']);
 const MOBI_BOLD = new Set(['b', 'strong', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'th']);
 const MOBI_ITALIC = new Set(['i', 'em', 'cite', 'var', 'dfn', 'address']);
-const MOBI_SIZE = {h1: 2, h2: 1.5, h3: 1.17, h4: 1, h5: 0.83, h6: 0.67, small: 0.83, big: 1.2, sub: 0.83, sup: 0.83};
-const MOBI_DECO = {u: 'u', ins: 'u', s: 's', strike: 's', del: 's'};
+const MOBI_SIZE = dict({h1: 2, h2: 1.5, h3: 1.17, h4: 1, h5: 0.83, h6: 0.67, small: 0.83, big: 1.2, sub: 0.83, sup: 0.83});
+const MOBI_DECO = dict({u: 'u', ins: 'u', s: 's', strike: 's', del: 's'});
 const FONT_PX = [0, 10, 13, 16, 18, 24, 32, 48];  // <font size=N> (HTML 3.2), 3 = 16px normal
-const FONT_KW = {'xx-small': 9, 'x-small': 10, small: 13, medium: 16, large: 18, 'x-large': 24,
-  'xx-large': 32, 'xxx-large': 48};
-const CSS_COLORS = {black: '000000', white: 'ffffff', gray: '808080', grey: '808080', silver: 'c0c0c0',
+const FONT_KW = dict({'xx-small': 9, 'x-small': 10, small: 13, medium: 16, large: 18, 'x-large': 24,
+  'xx-large': 32, 'xxx-large': 48});
+const CSS_COLORS = dict({black: '000000', white: 'ffffff', gray: '808080', grey: '808080', silver: 'c0c0c0',
   red: 'ff0000', maroon: '800000', green: '008000', lime: '00ff00', blue: '0000ff', navy: '000080',
   purple: '800080', teal: '008080', olive: '808000', yellow: 'ffff00', fuchsia: 'ff00ff', aqua: '00ffff',
   orange: 'ffa500', brown: 'a52a2a', darkgray: 'a9a9a9', darkgrey: 'a9a9a9', dimgray: '696969',
   dimgrey: '696969', lightgray: 'd3d3d3', lightgrey: 'd3d3d3', darkred: '8b0000', darkblue: '00008b',
-  darkgreen: '006400'};
+  darkgreen: '006400'});
 
 /** Split s on sep outside (), [] and strings. */
 function cssSplit(s, sep) {
@@ -1759,49 +1794,63 @@ function cssColor(v) {
   return CSS_COLORS[v] ? '#' + CSS_COLORS[v] : undefined;
 }
 
-/** Does a media query list apply to a MOBI 6 reader (a 600 × 800 screen, light)? */
+/** Does a media query list apply to a MOBI 6 reader (a 600 × 800 screen, light)?
+ *  "not …" negates a query that is understood ("not amzn-kf8", "not print"); a query
+ *  with an unknown media feature never applies, negated or not. */
 function mobiMediaOk(q) {
   q = (q || '').trim().toLowerCase();
   if (!q) return true;
-  return cssSplit(q, ',').some(mq => mq.trim().replace(/^only\s+/, '').split(/\s+and\s+/).every((p, k) => {
-    if (k === 0 && /^[a-z-]+$/.test(p)) return /^(all|screen|amzn-mobi)$/.test(p);
-    const f = /^\(\s*([\w-]+)\s*(?::\s*(.+?))?\s*\)$/.exec(p);
-    if (!f) return false;
-    const v = f[2] || '', px = cssPx(v, 16, null);
-    switch (f[1]) {
-      case 'prefers-color-scheme': return v !== 'dark';
-      case 'min-width': return px != null && px <= 600;
-      case 'max-width': return px != null && px >= 600;
-      case 'min-height': return px != null && px <= 800;
-      case 'max-height': return px != null && px >= 800;
-      case 'orientation': return v === 'portrait';
-    }
-    return false;
-  }));
+  return cssSplit(q, ',').some(mq => {
+    mq = mq.trim().replace(/^only\s+/, '');
+    const not = /^not\s+/.test(mq);
+    let known = true;
+    const ok = mq.replace(/^not\s+/, '').split(/\s+and\s+/).every((p, k) => {
+      if (k === 0 && /^[a-z][a-z0-9-]*$/.test(p)) return /^(all|screen|amzn-mobi)$/.test(p);  // media type
+      const f = /^\(\s*([\w-]+)\s*(?::([^)]*))?\)$/.exec(p);
+      if (!f) { known = false; return false; }
+      const v = (f[2] || '').trim(), px = cssPx(v, 16, null);
+      switch (f[1]) {
+        case 'prefers-color-scheme': return v !== 'dark';
+        case 'min-width': return px != null && px <= 600;
+        case 'max-width': return px != null && px >= 600;
+        case 'min-height': return px != null && px <= 800;
+        case 'max-height': return px != null && px >= 800;
+        case 'orientation': return v === 'portrait';
+      }
+      known = false;
+      return false;
+    });
+    return not ? known && !ok : ok;
+  });
 }
 function mobiSupportsOk(cond) {
   try { return typeof CSS !== 'undefined' && CSS.supports(cond.trim()); } catch(e) { return false; }
 }
 
+// Nesting kept in the MOBI cascade (@media/@supports/@layer blocks, @import chains); deeper
+// blocks are ignored, which also bounds the recursion of mobiCssRules
+const CSS_MAX_DEPTH = 64;
+
 /** Rules of one stylesheet for the MOBI cascade, in source order: [{sels: [{q, raw, spec}],
  *  decls, hide}]; @import (through cssFiles), @media/@supports/@layer blocks inlined when they apply. */
-function mobiCssRules(css, baseDir, cssFiles, seen = new Set()) {
+function mobiCssRules(css, baseDir, cssFiles, seen = new Set(), depth = 0) {
   const out = [];
-  const add = text => {
+  const add = (text, level) => {
+    if (level >= CSS_MAX_DEPTH) return;
     for (const {prelude, body} of cssBlocks(text)) {
       if (prelude.startsWith('@')) {
         const m = /^@([\w-]+)\s*([\s\S]*)$/.exec(prelude);
         if (!m) continue;
         const name = m[1].toLowerCase(), rest = m[2].trim();
         if (body != null) {
-          if (name === 'media' ? mobiMediaOk(rest) : name === 'supports' ? mobiSupportsOk(rest) : name === 'layer') add(body);
+          if (name === 'media' ? mobiMediaOk(rest) : name === 'supports' ? mobiSupportsOk(rest) : name === 'layer') add(body, level + 1);
         } else if (name === 'import') {
           const im = /^(?:url\(\s*)?["']?([^"')\s]+)["']?\s*\)?\s*(.*)$/.exec(rest);
           if (!im || !mobiMediaOk(im[2])) continue;
           const path = joinPath(baseDir, im[1].split(/[?#]/)[0]);
           if (seen.has(path) || !cssFiles?.has(path)) continue;
           seen.add(path);
-          out.push(...mobiCssRules(cssFiles.get(path), dirOf(path), cssFiles, seen));
+          for (const r of mobiCssRules(cssFiles.get(path), dirOf(path), cssFiles, seen, level + 1)) out.push(r);
         }
         continue;
       }
@@ -1818,14 +1867,93 @@ function mobiCssRules(css, baseDir, cssFiles, seen = new Set()) {
         p === 'display' && /^none$/i.test(v) || p === 'visibility' && /^(hidden|collapse)$/i.test(v))});
     }
   };
-  add(css.replace(/\/\*[\s\S]*?\*\//g, ''));
+  add(css.replace(/\/\*[\s\S]*?\*\//g, ''), depth);
   return out;
 }
 
+const CSS_IDENT_RE = /^[\w\u0080-\uffff-]+/;
+
+/** What an element needs to match a selector, from its rightmost compound: {tag, classes,
+ *  ids} (lower-cased: HTML and quirks-mode matching ignore ASCII case, so a test against
+ *  lower-cased names can only over-approximate), or null when not worked out (escapes, namespaces,
+ *  anything unexpected). Only meaningful for a selector querySelectorAll accepts. */
+function mobiSelectorNeeds(sel) {
+  if (/[\\|]/.test(sel)) return null;
+  // the rightmost compound starts after the last combinator outside (), [] and strings
+  let start = 0, depth = 0, q = null;
+  for (let i = 0; i < sel.length; i++) {
+    const c = sel[i];
+    if (q) { if (c === q) q = null; continue; }
+    if (c === '"' || c === "'") q = c;
+    else if (c === '(' || c === '[') depth++;
+    else if (c === ')' || c === ']') depth--;
+    else if (depth === 0 && /[\s>+~]/.test(c)) start = i + 1;
+  }
+  const comp = sel.slice(start);
+  const need = {tag: null, classes: [], ids: []};
+  // skip a balanced (…) or […] starting at j; returns the index after it
+  const skip = j => {
+    let d = 0, qq = null;
+    for (; j < comp.length; j++) {
+      const c = comp[j];
+      if (qq) { if (c === qq) qq = null; continue; }
+      if (c === '"' || c === "'") qq = c;
+      else if (c === '(' || c === '[') d++;
+      else if ((c === ')' || c === ']') && --d === 0) return j + 1;
+    }
+    return -1;
+  };
+  let i = 0, m;
+  if ((m = CSS_IDENT_RE.exec(comp))) { need.tag = m[0].toLowerCase(); i = m[0].length; }
+  while (i < comp.length) {
+    const c = comp[i];
+    if (c === '*') { i++; continue; }
+    if (c === '.' || c === '#') {
+      if (!(m = CSS_IDENT_RE.exec(comp.slice(i + 1)))) return null;
+      (c === '.' ? need.classes : need.ids).push(m[0].toLowerCase());
+      i += 1 + m[0].length;
+    } else if (c === '[') {
+      if ((i = skip(i)) < 0) return null;
+    } else if (c === ':') {
+      while (comp[i] === ':') i++;
+      if (!(m = CSS_IDENT_RE.exec(comp.slice(i)))) return null;
+      i += m[0].length;
+      if (comp[i] === '(' && (i = skip(i)) < 0) return null;
+    } else return null;
+  }
+  return need;
+}
+let _selectorProbe = null;  // empty fragment: querySelector on it only checks the syntax
+function mobiSelectorValid(q) {
+  try { (_selectorProbe ||= document.createDocumentFragment()).querySelector(q); return true; }
+  catch(e) { return false; }
+}
+
 /** Winning declarations per element: {decl: Map<Element, Map<prop, [value, important, spec]>>,
- *  hidden: ["selector{display:none}"] for hiding rules whose selector querySelectorAll rejects}. */
+ *  hidden: ["selector{display:none}"] for hiding rules whose selector querySelectorAll rejects}.
+ *  A selector whose rightmost compound names a tag, class or id the chapter does not have
+ *  (mobiSelectorNeeds) cannot match and is not run (chapters × selectors querySelectorAll
+ *  calls otherwise); the facts about a selector are cached on the shared rule object. */
 function mobiCascade(doc, sheets) {
   const decl = new Map(), hidden = [];
+  // tag names, class names and ids present in the chapter (lower-cased)
+  const tags = new Set(), classes = new Set(), ids = new Set();
+  if (sheets.length) {
+    const rawTags = new Set(), rawClasses = new Set();
+    for (const el of doc.getElementsByTagName('*')) rawTags.add(el.localName);
+    for (const t of rawTags) tags.add(t.toLowerCase());
+    for (const el of doc.querySelectorAll('[class]')) rawClasses.add(el.getAttribute('class'));
+    for (const cl of rawClasses) for (const c of cl.split(/[ \t\n\f\r]+/)) if (c) classes.add(c.toLowerCase());
+    for (const el of doc.querySelectorAll('[id]')) ids.add(el.getAttribute('id').toLowerCase());
+  }
+  const cannotMatch = s => {
+    if (s.need === undefined) s.need = mobiSelectorNeeds(s.q);
+    const n = s.need;
+    if (!n || ((!n.tag || tags.has(n.tag)) && n.classes.every(c => classes.has(c)) &&
+               n.ids.every(c => ids.has(c)))) return false;
+    if (s.valid === undefined) s.valid = mobiSelectorValid(s.q);
+    return s.valid;  // an invalid selector still goes to querySelectorAll (→ hidden)
+  };
   const put = (el, list, spec) => {
     let m = decl.get(el);
     if (!m) decl.set(el, m = new Map());
@@ -1835,6 +1963,7 @@ function mobiCascade(doc, sheets) {
     }
   };
   for (const rules of sheets) for (const r of rules) for (const s of r.sels) {
+    if (cannotMatch(s)) continue;
     let els;
     try { els = doc.querySelectorAll(s.q); }
     catch(e) {
@@ -1914,6 +2043,8 @@ function mobiMeasure(px) {
 }
 
 const MOBI_PAGEBREAK = 'epub2mobi:pagebreak';  // comment placeholder, becomes <mbp:pagebreak/>
+// Element nesting mobiMarkup rewrites (it recurses per level; HTML parsing caps trees at 512)
+const MOBI_MAX_DEPTH = 512;
 
 /**
  * Rewrite the chapter body into MOBI 6 markup using cascade.decl (see the section comment)
@@ -1927,7 +2058,10 @@ function mobiMarkup(doc, body, decl) {
     n.nodeType === 3 ? /\S/.test(n.data) : n.nodeType === 1 && !isBlock(n));
   const rename = (el, tag) => {
     const n = mk(tag);
-    for (const a of [...el.attributes]) n.setAttributeNS(a.namespaceURI, a.name, a.value);
+    // an attribute without namespace keeps its qualified name (text/html chapters: epub:type,
+    // xml:lang, xmlns:x are plain names there; setAttributeNS(null, "epub:type") throws)
+    for (const a of [...el.attributes])
+      a.namespaceURI ? n.setAttributeNS(a.namespaceURI, a.name, a.value) : n.setAttribute(a.name, a.value);
     while (el.firstChild) n.appendChild(el.firstChild);
     el.replaceWith(n);
     return n;
@@ -2019,8 +2153,9 @@ function mobiMarkup(doc, body, decl) {
       if (c.pbAfter && seen) pendBreak = true;
     }
   };
+  let level = 0;  // element nesting: beyond MOBI_MAX_DEPTH a subtree is left as is
   const visit = (el, pc, ms) => {
-    if (!isXhtml(el)) { seen = true; return; }   // svg, math: as is
+    if (!isXhtml(el) || level >= MOBI_MAX_DEPTH) { seen = true; return; }   // svg, math: as is
     let tag = el.localName.toLowerCase();
     const c = mobiComputed(tag, decl.get(el), pc);
     if (c.hidden) { hide(el); return; }
@@ -2044,7 +2179,8 @@ function mobiMarkup(doc, body, decl) {
       if (/^[1-7]$/.test(s || '')) mt.size = FONT_PX[+s];
       if (col && cssColor(col)) mt.color = cssColor(col);
     }
-    content(el, tag, c, mt);
+    level++;
+    try { content(el, tag, c, mt); } finally { level--; }
   };
 
   const root = {size: 16, weight: 400, italic: false, u: false, s: false, align: null, indent: null,
@@ -2062,7 +2198,14 @@ function mobiMarkup(doc, body, decl) {
 // ─── Internal links → kindle:pos:fid ─────────────────────────────────────────
 
 const LINK_PLACEHOLDER = 'kindle:pos:fid:0000:off:';  // + 10 decimal digits
-const LINK_PLACEHOLDER_RE = /kindle:pos:fid:0000:off:\d{10}/g;
+const LINK_PLACEHOLDER_ESC = LINK_PLACEHOLDER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');  // as regex source
+const LINK_PLACEHOLDER_RE = new RegExp(LINK_PLACEHOLDER_ESC + String.raw`\d{10}`, 'g');
+
+// A start tag in serialised markup (innerHTML always double-quotes attribute values, so a
+// '>' inside "…" is skipped): START_TAG_BODY is what follows the name, up to the '>'
+const START_TAG_BODY = String.raw`(?:[^>"]|"[^"]*")*`;
+const START_TAG = String.raw`<[a-zA-Z]${START_TAG_BODY}>`;
+const START_TAG_RE = new RegExp(START_TAG, 'g');  // for replace() only (exec loops: own copy)
 
 /** Put the original hrefs back (links whose target chapter was skipped; any placeholder
  *  the MOBI v6 filepos rewrite did not reach). */
@@ -2077,8 +2220,7 @@ function restoreLinks(content, links, onlyUnresolved = false) {
 /** Byte offset (in html's UTF-8 encoding) of the '<' of the start tag carrying each wanted aid. */
 function aidOffsets(html, wanted) {
   const res = new Map();
-  // innerHTML always double-quotes attribute values, so a '>' inside "…" is skipped
-  const tagRe = /<[a-zA-Z](?:[^>"]|"[^"]*")*>/g;
+  const tagRe = new RegExp(START_TAG, 'g');
   let m, last = 0, bytes = 0;
   while (res.size < wanted.size && (m = tagRe.exec(html))) {
     const a = /\said="([^"]*)"/.exec(m[0]);
@@ -2097,11 +2239,13 @@ function aidOffsets(html, wanted) {
  *  returns where they were: {html, offsets: Map<aid, UTF-8 byte offset>}. */
 function markAids(html, wanted) {
   if (!wanted?.size) return html;
-  return html.replace(/<[a-zA-Z](?:[^>"]|"[^"]*")*>/g, tag => {
+  return html.replace(START_TAG_RE, tag => {
     const a = /\said="([^"]*)"/.exec(tag);
     return a && wanted.has(a[1]) ? `\0${a[1]}\0${tag}` : tag;
   });
 }
+// A run of aid marks (markAids) in front of a start tag
+const AID_MARKS = String.raw`(?:\0[^\0<]*\0)*`;
 function takeAidMarks(html) {
   const offsets = new Map();
   if (!html.includes('\0')) return {html, offsets};
@@ -2169,15 +2313,18 @@ function resolveInternalLinks(chapters, links) {
 // ─── EPUB → AZW3 converter ───────────────────────────────────────────────────
 
 // <svg …> + one <image …/> + </svg>, whitespace only in between (serialised
-// markup: attribute values are double-quoted); group 1 = the image's attributes
-const START_TAG_BODY = String.raw`(?:[^>"]|"[^"]*")*`;
+// markup: attribute values are double-quoted), the <image> possibly preceded by aid
+// marks (markAids: a link/TOC target); group 1 = the marks, group 2 = the image's attributes
 const SVG_IMAGE_ONLY_RE = new RegExp(
-  String.raw`<svg\b${START_TAG_BODY}>\s*<image\b(${START_TAG_BODY})>\s*(?:<\/image>\s*)?<\/svg>`, 'g');
+  String.raw`<svg\b${START_TAG_BODY}>\s*(${AID_MARKS})<image\b(${START_TAG_BODY})>\s*(?:<\/image>\s*)?<\/svg>`, 'g');
+const VIDEO_RE = new RegExp(String.raw`<video\b(${START_TAG_BODY})>([\s\S]*?)<\/video>`, 'g');
+const SOURCE_TAG_RE = new RegExp(String.raw`<source\b${START_TAG_BODY}>(?:<\/source>)?`, 'g');
+const A_TAG_RE = new RegExp(String.raw`<a(?=[\s>/])${START_TAG_BODY}>`, 'g');
+const HREF_PLACEHOLDER_RE = new RegExp(String.raw`\shref="(${LINK_PLACEHOLDER_ESC}(\d{10}))"`);
 
 function convertToAzw3(epub, format='azw3') {
   // format: 'azw3' = KF8 (file_version=8), 'mobi' = MOBI v6 (file_version=6)
   // MOBI v6 is needed for old Kindles (Kindle Keyboard etc) — no FDST/skeleton/chunk
-  _aid = 1;
   const {metadata, chapters, css} = epub;
   const mobi6 = format === 'mobi';
 
@@ -2188,7 +2335,7 @@ function convertToAzw3(epub, format='azw3') {
   // the subsequent <head><style> blocks appear after </html> and render as
   // visible text. Fix: one <html> wrapper for the whole book, CSS once in
   // <head>, all chapter content concatenated in <body>.
-  let fullText, textLen, idxParts, htmlByteLen, fdstEntries;
+  let fullText, idxParts, fdstEntries;
   // Table of contents; per chapter, the aids of the TOC targets in it, and (set below)
   // their byte offsets in the chapter's final text and where the TOC's text ends
   const toc = tocEntries(epub);
@@ -2201,10 +2348,10 @@ function convertToAzw3(epub, format='azw3') {
     const docHead =
       `<html xmlns="http://www.w3.org/1999/xhtml">\n` +
       `<head>\n<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n` +
-      `<title>${metadata.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</title>\n` +
+      `<title>${escText(metadata.title)}</title>\n` +
       styleBlock + `</head>\n<body>\n`;
     const docTail = `</body>\n</html>\n`;
-    const docHeadB = enc.encode(docHead).length;
+    const docHeadB = utf8Len(docHead);
 
     // MOBI v6 markup (Calibre writer2/serializer.py, mobiml.py): chapters are
     // separated by <mbp:pagebreak/>, images are <img recindex="NNNNN"/> (1-based
@@ -2213,13 +2360,16 @@ function convertToAzw3(epub, format='azw3') {
     // (innerHTML always double-quotes values, so a '>' inside "..." is skipped).
     // Old readers have no SVG: an <svg> whose only content is one <image> (the usual
     // svg-wrapped cover) becomes <img recindex> with the image's width/height;
-    // any other SVG is left as is.
+    // any other SVG is left as is. An <img> of an SVG file (a KF8 flow, kindle:flow:…)
+    // becomes its alt text (nothing without one). Aid marks (markAids) inside a replaced
+    // construct are kept, in front of the replacement.
     const recindex = n => String(parseInt(n, 32)).padStart(5, '0');
-    const svgImageToImg = html => html.replace(SVG_IMAGE_ONLY_RE, (m, attrs) => {
+    const marksIn = html => (html.match(/\0[^\0<]*\0/g) || []).join('');
+    const svgImageToImg = html => html.replace(SVG_IMAGE_ONLY_RE, (m, marks, attrs) => {
       const ref = /\s(?:[\w-]+:)?href="kindle:embed:([0-9A-Va-v]+)[^"]*"/.exec(attrs);
       if (!ref) return m;
       const w = /\swidth="([^"]*)"/.exec(attrs), h = /\sheight="([^"]*)"/.exec(attrs);
-      return `<img recindex="${recindex(ref[1])}"` +
+      return `${marks}<img recindex="${recindex(ref[1])}"` +
         (w ? ` width="${w[1]}"` : '') + (h ? ` height="${h[1]}"` : '') + '/>';
     });
     // Every attribute that may hold a kindle:embed URL (img src, video poster, svg image
@@ -2227,18 +2377,23 @@ function convertToAzw3(epub, format='azw3') {
     // poster (v6 readers cannot play video), or its fallback content without one.
     const embedAttrRe = /\s(?:src|poster|data|(?:[\w-]+:)?href)="kindle:embed:([0-9A-Va-v]+)(?:\?[^"]*)?"/g;
     const videoToImg = html => !html.includes('<video') ? html :
-      html.replace(/<video\b((?:[^>"]|"[^"]*")*)>([\s\S]*?)<\/video>/g, (m, attrs, inner) => {
+      html.replace(VIDEO_RE, (m, attrs, inner) => {
         const ref = /\sposter="kindle:embed:([0-9A-Va-v]+)[^"]*"/.exec(attrs);
-        return ref ? `<img recindex="${recindex(ref[1])}" alt=""/>`
-                   : inner.replace(/<source\b(?:[^>"]|"[^"]*")*>(?:<\/source>)?/g, '');
+        return ref ? `${marksIn(inner)}<img recindex="${recindex(ref[1])}" alt=""/>`
+                   : inner.replace(SOURCE_TAG_RE, '');
       });
-    const toMobi6 = html => videoToImg(svgImageToImg(html)).replace(/<[a-zA-Z](?:[^>"]|"[^"]*")*>/g, tag => {
+    const toMobi6 = html => videoToImg(svgImageToImg(html)).replace(START_TAG_RE, tag => {
+      if (/^<img\b/i.test(tag) && /\ssrc="kindle:flow:/.test(tag)) {
+        const alt = /\salt="([^"]*)"/.exec(tag);
+        const text = alt ? unescAttr(alt[1]) : '';
+        return /\S/.test(text) ? escText(text) : '';
+      }
       let first = true;
       return tag.replace(embedAttrRe, (_, n) => first ? (first = false, ` recindex="${recindex(n)}"`) : '')
         .replace(/\said="\d+"/, '');
     });
     const pagebreak = '<mbp:pagebreak/>';
-    const pagebreakB = enc.encode(pagebreak).length;
+    const pagebreakB = utf8Len(pagebreak);
     // Internal links (Calibre writer2/serializer.py): <a filepos="NNNNNNNNNN">, the
     // 10-digit decimal byte offset in the flat text of the target element's start tag
     // (KindleUnpack inserts <a id="fileposN"/> exactly there; a link without fragment
@@ -2254,9 +2409,8 @@ function convertToAzw3(epub, format='azw3') {
     const linkAid = l => (l.chapter >= 0 && l.frag && chapters[l.chapter].ids?.get(l.frag)) || null;
     const wanted = tocAids.map(s => new Set(s));
     for (const l of links.values()) { const a = linkAid(l); if (a) wanted[l.chapter].add(a); }
-    const A_TAG_RE = /<a(?=[\s>/])(?:[^>"]|"[^"]*")*>/g;
     const toFilepos = html => !html.includes(LINK_PLACEHOLDER) ? html : html.replace(A_TAG_RE, tag =>
-      tag.replace(/\shref="(kindle:pos:fid:0000:off:(\d{10}))"/, (m, ph, n) => {
+      tag.replace(HREF_PLACEHOLDER_RE, (m, ph, n) => {
         const l = links.get(ph);
         return !l ? m : l.chapter < 0 ? ` href="${escAttr(l.href)}"` : ` filepos="${n}"`;
       }));
@@ -2270,7 +2424,7 @@ function convertToAzw3(epub, format='azw3') {
     let bodyOffset = docHeadB;
     idxParts = bodies.map((body, i) => {
       if (i > 0) bodyOffset += pagebreakB;  // NCX entry points just after the break
-      const contB = enc.encode(body).length;
+      const contB = utf8Len(body);
       const part = {
         chapterIndex: i, chunkCount: 1,
         skelHeadByteLen: 0, skelTailByteLen: 0,  // no skeleton for mobi6
@@ -2291,8 +2445,6 @@ function convertToAzw3(epub, format='azw3') {
         return l && l.chapter >= 0 ? ` filepos="${String(filepos(l)).padStart(10, '0')}"` : m;
       })));
     fullText = docHead + finalBodies.join(pagebreak) + docTail;
-    htmlByteLen = enc.encode(fullText).length;
-    fdstEntries = [{start: 0, end: htmlByteLen}];  // unused for mobi6 but kept for symmetry
 
   } else {
     // ── KF8: per-chapter skelHead + skelTail + content ─────────────────────
@@ -2300,9 +2452,9 @@ function convertToAzw3(epub, format='azw3') {
     const contents = resolveInternalLinks(chapters, epub.links);
     let htmlByteOffset = 0;
     idxParts = chapters.map((ch, i) => {
-      const headB = enc.encode(ch.skelHead).length;
-      const tailB = enc.encode(ch.skelTail).length;
-      const contB = enc.encode(contents[i]).length;
+      const headB = utf8Len(ch.skelHead);
+      const tailB = utf8Len(ch.skelTail);
+      const contB = utf8Len(contents[i]);
       const part = {
         chapterIndex: i, chunkCount: 1,
         skelHeadByteLen: headB, skelTailByteLen: tailB, contentByteLen: contB,
@@ -2311,7 +2463,7 @@ function convertToAzw3(epub, format='azw3') {
       htmlByteOffset += headB + tailB + contB;
       return part;
     });
-    htmlByteLen = htmlByteOffset;
+    const htmlByteLen = htmlByteOffset;
     tocOffsets = contents.map((c, i) => tocAids[i].size ? aidOffsets(c, tocAids[i]) : new Map());
     tocTextEnd = htmlByteLen;  // len(flows[0])
     // Flow 0 = all HTML (skeleton/chunk/NCX offsets index into it); then one flow
@@ -2320,15 +2472,18 @@ function convertToAzw3(epub, format='azw3') {
     fdstEntries = [{start: 0, end: htmlByteLen}];
     for (const sheet of sheets) {
       const start = fdstEntries[fdstEntries.length - 1].end;
-      fdstEntries.push({start, end: start + enc.encode(sheet).length});
+      fdstEntries.push({start, end: start + utf8Len(sheet)});
     }
     fullText = chapters.map((ch, i) => ch.skelHead + ch.skelTail + contents[i]).join('') +
                sheets.join('');
   }
 
-  textLen = enc.encode(fullText).length;
+  // the text is encoded once (all lengths above: utf8Len)
+  const textBytes = enc.encode(fullText);
+  const textLen = textBytes.length;
+  if (mobi6) fdstEntries = [{start: 0, end: textLen}];  // unused for mobi6 but kept for symmetry
   const compress = textLen > 2048;
-  const textRecs = buildTextRecords(fullText, compress);
+  const textRecs = buildTextRecords(textBytes, compress);
   const numTextRecs = textRecs.length;
 
   // Build record list (record 0 = placeholder)
@@ -2473,7 +2628,22 @@ retryBtn.addEventListener('click', () => {
   }
 });
 
+// One conversion at a time (parseEpub/extractContent share module state such as _aid): a
+// file chosen or dropped while one runs waits, and only the latest one is kept.
+let converting = false, queuedFile = null;
 async function handleFile(file) {
+  if (converting) { queuedFile = file; return; }
+  converting = true;
+  try { await convertFile(file); }
+  finally {
+    converting = false;
+    const next = queuedFile;
+    queuedFile = null;
+    if (next) handleFile(next);
+  }
+}
+
+async function convertFile(file) {
   if (!file?.name.toLowerCase().endsWith('.epub')) {
     showStatus('Please choose an .epub file', 'error'); return;
   }
@@ -2503,7 +2673,7 @@ async function handleFile(file) {
           await new Promise(r => setTimeout(r, delay));
           buf = await file.arrayBuffer();
         }
-        epub = await parseEpub(buf, {mobi: fmt === 'mobi'});
+        epub = await parseEpub(buf, {mobi: fmt === 'mobi', kf8: fmt !== 'mobi'});
         break; // success
       } catch(parseErr) {
         // JSZip throws different errors depending on how the file is broken:
@@ -2560,5 +2730,3 @@ if ('serviceWorker' in navigator)
 </script>
 </body>
 </html>
-<!-- test -->
-<!-- test -->
