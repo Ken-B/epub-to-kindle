@@ -175,6 +175,18 @@
         0.9954655,
         200
       ],
+      "visibility_pooled": {
+        "hidden_shown": 0,
+        "shown_hidden": 0,
+        "books": 209,
+        "books_over": 0
+      },
+      "device_visibility_pooled": {
+        "hidden_shown": 0,
+        "shown_hidden": 0,
+        "books": 209,
+        "books_over": 0
+      },
       "layout_hygiene_pooled": {
         "empty_blocks": 21,
         "trailing_breaks": 0,
@@ -217,21 +229,23 @@
         "style-lost": 29,
         "text-loss": 1,
         "images-unextractable": 1,
-        "links-unresolved": 1
+        "links-unresolved": 1,
+        "visibility-changed": 77
       },
       "actionable_category_books": {
         "input-repair": 1,
         "style-lost": 29,
         "text-loss": 1,
-        "links-unresolved": 1
+        "links-unresolved": 1,
+        "visibility-changed": 77
       },
       "kind_books": {
-        "unported Calibre transform": 29,
+        "unported Calibre transform": 95,
         "input repair": 1,
         "writer bug": 1
       },
       "kind_instances": {
-        "unported Calibre transform": 30,
+        "unported Calibre transform": 107,
         "input repair": 1,
         "writer bug": 1
       },
@@ -239,19 +253,30 @@
         "informational": 419
       },
       "kind_shares": {
-        "unported Calibre transform": 0.9666666666666667,
-        "input repair": 0.03333333333333333,
-        "writer bug": 0.03333333333333333
+        "unported Calibre transform": 0.9895833333333334,
+        "input repair": 0.010416666666666666,
+        "writer bug": 0.010416666666666666
       },
-      "gap_instances": 32,
-      "books_with_gap": 30,
+      "gap_instances": 109,
+      "books_with_gap": 96,
       "dominant_kind": "unported Calibre transform",
       "top_category_by_kind": {
-        "unported Calibre transform": "style-lost",
+        "unported Calibre transform": "visibility-changed",
         "input repair": "input-repair",
         "writer bug": "text-loss"
       },
       "top5": [
+        {
+          "category": "visibility-changed",
+          "books": 77,
+          "description": "Text hidden in the input is visible in the output, or the reverse (display:none / [hidden] / visibility / clip / off-page), in the preservation or the device-model render",
+          "kind": "unported Calibre transform",
+          "examples": [
+            "real/standard-ebooks/a-e-w-mason_the-four-feathers",
+            "real/standard-ebooks/agatha-christie_partners-in-crime",
+            "real/standard-ebooks/ameen-rihani_the-book-of-khalid"
+          ]
+        },
         {
           "category": "style-lost",
           "books": 29,
@@ -352,6 +377,7 @@
           "links-unresolved": 1
         },
         "se": {
+          "visibility-changed": 77,
           "layout-hygiene": 100,
           "calibre-header-diff": 100,
           "style-lost": 12
@@ -367,7 +393,7 @@
       "systemic_eval_books": 209,
       "kind_books_excl_systemic": null,
       "books_with_gap_excl_systemic": null,
-      "books_with_no_gap": 179,
+      "books_with_no_gap": 113,
       "books_not_fully_evaluated": 0,
       "books_fixed_layout": 0,
       "books_harness_error": 0,
@@ -386,6 +412,13 @@
         null,
         0
       ],
+      "visibility_pooled": {
+        "hidden_shown": 3876,
+        "shown_hidden": 0,
+        "books": 209,
+        "books_over": 77
+      },
+      "device_visibility_pooled": null,
       "layout_hygiene_pooled": {
         "empty_blocks": 241,
         "trailing_breaks": 1436,
@@ -460,6 +493,8 @@
             "books": 209,
             "books_nonzero": 209
           },
+          "visibility": null,
+          "device_visibility": null,
           "links": [
             29021,
             29021
@@ -500,6 +535,18 @@
             "nbsp_indents_ambiguous": 426,
             "books": 209,
             "books_nonzero": 17
+          },
+          "visibility": {
+            "hidden_shown": 0,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 0
+          },
+          "device_visibility": {
+            "hidden_shown": 0,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 0
           },
           "links": [
             29021,
@@ -2686,6 +2733,10 @@
             "before": 29,
             "after": 29
           },
+          "visibility-changed": {
+            "before": null,
+            "after": 77
+          },
           "layout-hygiene": {
             "before": 209,
             "after": 209
@@ -2719,6 +2770,8 @@
             "books": 209,
             "books_nonzero": 209
           },
+          "visibility": null,
+          "device_visibility": null,
           "links": [
             28987,
             28991
@@ -2760,6 +2813,13 @@
             "books": 209,
             "books_nonzero": 209
           },
+          "visibility": {
+            "hidden_shown": 3876,
+            "shown_hidden": 0,
+            "books": 209,
+            "books_over": 77
+          },
+          "device_visibility": null,
           "links": [
             28987,
             28991

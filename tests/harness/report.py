@@ -23,6 +23,11 @@ treated as "unknown/false" when absent):
     result["invariants"]["style"]["device_score"]
                                                 AZW3 style score under the Kindle device model (category
                                                 `device-style-lost` below DEVICE_STYLE_MIN)
+    result["invariants"]["style"]["visibility"] / ["device_visibility"]
+                                                {hidden_in_input_shown_out_chars, shown_in_input_hidden_out_chars,
+                                                ...}: text whose visibility changed, preservation render / AZW3
+                                                device-model render (category `visibility-changed` above
+                                                VISIBILITY_MIN_CHARS in either direction)
     result["invariants"]["layout_hygiene"] / ["layout_hygiene_input"]
                                                 {empty_blocks, trailing_breaks, whitespace_runs, nbsp_indents}
                                                 in our output / in the input (category `layout-hygiene`)
@@ -70,6 +75,9 @@ TAXONOMY: dict[str, tuple[str, str]] = {
     "device-style-lost": ("AZW3 style score under the Kindle device model (Kindle UA defaults, no @media/"
                           "@supports, no sibling/attribute/structural selectors) below 0.8",
                           "unported Calibre transform"),
+    "visibility-changed": ("Text hidden in the input is visible in the output, or the reverse "
+                           "(display:none / [hidden] / visibility / clip / off-page), in the preservation or "
+                           "the device-model render", "unported Calibre transform"),
     "layout-hygiene": ("Output markup has empty p/div, trailing <br>, raw whitespace runs or &nbsp; indents",
                        "informational"),
     "fixed-layout-unsupported": ("Input is fixed-layout (pre-paginated)", "out of scope"),
@@ -83,6 +91,10 @@ TAXONOMY: dict[str, tuple[str, str]] = {
 
 KINDS_ACTIONABLE = ("unported Calibre transform", "input repair", "writer bug")
 DEVICE_STYLE_MIN = 0.8
+# `visibility-changed`: more than this many non-space characters of text change visibility in one
+# direction (hidden -> shown or shown -> hidden), in the preservation or the device render of one book
+VISIBILITY_MIN_CHARS = 20
+VIS_KEYS = ("hidden_in_input_shown_out_chars", "shown_in_input_hidden_out_chars")
 HYGIENE_KEYS = ("empty_blocks", "trailing_breaks", "whitespace_runs", "nbsp_indents")
 # stricter facts (intentional markers, double breaks, verse/column nbsp): shown, not categorised
 HYGIENE_EXTRA_KEYS = ("empty_blocks_styled", "trailing_breaks_double", "nbsp_indents_ambiguous")
@@ -260,6 +272,9 @@ def categorize(result: dict) -> list[str]:
         dsc = _int(st.get("device_score"))
         if dsc is not None and dsc < DEVICE_STYLE_MIN and r.get("format") != "mobi":
             cats.add("device-style-lost")
+        if any((_int(_d(st.get(v)).get(k)) or 0) > VISIBILITY_MIN_CHARS
+               for v in ("visibility", "device_visibility") for k in VIS_KEYS):
+            cats.add("visibility-changed")
         hy = _d(inv.get("layout_hygiene"))
         if any((_int(hy.get(k)) or 0) > 0 for k in HYGIENE_KEYS):
             cats.add("layout-hygiene")
@@ -351,6 +366,28 @@ def hygiene_pooled(rs: list[dict], key: str = "layout_hygiene"):
         for k in HYGIENE_KEYS + HYGIENE_EXTRA_KEYS:
             tot[k] += _int(h.get(k)) or 0
     return {**tot, "books": books, "books_nonzero": nonzero} if books else None
+
+
+def visibility_pooled(rs: list[dict], key: str = "visibility"):
+    """{hidden_shown, shown_hidden, books, books_over} pooled over the results whose style invariant
+    has `key` (visibility / device_visibility): characters hidden in the input and shown in the output,
+    the reverse, books with the field, books above VISIBILITY_MIN_CHARS in either direction; None when
+    no result has it."""
+    hs = sh = books = over = 0
+    for r in rs:
+        v = _d(_d(_d(r.get("invariants")).get("style")).get(key))
+        if not v:
+            continue
+        a, b = (_int(v.get(k)) or 0 for k in VIS_KEYS)
+        books += 1
+        hs += a
+        sh += b
+        over += a > VISIBILITY_MIN_CHARS or b > VISIBILITY_MIN_CHARS
+    return {"hidden_shown": hs, "shown_hidden": sh, "books": books, "books_over": over} if books else None
+
+
+def visibility_str(v) -> str:
+    return "n/a" if not v else f"{v['hidden_shown']} / {v['shown_hidden']}"
 
 
 def hygiene_str(h, keys=HYGIENE_KEYS) -> str:
@@ -582,6 +619,8 @@ def _aggregate(rs: list[dict]) -> dict:
         "invariants_not_evaluated": {k: not_eval[k] for k in INVARIANTS},
         "style_score_se_pg": mean_score(rs, _score),
         "device_score_se_pg": mean_score(rs, _device_score),
+        "visibility_pooled": visibility_pooled(rs),
+        "device_visibility_pooled": visibility_pooled(rs, "device_visibility"),
         "layout_hygiene_pooled": hygiene_pooled(rs),
         "layout_hygiene_input_pooled": hygiene_pooled(rs, "layout_hygiene_input"),
     }
@@ -639,6 +678,13 @@ def _summary_paragraph(fmt: str, a: dict) -> str:
         s.append(f"Mean style score on se+pg books: preservation {'n/a' if ms is None else f'{ms:.3f} (n={ns})'}"
                  + (f", Kindle device model {'n/a' if md is None else f'{md:.3f} (n={nd})'}" if fmt != "mobi" else "")
                  + ".")
+    vp, dvp = a.get("visibility_pooled"), a.get("device_visibility_pooled")
+    if vp:
+        s.append(f"Visibility changes, pooled characters (hidden in the input but shown in the output / the "
+                 f"reverse): preservation render {visibility_str(vp)} over {vp['books']} books, "
+                 f"{vp['books_over']} above {VISIBILITY_MIN_CHARS} chars"
+                 + (f"; Kindle device model {visibility_str(dvp)}, {dvp['books_over']} books above"
+                    if dvp else "") + ".")
     hy, hyi = a.get("layout_hygiene_pooled"), a.get("layout_hygiene_input_pooled")
     if hy:
         s.append(f"Layout hygiene, pooled over {hy['books']} books (empty blocks / trailing breaks / whitespace "
@@ -665,6 +711,15 @@ def _table(headers: list[str], rows: list[list]) -> list[str]:
     for row in rows:
         out.append("| " + " | ".join(_md(c) for c in row) + " |")
     return out
+
+
+def _vis_cell(st: dict) -> str:
+    """'hidden>shown/shown>hidden' of the preservation render, '(…)' of the device render."""
+    def one(v):
+        v = _d(v)
+        return "-" if not v else "/".join(str(_int(v.get(k)) or 0) for k in VIS_KEYS)
+    v, d = st.get("visibility"), st.get("device_visibility")
+    return one(v) + (f" ({one(d)})" if d else "")
 
 
 def _fmt_section(fmt: str, rs: list[dict], a: dict) -> list[str]:
@@ -711,7 +766,7 @@ def _fmt_section(fmt: str, rs: list[dict], a: dict) -> list[str]:
     L += ["### 5. All books", ""]
     hdr = ["id", "category", "verdict", "app ok", "calibre ok", "gate pass", "text match/spine",
            "images matched/referenced", "image refs ok/total", "toc matched/input", "links resolved/total",
-           "style", "device style", "hygiene out (e/b/ws/nb)", "css rules out/in", "categories"]
+           "style", "device style", "visibility h>s/s>h (device)", "hygiene out (e/b/ws/nb)", "css rules out/in", "categories"]
     rows = []
     for r in sorted(rs, key=lambda x: str(x.get("id"))):
         inv = _d(r.get("invariants"))
@@ -730,6 +785,7 @@ def _fmt_section(fmt: str, rs: list[dict], a: dict) -> list[str]:
                      _frac(lk.get("resolved"), lk.get("internal_total")),
                      "-" if sc is None else f"{sc:.2f}",
                      "-" if _device_score(r) is None else f"{_device_score(r):.2f}",
+                     _vis_cell(st),
                      "-" if not isinstance(inv.get("layout_hygiene"), dict) else
                      "/".join(str(_int(inv["layout_hygiene"].get(k)) or 0) for k in HYGIENE_KEYS),
                      _frac(st.get("output_css_rules"), st.get("input_css_rules")),

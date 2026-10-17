@@ -9,7 +9,9 @@ that a changed taxonomy cannot show up as a change in the converter. A book REGR
 with its baseline result, any of these holds: the app fails now but not before; a parser gate passed
 before and fails now; a text/image/TOC/link invariant count got worse; the style score or the (AZW3)
 device score dropped by more than STYLE_TOL; or a new gap category (other than informational ones)
-appeared. A baseline written before a field existed (no device_score, no layout_hygiene) shows "n/a"
+appeared; or the characters of text that changed visibility (hidden in the input and shown in the output,
+or the reverse; preservation or device render) rose. A baseline written before a field existed (no
+device_score, no layout_hygiene, no style.visibility) shows "n/a"
 and is not compared on it.
 """
 from __future__ import annotations
@@ -29,6 +31,7 @@ INFORMATIONAL = {"calibre-header-diff", "images-resized", "spine-non-xhtml", "im
 CAT_FIELD = {
     "device-style-lost": lambda r: R._device_score(r) is not None,
     "layout-hygiene": lambda r: isinstance(R._d(r.get("invariants")).get("layout_hygiene"), dict),
+    "visibility-changed": lambda r: isinstance(R._d(_inv(r, "style")).get("visibility"), dict),
 }
 
 
@@ -63,6 +66,14 @@ def _pool(rs: list[dict], key: str, num: str, den: str):
     return (n, d)
 
 
+def _vis_chars(r: dict, key: str):
+    """(hidden->shown chars, shown->hidden chars) of style.<key> (visibility / device_visibility), or None."""
+    v = R._d(_inv(r, "style").get(key))
+    if not v:
+        return None
+    return tuple(_num(v.get(k)) or 0 for k in R.VIS_KEYS)
+
+
 def _metrics(rs: list[dict]) -> dict:
     conv = [r for r in rs if R._d(r.get("app")).get("ok")]
     gate_known = [r for r in conv if R._gate_pass(r) is not None]
@@ -74,6 +85,8 @@ def _metrics(rs: list[dict]) -> dict:
         "style_se_pg": ms, "style_se_pg_n": ns,
         "device_se_pg": md, "device_se_pg_n": nd,
         "hygiene": R.hygiene_pooled(rs),
+        "visibility": R.visibility_pooled(rs),
+        "device_visibility": R.visibility_pooled(rs, "device_visibility"),
         "links": _pool(rs, "links", "resolved", "internal_total"),
         "image_refs": _pool(rs, "images", "refs_correct", "refs_total"),
         "images_hash": _pool(rs, "images", "matched_by_hash", "input"),
@@ -104,6 +117,12 @@ def _regression_reasons(b: dict, a: dict, cb: list[str], ca: list[str]) -> list[
     db, da = R._device_score(b), R._device_score(a)
     if db is not None and da is not None and da < db - STYLE_TOL:
         why.append(("device score", f"device score {db:.2f} -> {da:.2f}"))
+    # text changing visibility (either direction, preservation or device render): any rise is a regression;
+    # a baseline without the field is not compared
+    for label, key in (("visibility changed", "visibility"), ("device visibility changed", "device_visibility")):
+        vb, va = _vis_chars(b, key), _vis_chars(a, key)
+        if vb is not None and va is not None and sum(va) > sum(vb):
+            why.append((label, f"{label} chars {vb[0]}/{vb[1]} -> {va[0]}/{va[1]} (hidden>shown/shown>hidden)"))
     new = [c for c in ca if c not in cb and c not in INFORMATIONAL and _evaluated(b, c)]
     if new:
         why.append(("new category", "new categories: " + ", ".join(new)))
@@ -184,6 +203,10 @@ def render(cmp: dict, before_label: str) -> str:
             ("mean device score, se+pg books", style(b, "device_se_pg"), style(a, "device_se_pg")),
             ("layout hygiene, pooled (empty blocks / trailing breaks / whitespace runs / nbsp indents)",
              R.hygiene_str(b.get("hygiene")), R.hygiene_str(a.get("hygiene"))),
+            ("visibility changed, pooled chars (hidden→shown / shown→hidden)",
+             R.visibility_str(b.get("visibility")), R.visibility_str(a.get("visibility"))),
+            ("visibility changed on the device model, pooled chars (hidden→shown / shown→hidden)",
+             R.visibility_str(b.get("device_visibility")), R.visibility_str(a.get("device_visibility"))),
             ("internal links resolved (pooled)", _frac(b["links"]), _frac(a["links"])),
             ("image refs correct (pooled)", _frac(b["image_refs"]), _frac(a["image_refs"])),
             ("images present by hash (pooled)", _frac(b["images_hash"]), _frac(a["images_hash"])),

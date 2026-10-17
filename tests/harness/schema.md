@@ -100,7 +100,12 @@ Timeouts and harness errors (`error` starting with `harness:`) are never cached.
                "device_score": 0.0, "device_per_chapter": [0.0], "device_checked_props": 0,
                "device_equal_props": 0, "device_prop_disagreements": {"text-indent": 0},
                "device_prop_examples": {"text-indent": [{"text": "", "tag": "p", "out_tag": "p", "in": "0px", "out": "24px"}]},
-               "device_model": "kindle-v1", "device_css_removed": {"at:media": 0, "selectors": 0, "rules": 0}},
+               "device_model": "kindle-v1", "device_css_removed": {"at:media": 0, "selectors": 0, "rules": 0},
+               "visibility": {"hidden_in_input_shown_out_chars": 0, "hidden_in_input_shown_out_elements": 0,
+                              "shown_in_input_hidden_out_chars": 0, "shown_in_input_hidden_out_elements": 0,
+                              "examples": {"hidden_in_input_shown_out": [{"chapter": 2, "text": "Here, Perfect to a Wish", "chars": 19}],
+                                           "shown_in_input_hidden_out": []}},
+               "device_visibility": {"…": "same shape as visibility, AZW3 only (null for MOBI)"}},
     "layout_hygiene":       {"empty_blocks": 0, "trailing_breaks": 0, "whitespace_runs": 0, "nbsp_indents": 0,
                              "empty_blocks_styled": 0, "trailing_breaks_double": 0,
                              "nbsp_indents_ambiguous": 0, "documents": 0, "examples": {"empty_blocks": ["part0003.xhtml: <p> ''"]}},
@@ -282,6 +287,35 @@ elements), elements, chars (visible chars removed), anchors (<a href> removed), 
   uses the first, unmodified input load as before. `device_score` = equal / checked over the
   book, `device_per_chapter` per spine item, `device_prop_disagreements` / `device_prop_examples`
   as for `prop_disagreements`. It runs whenever the style pass runs (`--no-style` skips both).
+- Visibility (`visibility`, and for AZW3 `device_visibility`): the style pass records, per element with
+  text of its own, whether that text is rendered visibly; the input is compared with the output render
+  (`visibility`) and with the device-model render (`device_visibility`), so a text that the input hides
+  and the output shows (a writer pinning `h2 {display: block}` over the UA rule `[hidden] {display: none}`:
+  Standard Ebooks' `<h2 hidden="hidden">` titles) or the reverse is reported, which neither the text
+  invariant (visibility-blind) nor the style scores (they align on visible input elements) notice.
+  - Rendered visibly = computed `visibility: visible`, a layout box for the text (so no `display:none` on
+    the element or an ancestor; `display: contents` is measured on the text itself), not clipped away by
+    the screen-reader patterns on the element or an ancestor (`clip: rect(..)` of at most 1 px under
+    `position: absolute|fixed`, `clip-path: inset(..)` with the insets adding up to 100 % in a direction,
+    `circle(0)`, a box of 1 px or less with `overflow` other than visible), and not positioned 500 px or
+    more off the page (right/bottom edge above -500, left edge below viewport width + 500). The input
+    is measured with its author CSS (MOBI v6: also the elements the writer removes, which count as hidden);
+    the MOBI output with MOBI_CSS applied like the style score.
+  - Matching is by text, per spine item (aligned mode) or for the whole book (concat mode): text T of a
+    hidden element (non-space characters, at least `VIS_MIN_CHARS` = 4) counts as changed when the other
+    side's visible text (whitespace-free concatenation of the visible elements' own text) holds it more
+    often than this side's visible text does: `min(hidden elements with T, count_B(T) - count_A(T))`.
+    Text that is absent from the other side is text loss, not a visibility change; one visible as often on
+    both sides cancels out. At most `VIS_MAX_TEXTS` = 2000 distinct hidden texts per unit are looked up
+    (`texts_capped: true` when more).
+  - `hidden_in_input_shown_out_chars|elements`: hidden in the input, visible in the output;
+    `shown_in_input_hidden_out_*` the reverse (chars = non-space characters). `examples`: up to 5 per
+    direction, `{chapter (spine index; null when unknown), text (<= 80 chars), chars}`. `visibility` is
+    null with `visibility_error` when the pure-Python accounting failed, `device_visibility` null for MOBI
+    and when the device pass failed.
+  - Category `visibility-changed` (`report.VISIBILITY_MIN_CHARS` = 20): either direction above that many
+    chars in `visibility` or `device_visibility`. compare.py: a regression when the summed chars of either
+    render rise against a baseline that has the field.
 - `input_css_rules`: rule blocks of the style sheets reachable from an XHTML spine document (`<link
   rel=stylesheet>` to CSS, i.e. not `.xpgt` and not another declared type; `<style>`; `@import` chains),
   `@font-face` blocks excluded (fonts are dropped by design). The same exclusion applies to
@@ -350,7 +384,9 @@ def layout_hygiene_doc(body, pre=(set(), set()), counts=None, examples=None, doc
 # calibre_diff.py
 def diff(entry: dict, out_dir: Path, fmt: str) -> dict
 
-# compare.py: a device_score drop > STYLE_TOL is a regression like the style score; a baseline result
+# compare.py: a rise of the chars that changed visibility (style.visibility / device_visibility) is a regression
+# (the metric rows "visibility changed, pooled chars", "n/a" on a baseline without the field);
+# a device_score drop > STYLE_TOL is a regression like the style score; a baseline result
 # without device_score / layout_hygiene shows "n/a" and gets no "new category" for device-style-lost /
 # layout-hygiene (CAT_FIELD); layout-hygiene is informational.
 
@@ -381,6 +417,7 @@ def write_report(results: list[dict], out_md: Path, out_json: Path, *, subset: s
 | links-unresolved | resolved < internal_total | unported transform (writer8 main: internal links) |
 | style-lost | style.score < 0.5, or (AZW3 only) input_css_rules (reachable sheets, no @font-face) > 0 and output_css_rules == 0 | unported transform (writer8 main: css flows / oeb flatcss) |
 | device-style-lost | (AZW3 only) style.device_score < 0.8 (`report.DEVICE_STYLE_MIN`) | unported transform (oeb flatcss: cascade baked into classes, UA defaults pinned) |
+| visibility-changed | `style.visibility` or `style.device_visibility`: more than 20 chars (`report.VISIBILITY_MIN_CHARS`) of text hidden in the input and shown in the output, or the reverse | unported transform (oeb flatcss / UA rules: hidden elements stay hidden) |
 | layout-hygiene | any output layout_hygiene count > 0 | informational |
 | fixed-layout-unsupported | `invariants.fixed_layout`: input OPF has rendition:layout pre-paginated; the book's other categories become out of scope | out of scope |
 | calibre-header-diff | header_fields_diff non-empty beyond the ignore list | informational |

@@ -1928,7 +1928,7 @@ _COLLECT_JS = r"""
   const props = args.props, anchorTags = new Set(args.anchors);
   const perr = document.getElementsByTagNameNS('*', 'parsererror').length > 0;
   const body = document.body || document.documentElement;
-  if (!body) return {perr, bodyFS: 16, baseFS: 16, els: [], tags: [], hid: []};
+  if (!body) return {perr, bodyFS: 16, baseFS: 16, els: [], tags: [], hid: [], vt: []};
   let mobiBase = null;
   if (args.mobiCss != null) {
     // MOBI v6 output: a MOBI 6 reader's defaults and the presentational markup it honours, as CSS
@@ -1953,6 +1953,50 @@ _COLLECT_JS = r"""
   const bodyFS = parseFloat(getComputedStyle(body).fontSize) || 16;
   const idx = new Map();
   const els = [], all = [];
+  // Visibility record (see _vis_*): [own text, rendered visibly] per element with text of its own,
+  // measured with every author rule applied, before the baseline pass below disables them
+  const vt = [], rng = document.createRange(), vw = window.innerWidth || 600;
+  const clipMemo = new Map();
+  const pcts = v => Array.from(v.matchAll(/(-?[\d.]+)%/g), m => parseFloat(m[1]));
+  const selfClips = (e, cs) => {
+    const pos = cs.position;
+    if ((pos === 'absolute' || pos === 'fixed') && /^rect\(/.test(cs.clip || '')) {    // clip: rect(1px,1px,1px,1px)
+      const n = (cs.clip.match(/^rect\((.*)\)$/) || [, ''])[1].split(/[,\s]+/).map(parseFloat);
+      if (n.length === 4 && !n.some(isNaN) && (n[1] - n[3] <= 1 || n[2] - n[0] <= 1)) return true;
+    }
+    const cp = cs.clipPath || '';
+    if (/^inset\(/.test(cp)) {                                                      // clip-path: inset(50%)
+      const v = pcts(cp.replace(/\bround\b.*$/, ''));
+      if (v.length) {
+        const [t, r = t, b = t, l = r] = v;
+        if (t + b >= 100 || l + r >= 100) return true;
+      }
+    } else if (/^circle\(\s*0(px|%)?[\s)]/.test(cp)) return true;
+    if ((cs.overflowX !== 'visible' || cs.overflowY !== 'visible') && cs.display !== 'inline' &&
+        cs.display !== 'contents') {                                                // 1px box, overflow hidden
+      const r = e.getBoundingClientRect();
+      if (r.width <= 1 || r.height <= 1) return true;
+    }
+    return false;
+  };
+  const clippedUp = (e, cs) => {
+    if (!e || e === document.documentElement) return false;
+    if (clipMemo.has(e)) return clipMemo.get(e);
+    cs = cs || getComputedStyle(e);
+    const v = selfClips(e, cs) || clippedUp(e.parentElement, null);
+    clipMemo.set(e, v);
+    return v;
+  };
+  const rendered = (e, cs) => {
+    if (cs.visibility !== 'visible' || clippedUp(e, cs)) return false;
+    for (const c of e.childNodes) {
+      if (c.nodeType !== 3 || !/\S/.test(c.data)) continue;
+      rng.selectNodeContents(c);
+      for (const r of rng.getClientRects())
+        if (r.width > 0 && r.height > 0 && r.right > -500 && r.bottom > -500 && r.left < vw + 500) return true;
+    }
+    return false;
+  };
   const isHidden = cs => cs.display === 'none' || cs.visibility === 'hidden' || cs.visibility === 'collapse';
   const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
   for (let e = walker.currentNode; e; e = walker.nextNode()) {
@@ -1964,6 +2008,7 @@ _COLLECT_JS = r"""
     // full text only for alignment anchors (own text, or an image/hr): keeps the payload small
     const full = (own.trim() || anchorTags.has(tag)) ? (e.textContent || '') : '';
     const cs = getComputedStyle(e);
+    if (own.trim()) vt.push([own, rendered(e, cs) ? 1 : 0]);
     const parent = e.parentElement && idx.has(e.parentElement) ? idx.get(e.parentElement) : -1;
     idx.set(e, els.length);
     els.push([tag, own, props.map(p => cs.getPropertyValue(p)), parent, e, full, all.length - 1,
@@ -1982,7 +2027,7 @@ _COLLECT_JS = r"""
     r[7] = r[7] && !isHidden(cs);     // hidden by the author CSS, not by the UA (e.g. [hidden])
     r[4] = props.map(p => cs.getPropertyValue(p));
   }
-  if (!args.hidden) return {perr, bodyFS, baseFS, els: els.map(r => r.slice(0, 6)), tags: [], hid: []};
+  if (!args.hidden) return {perr, bodyFS, baseFS, els: els.map(r => r.slice(0, 6)), tags: [], hid: [], vt};
   // An element the author CSS hides goes with its whole subtree (as the MOBI writer removes it);
   // hid: its index in `all` (every element under body, document order), for the caller's mapping
   const gone = new Array(els.length).fill(false), newIdx = new Array(els.length).fill(-1);
@@ -1995,7 +2040,7 @@ _COLLECT_JS = r"""
     newIdx[k] = kept.length;
     kept.push([r[0], r[1], r[2], r[3] >= 0 ? newIdx[r[3]] : -1, r[4], r[5]]);
   });
-  return {perr, bodyFS, baseFS, els: kept, tags: all, hid};
+  return {perr, bodyFS, baseFS, els: kept, tags: all, hid, vt};
 }
 """
 
@@ -2092,7 +2137,101 @@ def _collect(page, url_xhtml: str, url_html: str, xhtml_first: bool = True, *, h
                     "inline": vals[_DISPLAY] in ("inline", "contents"),
                     "anchored": anchored})
     return {"els": els, "parsed_as": data["parsed_as"], "body_fs": data["bodyFS"],
-            "tags": data["tags"], "hid": data["hid"]}
+            "tags": data["tags"], "hid": data["hid"], "vt": data["vt"]}
+
+
+# ── visibility ────────────────────────────────────────────────────────────────
+# _COLLECT_JS records, per element with text of its own, whether that text is rendered visibly
+# (computed visibility, a box for the text, not clipped to nothing by the screen-reader patterns, not
+# positioned >= 500 px off the page; `display:none` on the element or an ancestor leaves no box). The
+# style pass compares input and output: text hidden in the input but visible in the output (a regression
+# such as a writer pinning `h2 {display: block}` over the UA rule `[hidden] {display: none}`), and the
+# reverse. Matching is by text, not by structure: for every text T (non-space characters, at least
+# VIS_MIN_CHARS) that an element hides on side A, the number of times it is shown more often on side B
+# than on side A -- count(T in B's visible text) - count(T in A's visible text), where the visible text
+# is the whitespace-free concatenation of the visible elements' own text -- bounded by the number of
+# hidden elements carrying T, is the number of hidden elements that changed. Text that is simply absent
+# from the other side (text loss) is not a visibility change, and a text that is visible on both sides
+# as often cancels out. Cost bound: at most VIS_MAX_TEXTS distinct hidden texts are looked up per unit
+# (a chapter, or the whole book in concat mode).
+VIS_MIN_CHARS = 4
+VIS_MAX_TEXTS = 2000
+VIS_EXAMPLES = 5
+VIS_EXAMPLE_CHARS = 80
+
+
+def _vis_prep(rows) -> tuple[str, dict]:
+    """rows: (chapter, own text, visible 0/1) -> (visible text without whitespace, {key: [display
+    text, hidden element count, first chapter]} of the hidden texts long enough to be matched)."""
+    vis: list[str] = []
+    hid: dict[str, list] = {}
+    for ch, own, v in rows:
+        n = _norm_ws(own)
+        if not n:
+            continue
+        k = "".join(n.split())
+        if v:
+            vis.append(k)
+        elif len(k) >= VIS_MIN_CHARS:
+            h = hid.get(k)
+            if h is None:
+                hid[k] = [n, 1, ch]
+            else:
+                h[1] += 1
+    return "".join(vis), hid
+
+
+def _vis_flip(hid: dict, vis_a: str, vis_b: str) -> list[tuple]:
+    """Texts hidden on side A (hid) that side B shows more often than A does: [(chapter, display,
+    elements, chars)], longest texts first, at most VIS_MAX_TEXTS looked up."""
+    out = []
+    for k, (disp, cnt, ch) in sorted(hid.items(), key=lambda kv: -len(kv[0]))[:VIS_MAX_TEXTS]:
+        n = min(cnt, vis_b.count(k) - vis_a.count(k))
+        if n > 0:
+            out.append((ch, disp, n, n * len(k)))
+    return out
+
+
+class _VisAcc:
+    """Visibility changes between input and output, accumulated per unit (chapter, or book)."""
+
+    def __init__(self):
+        self.d = {"hidden_in_input_shown_out": [0, 0, []], "shown_in_input_hidden_out": [0, 0, []]}
+        self.truncated = False
+
+    def add(self, rows_in, rows_out) -> None:
+        """rows_in: (chapter, own, visible) of the input unit, rows_out: (None, own, visible) of the
+        output unit. An output element has no chapter: one hidden there takes the chapter of the first
+        input element (visible, or hidden) with the same text."""
+        vin, hin = _vis_prep(rows_in)
+        vout, hout = _vis_prep(rows_out)
+        self.truncated |= len(hin) > VIS_MAX_TEXTS or len(hout) > VIS_MAX_TEXTS
+        chap = None
+        for key, hid, a, b in (("hidden_in_input_shown_out", hin, vin, vout),
+                               ("shown_in_input_hidden_out", hout, vout, vin)):
+            for ch, disp, n, chars in _vis_flip(hid, a, b):
+                if ch is None:
+                    if chap is None:
+                        chap = {}
+                        for c, own, _v in rows_in:
+                            chap.setdefault("".join(_norm_ws(own).split()), c)
+                    ch = chap.get("".join(disp.split()))
+                slot = self.d[key]
+                slot[0] += chars
+                slot[1] += n
+                slot[2].append({"chapter": ch, "text": disp[:VIS_EXAMPLE_CHARS], "chars": chars})
+
+    def result(self) -> dict:
+        hi, si = self.d["hidden_in_input_shown_out"], self.d["shown_in_input_hidden_out"]
+
+        def ex(slot):
+            return sorted(slot[2], key=lambda e: (-1 if e["chapter"] is None else e["chapter"]))[:VIS_EXAMPLES]
+        res = {"hidden_in_input_shown_out_chars": hi[0], "hidden_in_input_shown_out_elements": hi[1],
+               "shown_in_input_hidden_out_chars": si[0], "shown_in_input_hidden_out_elements": si[1],
+               "examples": {"hidden_in_input_shown_out": ex(hi), "shown_in_input_hidden_out": ex(si)}}
+        if self.truncated:
+            res["texts_capped"] = True
+        return res
 
 
 _TA, _ML, _PL = STYLE_PROPS.index("text-align"), STYLE_PROPS.index("margin-left"), STYLE_PROPS.index("padding-left")
@@ -2493,6 +2632,7 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
     chk, eq = [0] * n, [0] * n
     dacc = _StyleAcc(page_box_free=True)
     dchk, deq = [0] * n, [0] * n
+    vis, dvis = _VisAcc(), _VisAcc()
     dctx = dpg = None
     if dev["on"]:
         try:
@@ -2503,24 +2643,29 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
     stats_all: dict[str, int] = {}
     parsed = {"input_html_fallback": 0, "output_html_fallback": 0}
     out_xhtml_first = outb.kind == "kf8"
+    vt: dict[str, list] = {}      # visibility rows of the last load_in / load_out / load_dev
+    vis_err: list[str] = []
 
     def add_stats(st):
         for k, v in st.items():
             stats_all[k] = stats_all.get(k, 0) + v
     try:
         def load_in(i):
+            vt["in"] = []
             if not book.spine[i]["xhtml"]:
                 return []   # foreign spine item (svg, image, xml, ...): not evaluated, see text.non_xhtml_handling
             d = _collect(pg, *_input_urls(book, i, base_url, out_dir), hidden=mobi, mobi=mobi)
             parsed["input_html_fallback"] += d["parsed_as"] == "html"
             if mobi and book.spine[i]["path"] not in book.hidden:
                 book.prune_hidden(book.spine[i]["path"], d["tags"], d["hid"])
+            vt["in"] = [(i, o, v) for o, v in d["vt"]]
             return d["els"]
 
         def load_out(p):
             d = _collect(pg, _url_for(base_url, out_dir, p, "xhtml"), _url_for(base_url, out_dir, p, "html"),
                          xhtml_first=out_xhtml_first, mobi_out=mobi, mobi=mobi)
             parsed["output_html_fallback"] += d["parsed_as"] == "html" and out_xhtml_first
+            vt["out"] = [(None, o, v) for o, v in d["vt"]]
             return d["els"]
 
         def load_in_dev(i):
@@ -2542,11 +2687,19 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             if not dev["on"]:
                 return None
             try:
-                return _collect(dpg, _url_for(base_url, out_dir, p, "xhtml") + "&device=1",
-                                _url_for(base_url, out_dir, p, "html") + "&device=1")["els"]
+                d = _collect(dpg, _url_for(base_url, out_dir, p, "xhtml") + "&device=1",
+                             _url_for(base_url, out_dir, p, "html") + "&device=1")
+                vt["dev"] = [(None, o, v) for o, v in d["vt"]]
+                return d["els"]
             except Exception as e:
                 dev.update(on=False, error=_err(e))
                 return None
+
+        def vis_add(acc, rows_in, rows_out):
+            try:
+                acc.add(rows_in, rows_out)
+            except Exception as e:   # pure python on collected rows: must not sink the style score
+                vis_err.append(_err(e))
 
         def shifted(els, off):
             out = []
@@ -2559,7 +2712,10 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
         if mode == "aligned":
             for i, p in enumerate(pairs):
                 ein = load_in(i)
+                vin = vt["in"]
+                vt["out"] = []
                 eout = load_out(p) if p is not None else []
+                vis_add(vis, vin, vt["out"])
                 contrib, ni, no, st = _align_score(ein, eout, acc, i)
                 tot_in += ni
                 tot_out += no
@@ -2570,20 +2726,27 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
                     eq[i] += e
                 if dev["on"]:
                     eind = load_in_dev(i)
+                    vt["dev"] = []
                     edev = (load_dev(p) if p is not None else []) if eind is not None else None
                     if edev is not None:
+                        vis_add(dvis, vin, vt["dev"])
                         for c, e in _align_score(eind, edev, dacc, i)[0].values():
                             dchk[i] += c
                             deq[i] += e
         else:
             ein, owner = [], []
+            vin = []
             for i in range(n):
                 els = shifted(load_in(i), len(ein))
+                vin += vt["in"]
                 ein += els
                 owner += [i] * len(els)
             eout = []
+            vout = []
             for p in outb.docs:
                 eout += shifted(load_out(p), len(eout))
+                vout += vt["out"]
+            vis_add(vis, vin, vout)
             contrib, tot_in, tot_out, st = _align_score(ein, eout, acc, "book")
             authored_els = sum(1 for e in ein if e["anchored"] and _authored(e, acc.all_idx))
             add_stats(st)
@@ -2599,12 +2762,15 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
                 downer += [i] * len(d)
             if dev["on"]:
                 edev = []
+                vdev = []
                 for p in outb.docs:
                     d = load_dev(p)
                     if d is None:
                         break
                     edev += shifted(d, len(edev))
+                    vdev += vt["dev"]
                 if dev["on"]:
+                    vis_add(dvis, vin, vdev)
                     for k, (c, e) in _align_score(eind, edev, dacc, "book")[0].items():
                         dchk[downer[k]] += c
                         deq[downer[k]] += e
@@ -2619,9 +2785,10 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
     denom = max(tot_in, tot_out)
     checked, equal = sum(chk), sum(eq)
     if mobi:
-        device_res: dict = {"device_score": None}
+        device_res: dict = {"device_score": None, "device_visibility": None}
     elif not dev["on"]:
-        device_res = {"device_score": None, "device_error": dev["error"] or "device pass failed"}
+        device_res = {"device_score": None, "device_visibility": None,
+                      "device_error": dev["error"] or "device pass failed"}
     else:
         dh = dict(sorted(dacc.hist.items(), key=lambda kv: -kv[1]))
         dc, de = sum(dchk), sum(deq)
@@ -2631,6 +2798,7 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             "device_checked_props": dc, "device_equal_props": de,
             "device_prop_disagreements": dh,
             "device_prop_examples": {k: dacc.examples[k][:2] for k in list(dh)[:8]},
+            "device_visibility": dvis.result(),
             "device_model": device.DEVICE_MODEL,
             "device_css_removed": dict(sorted(dev["stats"].items())),
         }
@@ -2650,6 +2818,8 @@ def inv_style(book: InputBook, outb: OutputBook, mode: str, pairs, page, base_ur
             "output_css_rules": outb.css_rules(),
             "prop_disagreements": hist, "prop_examples": {k: acc.examples[k] for k in hist},
             "props_excluded_for_format": list(MOBI_EXCLUDED_PROPS) if mobi else [],
+            "visibility": vis.result() if not vis_err else None,
+            **({"visibility_error": vis_err[0]} if vis_err else {}),
             **parsed, **device_res}
 
 
