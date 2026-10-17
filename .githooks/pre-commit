@@ -37,9 +37,22 @@ NEW="v${MAJOR}.${MINOR}.${NEW_PATCH}"
 
 echo "pre-commit: auto-bumping $CURRENT → $NEW"
 
-# Update both files (macOS sed requires empty string after -i)
-sed -i '' "s/${CURRENT}/${NEW}/g" "$INDEX"
-sed -i '' "s/${CURRENT}/${NEW}/g" "$SW"
+# Update both files. `sed -i` differs between BSD (macOS) and GNU (Linux), so
+# write to a temp file and move it over the original (keeps the file mode).
+bump_file() {
+  local f="$1" tmp
+  tmp=$(mktemp) || return 1
+  if sed "s/${CURRENT}/${NEW}/g" "$f" > "$tmp"; then
+    cat "$tmp" > "$f"   # overwrite in place: preserves permissions/ownership
+    rm -f "$tmp"
+  else
+    rm -f "$tmp"
+    echo "pre-commit: sed failed on $f" >&2
+    return 1
+  fi
+}
+bump_file "$INDEX" || exit 1
+bump_file "$SW" || exit 1
 
 # Re-stage the modified files
 git add "$INDEX" "$SW"

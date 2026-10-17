@@ -4,7 +4,7 @@
 # ///
 """Differential quality harness driver.
 
-    uv run tests/harness/cli.py prepare [--fetch]
+    uv run tests/harness/cli.py prepare [--fetch | --fetch-spec]
     uv run tests/harness/cli.py convert [flags]     # app (Chromium) + Calibre ebook-convert
     uv run tests/harness/cli.py check   [flags]     # gate + invariants + calibre_diff -> result.<fmt>.json
     uv run tests/harness/cli.py report  [flags]     # tests/reports/<date>-<subset>.md/.json
@@ -90,7 +90,7 @@ def _write_json_atomic(path: Path, obj) -> None:
 def cmd_prepare(args) -> None:
     import corpus
     t0 = time.time()
-    entries = corpus.prepare(ROOT, se=100, pg=100, fetch=args.fetch)
+    entries = corpus.prepare(ROOT, se=100, pg=100, fetch=args.fetch, spec=args.fetch_spec)
     from collections import Counter
     log(f"manifest: {len(entries)} entries "
         f"{dict(sorted(Counter(e['subset'] for e in entries).items()))} ({time.time() - t0:.0f}s)")
@@ -450,7 +450,12 @@ def main(argv=None) -> int:
         p.add_argument("--limit", type=int, help="only the first N entries (smoke tests)")
 
     p = sub.add_parser("prepare", help="regenerate tests/corpus/manifest.json")
-    p.add_argument("--fetch", action="store_true", help="also (re)fetch real-world books")
+    p.add_argument("--fetch", action="store_true",
+                   help="also (re)fetch real-world books (1 req/s) and, if core/ or heavy/ are empty and "
+                        "the private epubs/*.zip are absent, rebuild them from the upstream repos")
+    p.add_argument("--fetch-spec", action="store_true",
+                   help="only that rebuild of core/ + heavy/ (three GitHub archive downloads, ~550 MB, "
+                        "cached in tests/corpus/tools/src/); no real-world books")
     p.set_defaults(fn=cmd_prepare)
     for name, fn in (("convert", cmd_convert), ("check", cmd_check), ("report", cmd_report),
                      ("all", cmd_all), ("compare", cmd_report)):

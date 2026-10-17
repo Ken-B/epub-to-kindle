@@ -3,8 +3,8 @@
     uv run --python 3.13 tests/harness/corpus.py
 
 Builds tests/corpus/manifest.json (list of BookEntry dicts, see schema.md) from:
-  tests/corpus/core/<folder>/*.epub      unpacked from epubs/epub-corpus-core.zip
-  tests/corpus/heavy/<folder>/*.epub     unpacked from epubs/epub-corpus-heavy.zip
+  tests/corpus/core/<folder>/*.epub      unpacked from epubs/epub-corpus-core.zip, or rebuilt from the
+  tests/corpus/heavy/<folder>/*.epub     upstream GitHub repos by fetch_spec() (heavy = files > 2 MB)
   tests/corpus/realworld/{standard-ebooks,gutenberg}/*.epub
   tests/corpus/generated/*.epub          synthetic mutated books (generate_cases)
   <repo root>/Oorlog en terpentijn - Stefan Hertmans.epub
@@ -12,12 +12,17 @@ Builds tests/corpus/manifest.json (list of BookEntry dicts, see schema.md) from:
 The files under tests/corpus/ are untrusted downloads: nothing in them is ever executed here;
 they are only hashed, and zip archives are extracted with zipfile (which sanitises member paths).
 
+Spec corpora without the private zips: `prepare(fetch=True)` or `prepare(spec=True)` (CLI:
+`cli.py prepare --fetch-spec`, spec corpora only; `--fetch` also downloads the real-world books) call
+fetch_spec() when core/ or heavy/ has no .epub and the matching epubs/epub-corpus-<name>.zip is absent.
+
 Byte-identical books (same sha256) share one working directory tests/corpus/out/<sha256>/, so the
 manifest keeps one entry per sha256: the first by id, with the ids of the others in `aliases`.
 """
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import random
@@ -109,14 +114,34 @@ def _entry(root: Path, path: Path, id_: str, category: str, verdict: str, url: s
     }
 
 
-def prepare(root: Path = ROOT, *, se: int = 100, pg: int = 100, fetch: bool = False) -> list[dict]:
+def prepare(root: Path = ROOT, *, se: int = 100, pg: int = 100, fetch: bool = False,
+            spec: bool = False) -> list[dict]:
+    """Regenerate tests/corpus/manifest.json.
+
+    core/ and heavy/ are filled, if they hold no .epub yet, from epubs/epub-corpus-<name>.zip when that
+    exists. When it does not, and `fetch` or `spec` is set, fetch_spec() rebuilds them from the upstream
+    GitHub repos (three archive downloads, cached under tests/corpus/tools/src/, resumable). `fetch` also
+    downloads the real-world books (Standard Ebooks + Gutenberg, 1 request/s); `spec` does only the spec
+    corpora. Without either flag nothing is downloaded and a hint is printed.
+    """
     root = Path(root)
     corpus = root / "tests/corpus"
     corpus.mkdir(parents=True, exist_ok=True)
 
+    missing = []
     for name in ("core", "heavy"):
         if not _epubs_in(corpus / name):
-            _unpack(root / f"epubs/epub-corpus-{name}.zip", corpus / name)
+            zip_path = root / f"epubs/epub-corpus-{name}.zip"
+            if zip_path.exists():
+                _unpack(zip_path, corpus / name)
+            else:
+                missing.append(name)
+    if missing:
+        if fetch or spec:
+            fetch_spec(root)
+        else:
+            print(f"corpus: no .epub in {' and '.join(f'tests/corpus/{m}/' for m in missing)} and no private "
+                  "zip; run `prepare --fetch-spec` to rebuild them from the upstream repos", file=sys.stderr)
 
     if fetch:
         fetch_realworld(root, se=se, pg=pg)
@@ -327,6 +352,231 @@ def fetch_realworld(root: Path = ROOT, *, se: int = 100, pg: int = 100) -> None:
             print(f"PG {have_pg}/{pg} pg{id_}")
             time.sleep(1)
     print(f"DONE standard-ebooks={_count_epubs(out / 'standard-ebooks')} gutenberg={_count_epubs(out / 'gutenberg')}")
+
+
+# ── spec corpora (core/ + heavy/) rebuilt from the upstream repos ─────────────
+
+# repo -> (owner/name, branch, pinned commit). The pinned sha makes the rebuilt set (and, with the fixed
+# timestamps below, the packed bytes) reproducible; set it to None to follow the branch head instead.
+_SPEC_REPOS = {
+    "epub3-samples": ("IDPF/epub3-samples", "main", "7651e2002b631e6577fadf7e9e0692fa6efb8746"),
+    "epub-tests": ("w3c/epub-tests", "main", "54092b4233253e9aac80e93ec4782b380b4b3403"),
+    "epubcheck": ("w3c/epubcheck", "main", "0cc28fb25fdb3cc7455f029e53afe9e00d7ae607"),
+}
+_HEAVY_BYTES = 2 * 1024 * 1024  # packed books above this go to heavy/ (same limit as default_timeout)
+_EPUBCHECK_RES = "src/test/resources/"
+
+
+def _download(url: str, dest: Path) -> None:
+    """Stream url to dest (via dest.part). One archive download, so no politeness delay is needed."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_name(dest.name + ".part")
+    last: Exception | None = None
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": _UA})
+            with urllib.request.urlopen(req, timeout=120) as r, open(part, "wb") as fh:
+                while chunk := r.read(1 << 20):
+                    fh.write(chunk)
+            if not zipfile.is_zipfile(part):
+                raise OSError("download is not a zip archive")
+            part.replace(dest)
+            return
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last = e
+            time.sleep(2 * (attempt + 1))
+    part.unlink(missing_ok=True)
+    raise RuntimeError(f"download failed: {url}: {last}")
+
+
+def _spec_archive(root: Path, repo: str, force: bool = False) -> Path:
+    """Path of the (cached) codeload zip of a repo, each in its own directory under tools/src/."""
+    slug, branch, sha = _SPEC_REPOS[repo]
+    ref = sha or branch
+    ref_path = ref if sha else f"refs/heads/{branch}"
+    dest = root / "tests/corpus/tools/src" / repo / f"{repo}-{ref}.zip"
+    if force or not (dest.exists() and zipfile.is_zipfile(dest)):
+        url = f"https://codeload.github.com/{slug}/zip/{ref_path}"
+        t0 = time.time()
+        print(f"corpus: downloading {url}")
+        _download(url, dest)
+        print(f"corpus:   {dest.stat().st_size / 1e6:.1f} MB in {time.time() - t0:.0f}s")
+    return dest
+
+
+def _is_hidden(name: str) -> bool:
+    return any(part.startswith(".") for part in name.split("/") if part)
+
+
+class _SpecArchive:
+    """Read-only view of a GitHub source archive; paths are relative to its single top-level directory.
+    Members are only ever read with zipfile (never extracted), so a hostile path cannot escape."""
+
+    def __init__(self, path: Path):
+        self.zf = zipfile.ZipFile(path)
+        top = {n.split("/", 1)[0] for n in self.zf.namelist()}
+        if len(top) != 1:
+            raise RuntimeError(f"{path.name}: expected a single top-level directory, got {sorted(top)[:3]}")
+        self.top = top.pop() + "/"
+        self.files = {i.filename[len(self.top):]: i for i in self.zf.infolist()
+                      if not i.is_dir() and i.filename.startswith(self.top)}
+
+    def roots(self, under: str = "") -> list[str]:
+        """Directories below `under` that are an unpacked EPUB, outermost only: they hold
+        META-INF/container.xml (a missing `mimetype` file is a legitimate test case and still packs; a
+        directory with a mimetype but no container.xml is not an openable book and is skipped)."""
+        tail = "/META-INF/container.xml"
+        found = {n[:-len(tail)] for n in self.files if n.startswith(under) and n.endswith(tail)
+                 and not _is_hidden(n)}
+        return sorted(r for r in found if not any(r.startswith(o + "/") for o in found if o != r))
+
+    def prebuilt(self, under: str = "") -> list[str]:
+        """Prebuilt *.epub files (exact lower-case extension: epubcheck also keeps `x.ePub` fixtures to
+        test extension handling; those are not part of this corpus)."""
+        return sorted(n for n in self.files if n.startswith(under) and n.endswith(".epub")
+                      and not _is_hidden(n))
+
+    def read_dir(self, root: str) -> dict[str, bytes]:
+        prefix = root + "/"
+        return {n[len(prefix):]: self.zf.read(i) for n, i in self.files.items()
+                if n.startswith(prefix) and not _is_hidden(n[len(prefix):])}
+
+    def pack(self, root: str, dest: Path) -> None:
+        """Pack directory `root` into an EPUB at dest: mimetype first and STORED, the rest DEFLATED, sorted,
+        fixed timestamps, hidden files skipped."""
+        prefix = root + "/"
+        rel = sorted(((n[len(prefix):], n) for n in self.files
+                      if n.startswith(prefix) and not _is_hidden(n[len(prefix):])),
+                     key=lambda t: (t[0] != "mimetype", t[0]))
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as out:
+            for name, full in rel:
+                zi = zipfile.ZipInfo(name, _FIXED_DATE)
+                zi.create_system = 3
+                zi.external_attr = 0o644 << 16
+                zi.compress_type = zipfile.ZIP_STORED if name == "mimetype" else zipfile.ZIP_DEFLATED
+                out.writestr(zi, self.zf.read(self.files[full]))
+
+    def copy(self, name: str, dest: Path) -> None:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(self.zf.read(self.files[name]))
+
+
+def _epubcheck_section_test(rel: str) -> tuple[str, str]:
+    """Directory below src/test/resources/ -> (section, test name), e.g.
+    'epub3/07-content-documents/files/foo' -> ('epub3_07-content-documents', 'foo'),
+    'epub-edupub/files/epub/foo' -> ('epub-edupub', 'foo'). Directories outside a files/ tree use their whole
+    path as the section: 'stress' -> ('stress', 'stress'), 'epub3/test-files-unused/foo' ->
+    ('epub3_test-files-unused_foo', 'foo') (names of the original private corpus)."""
+    parts = rel.split("/")
+    if "files" in parts[:-1]:
+        i = parts.index("files")
+        tree, rest = parts[:i], parts[i + 1:]
+        if len(rest) > 1 and rest[0] == "epub":  # <feature>/files/epub/<test>: 'epub' is just a container
+            rest = rest[1:]
+        return "_".join(tree), "_".join(rest)
+    return "_".join(parts), parts[-1]
+
+
+def _epubcheck_folder(test: str) -> str:
+    """Folder by verdict word: the name's suffix (`...-valid`), else any `-valid-`/`-warning-` style token
+    in the name (cli__30-valid-test, cli__20-warning-tester). `invalid` is a different token from `valid`."""
+    tokens = re.split(r"[-_]", test)
+    for word in (tokens[-1], *tokens):
+        if word == "valid":
+            return "03-epubcheck-valid"
+        if word in ("warning", "usage"):
+            return "03-epubcheck-warnings"
+        if word in ("error", "fatal"):
+            return "03-epubcheck-invalid"
+    return "03-epubcheck-other"
+
+
+def _signature(files: dict[str, bytes]) -> frozenset:
+    return frozenset((n, hashlib.sha256(b).hexdigest()) for n, b in files.items())
+
+
+def fetch_spec(root: Path, *, force: bool = False) -> None:
+    """Rebuild tests/corpus/core/<folder>/ and tests/corpus/heavy/<folder>/ without the private zips.
+
+    Downloads the three GitHub source archives (pinned commits, see _SPEC_REPOS) to
+    tests/corpus/tools/src/<repo>/, reads them with zipfile only, and writes EPUBs:
+      01-idpf-samples      IDPF/epub3-samples: prebuilt .epub files if the repo ships any (it does not),
+                           else every directory <sample>/ holding META-INF + mimetype under 30/
+      02-w3c-conformance   w3c/epub-tests: every tests/<feature>/ directory, one feature per book
+      03-epubcheck-*       w3c/epubcheck src/test/resources: every unpacked EPUB directory becomes
+                           <section>__<test>.epub (section = feature/tree path with '/' -> '_', as in
+                           epub3_07-content-documents__foo); folder by test-name suffix: -valid -> valid,
+                           -warning/-usage -> warnings, -error/-fatal -> invalid, else other (a `-valid-`
+                           or `-warning-` token elsewhere in the name counts too). Directories without
+                           META-INF/container.xml, and ones identical to a prebuilt fixture, are skipped.
+                           Prebuilt .epub fixtures are copied under their own name into 03-epubcheck-other.
+    Packing is deterministic (mimetype first and stored, rest deflated, sorted, fixed timestamps, hidden
+    files skipped). Books above 2 MB go to heavy/<folder>/, the rest to core/<folder>/.
+    Resumable: a book that already exists in core/ or heavy/ is skipped unless force=True, and cached
+    archives are reused (force=True downloads them again).
+    """
+    root = Path(root)
+    corpus = root / "tests/corpus"
+    jobs: list[tuple[str, str, bool, _SpecArchive, str]] = []  # (folder, name, pack?, archive, source path)
+    seen: dict[tuple[str, str], str] = {}
+
+    def add(folder: str, name: str, pack: bool, arc: _SpecArchive, src: str) -> None:
+        if (folder, name) in seen:  # e.g. several minimal.epub fixtures: keep the first, say so
+            print(f"corpus: {folder}/{name}.epub from {src} dropped (already provided by "
+                  f"{seen[folder, name]})", file=sys.stderr)
+            return
+        seen[folder, name] = src
+        jobs.append((folder, name, pack, arc, src))
+
+    t0 = time.time()
+    samples = _SpecArchive(_spec_archive(root, "epub3-samples", force))
+    pre = [n for n in samples.prebuilt() if not n.startswith("lib/")]
+    for n in pre:
+        add("01-idpf-samples", Path(n).stem, False, samples, n)
+    if not pre:
+        for r in samples.roots("30/"):
+            add("01-idpf-samples", r.rsplit("/", 1)[-1], True, samples, r)
+
+    tests = _SpecArchive(_spec_archive(root, "epub-tests", force))
+    for r in tests.roots("tests/"):
+        add("02-w3c-conformance", r.rsplit("/", 1)[-1], True, tests, r)
+
+    check = _SpecArchive(_spec_archive(root, "epubcheck", force))
+    prebuilt = check.prebuilt(_EPUBCHECK_RES)
+    twins: dict[str, frozenset] = {}  # prebuilt fixtures by name -> content, to spot unpacked duplicates
+    for n in prebuilt:
+        try:
+            with zipfile.ZipFile(io.BytesIO(check.zf.read(check.files[n]))) as z:
+                twins[Path(n).stem] = _signature({i.filename: z.read(i) for i in z.infolist() if not i.is_dir()})
+        except (zipfile.BadZipFile, NotImplementedError, RuntimeError):
+            pass  # deliberately corrupt fixture
+    for r in check.roots(_EPUBCHECK_RES):
+        section, test = _epubcheck_section_test(r[len(_EPUBCHECK_RES):])
+        if test in twins and twins[test] == _signature(check.read_dir(r)):
+            print(f"corpus: {r} skipped (same content as the prebuilt {test}.epub)", file=sys.stderr)
+            continue
+        add(_epubcheck_folder(test), f"{section}__{test}", True, check, r)
+    for n in prebuilt:
+        add("03-epubcheck-other", Path(n).stem, False, check, n)
+
+    done = skipped = 0
+    for folder, name, pack, arc, src in jobs:
+        core_f = corpus / "core" / folder / f"{name}.epub"
+        heavy_f = corpus / "heavy" / folder / f"{name}.epub"
+        if not force and (core_f.exists() or heavy_f.exists()):
+            skipped += 1
+            continue
+        part = core_f.with_name(core_f.name + ".part")  # never a *.epub until complete
+        (arc.pack if pack else arc.copy)(src, part)
+        final = heavy_f if part.stat().st_size > _HEAVY_BYTES else core_f
+        for stale in (core_f, heavy_f):  # force: the book may land in the other tier than before
+            stale.unlink(missing_ok=True)
+        final.parent.mkdir(parents=True, exist_ok=True)
+        part.replace(final)
+        done += 1
+    print(f"corpus: spec corpora: {done} written, {skipped} already present, {len(jobs)} total "
+          f"({time.time() - t0:.0f}s)")
 
 
 # ── generated cases ──────────────────────────────────────────────────────────

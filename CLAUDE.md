@@ -57,8 +57,8 @@ The app version lives in `docs/index.html` (`APP_VERSION`) and `docs/sw.js` (`CA
 Both must match — the SW cache name must change to bust the cache for returning users.
 
 A pre-commit hook in `.githooks/pre-commit` **auto-bumps the patch version**
-whenever any `docs/` file changes. It's wired via `git config core.hooksPath .githooks`
-(already set in this repo).
+whenever any `docs/` file changes. Hooks path is local git config, so it is NOT set
+in a fresh clone: run `git config core.hooksPath .githooks` once after cloning.
 
 - To release a minor/major bump: manually edit both files before committing.
 - The hook detects that the version already changed and leaves it alone.
@@ -69,25 +69,40 @@ whenever any `docs/` file changes. It's wired via `git config core.hooksPath .gi
 # Start local server
 cd docs && python3 -m http.server 8765
 
+# Unit tests of the converter in Node (no browser needed)
+node tests/test_converter.mjs
+
+# Browser, Calibre-comparison and end-to-end tests
+uv run --python 3.13 tests/test_browser.py
+uv run --python 3.13 tests/test_calibre_compare.py
+uv run --python 3.13 tests/test_e2e.py
+
 # Validate AZW3 output with Calibre
 ebook-meta output.azw3
 ebook-convert output.azw3 output.txt
-
-# Test EPUB → AZW3 in Node (no browser needed)
-node /tmp/test-v6.mjs  # see /tmp/ for test scripts
 ```
 
 ### Quality harness
 
 Differential harness: converts a ~900-book corpus with the app (headless Chromium) and with Calibre, then
 checks gate (mobitool, KindleUnpack, Calibre reader), invariants (text/images/TOC/links/style) and a Calibre diff.
-Prerequisites: `brew install libmobi`, Calibre, `git clone --depth 1 https://github.com/kevinhendricks/KindleUnpack tests/corpus/tools/KindleUnpack`, `uv run --with playwright playwright install chromium`.
+Prerequisites (`uv` for all Python):
+- libmobi (`mobitool`): macOS `brew install libmobi`; Debian/Ubuntu `apt install libmobi-tools`.
+- Calibre on PATH: macOS `brew install --cask calibre`; Linux the official installer script (https://calibre-ebook.com/download_linux).
+- KindleUnpack: `git clone --depth 1 https://github.com/kevinhendricks/KindleUnpack tests/corpus/tools/KindleUnpack`.
+- Playwright Chromium: `uv run --with playwright playwright install chromium` (Linux: `uv run --with playwright playwright install --with-deps chromium`).
+
 ```bash
-uv run tests/harness/cli.py prepare            # manifest (add --fetch to download real-world books)
+uv run tests/harness/cli.py prepare            # manifest (add --fetch to download the corpus, see below)
 uv run tests/harness/cli.py all                # convert + check + report (--subset, --ids, --fmt, --limit, --no-style, --force)
 uv run tests/harness/cli.py report             # only rewrite the report from cached results
+uv run tests/harness/cli.py compare --before tests/corpus/<name>-results   # before/after diff
 ```
 Per-book results: `tests/corpus/out/<sha256>/result.<fmt>.json`; reports: `tests/reports/<date>-<subset>.md/.json`; contracts: `tests/harness/schema.md`.
+
+Corpus: `tests/corpus/` is git-ignored. When no corpus is present, `prepare --fetch` rebuilds it from the GitHub sources: the spec corpora from github.com/IDPF/epub3-samples, github.com/w3c/epub-tests and the github.com/w3c/epubcheck test resources, plus the real-world books (100 Standard Ebooks and 100 Project Gutenberg, fetched at 1 request/s).
+
+`compare --before DIR` needs an archived results directory (`tests/corpus/<name>-results/`, a copy of an earlier `tests/corpus/out/`). A fresh clone has none until a first run is archived (e.g. `cp -r tests/corpus/out tests/corpus/<name>-results` before changing the writer).
 
 ## PWA / Offline
 

@@ -440,10 +440,9 @@ test('Space before non-ASCII NOT encoded as space-char shortcut', () => {
   eq(dec.decode(palmDocDecompress(c)), ' é ');
 });
 test('Long Dutch paragraph compresses and decompresses correctly', () => {
-  const t = ('Stefan Hertmans\u2019 jarenlange fascinatie voor zijn grootvaders leven ' +
-             'bracht hem uiteindelijk tot het schrijven van deze aangrijpende roman. ' +
-             'Vlak voor zijn dood in de jaren tachtig van de vorige eeuw gaf de ' +
-             'grootvader zijn kleinzoon een paar volgeschreven oude cahiers. ').repeat(5);
+  const t = ('Zo\u00eb dronk een caf\u00e9 cr\u00e8me en las de uitnodiging voor de re\u00fcnie van de ' +
+             'ingenieurs. Voor de ge\u00efllustreerde gids betaalde ze \u20ac12,50, ' +
+             'en Zo\u00eb\u2019s buurman vond dat een redelijke prijs. ').repeat(5);
   eq(compressRoundtrip(t), t);
 });
 
