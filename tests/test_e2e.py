@@ -31,6 +31,7 @@ from xml.etree import ElementTree as ET
 sys.path.insert(0, str(Path(__file__).parent))
 from epub_fixtures import make_epub, MINIMAL_PNG
 from kf8_extract import text_bytes as kf8_text_bytes, fdst_flows as kf8_fdst_flows, strip_trailing_entries
+import fixtures
 
 # ── KF8 binary writer: Python REFERENCE MODEL of docs/index.html ───────────
 #
@@ -400,12 +401,13 @@ Path(_img_epub_path).write_bytes(make_epub(
     images=[('cover.png', MINIMAL_PNG)]
 ))
 
+# First element: a fixture name (downloaded once into tests/corpus/fixtures/, see fixtures.py) or a path.
 EPUB_TESTS = [
-    ('/tmp/alice_images.epub',         "Alice in Wonderland (EPUB2 + images)", "Alice's Adventures"),
-    ('/tmp/pride_prejudice.epub',      "Pride and Prejudice (long book)",       "Pride and Prejudice"),
-    ('/tmp/sherlock.epub',             "Sherlock Holmes",                        "Adventures of Sherlock Holmes"),
-    ('/tmp/tale_two_cities.epub',      "A Tale of Two Cities (48 chapters)",    "Tale of Two Cities"),
-    ('/tmp/moby_dick.epub',            "Moby Dick",                             "Moby Dick"),
+    ('alice_images',                   "Alice in Wonderland (EPUB2 + images)", "Alice's Adventures"),
+    ('pride_prejudice',                "Pride and Prejudice (long book)",       "Pride and Prejudice"),
+    ('sherlock',                       "Sherlock Holmes",                        "Adventures of Sherlock Holmes"),
+    ('tale_two_cities',                "A Tale of Two Cities (48 chapters)",    "Tale of Two Cities"),
+    ('moby_dick',                      "Moby Dick",                             "Moby Dick"),
     (_epub3_path,                      "Synthetic EPUB 3.0",                    "EPUB3"),
     (_css_epub_path,                   "Synthetic: CSS display:none",           "CSS Visibility"),
     (_img_epub_path,                   "Synthetic: embedded image",             "Image Test"),
@@ -431,12 +433,14 @@ def check_trailing_entries(data: bytes):
             assert recs[i+1].startswith(overlap), f'record {i}: overlap not repeated at start of next record'
 
 for epub_path, label, expected_title_fragment in EPUB_TESTS:
-    if not Path(epub_path).exists():
-        print(f'  ⚠ skip {label} (not found: {epub_path})')
-        continue
+    if epub_path in fixtures.FIXTURES:
+        _fx = fixtures.try_fixture(epub_path, label)
+        if _fx is None:
+            continue
+        epub_path = str(_fx)
 
-    out_path = epub_path.replace('.epub', '_e2e.azw3')
-    txt_path = epub_path.replace('.epub', '_e2e.txt')
+    out_path = f'/tmp/{Path(epub_path).stem}_e2e.azw3'
+    txt_path = f'/tmp/{Path(epub_path).stem}_e2e.txt'
     meta = None
 
     print(f'\n── {label} ──')
@@ -526,8 +530,9 @@ for epub_path, label, expected_title_fragment in EPUB_TESTS:
 print('\n── Binary format validation ──')
 
 # Re-convert Alice and check specific binary properties
-alice_path = '/tmp/alice_images.epub'
-if Path(alice_path).exists():
+alice_path = fixtures.try_fixture('alice_images', 'Binary format validation')
+_checks_before = passed + failed
+if alice_path:
     out = '/tmp/alice_validate.azw3'
     try:
         meta = convert_epub(alice_path, out)
@@ -613,14 +618,24 @@ if Path(alice_path).exists():
         test('Skeleton head fits in one text record (≤4096 bytes)', check_skeleton_fits_in_one_record)
 
     except Exception as e:
-        print(f'  ⚠ Binary validation skipped: {e}')
+        test('Binary format validation setup (convert Alice)', lambda: (_ for _ in ()).throw(e))
+    if passed + failed == _checks_before:
+        test('Binary format validation ran at least one check', lambda: (_ for _ in ()).throw(
+            AssertionError('section ran zero checks')))
 
 # ── Screenshot validation (requires playwright) ────────────────────────────
 
 print('\n── Screenshot validation ──')
 
 alice_azw3 = '/tmp/alice_validate.azw3'
-if Path(alice_azw3).exists():
+_checks_before = passed + failed
+_skips_before_shots = fixtures.skip_count()
+if not alice_path:
+    fixtures.skip('Screenshot validation', 'Alice fixture unavailable')
+elif not Path(alice_azw3).exists():
+    test('Screenshot validation input exists', lambda: (_ for _ in ()).throw(
+        AssertionError(f'{alice_azw3} was not produced by Binary format validation')))
+else:
     try:
         from playwright.sync_api import sync_playwright
 
@@ -763,10 +778,13 @@ if Path(alice_azw3).exists():
             test('Skeleton heads are each ≤4096 bytes (fit in one text record)', check_skel_head_size)
 
     except ImportError:
-        print('  ⚠ playwright not installed — run: uvx --with playwright playwright install chromium')
+        fixtures.skip('Screenshot validation', 'playwright not installed')
     except Exception as e:
-        print(f'  ⚠ Screenshot tests skipped: {e}')
         import traceback; traceback.print_exc()
+        test('Screenshot validation setup', lambda: (_ for _ in ()).throw(e))
+if passed + failed == _checks_before and fixtures.skip_count() == _skips_before_shots:
+    test('Screenshot validation ran at least one check', lambda: (_ for _ in ()).throw(
+        AssertionError('section ran zero checks')))
 
 # ── Error cases ────────────────────────────────────────────────────────────
 
@@ -998,18 +1016,19 @@ try:
             test('kindle:embed reference is 4-char base-32, 1-indexed',
                  lambda: len(embed_refs) > 0 and embed_refs[0] != '0000')
         else:
-            print('  ⚠ no chapter with <img> found for image rendering test')
+            test('Image rendering: a chapter with <img> was found', lambda: (_ for _ in ()).throw(
+                AssertionError('no chapter with <img> in the converted synthetic image book')))
 
     except ImportError:
-        print('  ⚠ playwright not available for image rendering test')
+        fixtures.skip('Image rendering (visual)', 'playwright not installed')
 
 except Exception as e:
-    print(f'  ⚠ image rendering test skipped: {e}')
+    test('Image rendering setup (convert synthetic image book)', lambda: (_ for _ in ()).throw(e))
 
 # ── Results ────────────────────────────────────────────────────────────────
 
 print(f'\n{"═"*60}')
-print(f'  {passed} passed  {failed} failed')
+print(f'  {passed} passed  {failed} failed  {fixtures.skip_count()} skipped')
 if failures:
     print('\nFailed:')
     for name, err in failures:

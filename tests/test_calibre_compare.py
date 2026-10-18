@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from epub_fixtures import make_epub, MINIMAL_PNG
 from kf8_extract import text_bytes, fdst_flows
+import fixtures
 
 from playwright.sync_api import sync_playwright
 
@@ -153,17 +154,13 @@ def our_convert(page, epub_path: str, fmt: str = 'azw3') -> bytes | None:
 
 httpd, base_url = start_server()
 
-# Test EPUBs: download if missing
-EPUBS = [
-    ('/tmp/sherlock.epub',        'Sherlock Holmes',    'https://www.gutenberg.org/ebooks/1661.epub.noimages'),
-    ('/tmp/frankenstein.epub',    'Frankenstein',       'https://www.gutenberg.org/ebooks/84.epub.noimages'),
-    ('/tmp/pride_prejudice.epub', 'Pride & Prejudice',  'https://www.gutenberg.org/ebooks/1342.epub.noimages'),
-]
-
-for path, label, url in EPUBS:
-    if not Path(path).exists():
-        print(f'Downloading {label}...')
-        subprocess.run(['curl', '-sL', url, '-o', path], timeout=30)
+# Test EPUBs: fixture books are downloaded once into tests/corpus/fixtures/ (see fixtures.py)
+EPUBS = []
+for name, label in (('sherlock', 'Sherlock Holmes'), ('frankenstein', 'Frankenstein'),
+                    ('pride_prejudice', 'Pride & Prejudice')):
+    _fx = fixtures.try_fixture(name, f'Calibre comparison: {label}')
+    if _fx:
+        EPUBS.append((str(_fx), label, None))
 
 # Also test with local EPUBs if present
 local_epubs = list(Path(__file__).parent.parent.glob('*.epub'))
@@ -174,20 +171,16 @@ with sync_playwright() as pw:
     browser = pw.chromium.launch()
 
     for epub_path, label, _ in EPUBS:
-        if not Path(epub_path).exists():
-            print(f'  ⚠ skip {label} (not found)')
-            continue
-
         print(f'\n── {label} ─────────────────────────────────────────────')
 
         # ── Generate reference with Calibre ──
-        cal_azw3 = epub_path.replace('.epub', '_calibre_ref.azw3')
-        cal_mobi = epub_path.replace('.epub', '_calibre_ref.mobi')
+        cal_azw3 = f'/tmp/{Path(epub_path).stem}_calibre_ref.azw3'
+        cal_mobi = f'/tmp/{Path(epub_path).stem}_calibre_ref.mobi'
         cal_azw3_ok = calibre_convert(epub_path, cal_azw3)
         cal_mobi_ok = calibre_convert(epub_path, cal_mobi)
 
         if not cal_azw3_ok:
-            print(f'  ⚠ Calibre AZW3 conversion failed — skipping comparisons')
+            test(f'{label}: Calibre reference conversion succeeds', lambda: False)
             continue
 
         # ── Convert with our app ──
@@ -203,8 +196,8 @@ with sync_playwright() as pw:
             continue
 
         # Save outputs for inspection
-        our_azw3 = epub_path.replace('.epub', '_ours.azw3')
-        our_mobi = epub_path.replace('.epub', '_ours.mobi')
+        our_azw3 = f'/tmp/{Path(epub_path).stem}_ours.azw3'
+        our_mobi = f'/tmp/{Path(epub_path).stem}_ours.mobi'
         Path(our_azw3).write_bytes(our_azw3_bytes)
         if our_mobi_bytes: Path(our_mobi).write_bytes(our_mobi_bytes)
 
@@ -346,7 +339,7 @@ with sync_playwright() as pw:
 httpd.shutdown()
 
 print(f'\n{"═"*60}')
-print(f'  {passed} passed  {failed} failed')
+print(f'  {passed} passed  {failed} failed  {fixtures.skip_count()} skipped')
 if failures:
     print('\nFailed:')
     for name, err in failures:

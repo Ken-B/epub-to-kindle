@@ -21,6 +21,7 @@ from functools import partial
 sys.path.insert(0, str(Path(__file__).parent))
 from epub_fixtures import make_epub, MINIMAL_PNG
 from kf8_extract import text_bytes as kf8_text_bytes, fdst_flows as kf8_fdst_flows
+import fixtures
 
 from playwright.sync_api import sync_playwright
 
@@ -172,7 +173,7 @@ httpd, port = start_server(docs_dir)
 base_url = f'http://localhost:{port}'
 print(f'Server: {base_url}  (docs: {docs_dir})')
 
-ALICE = Path('/tmp/alice_images.epub')
+ALICE = fixtures.try_fixture('alice_images', 'T2: Basic conversion (Alice EPUB 2)')
 
 with sync_playwright() as pw:
     browser = pw.chromium.launch()
@@ -199,8 +200,8 @@ with sync_playwright() as pw:
 
     # ── T2: Basic conversion (Alice EPUB 2) ────────────────────────────────
     print('\n── T2: Basic conversion (Alice EPUB 2) ────────────────────────')
-    if not ALICE.exists():
-        print('  ⚠ skip (alice_images.epub not found at /tmp/)')
+    if ALICE is None:
+        pass  # SKIP line already printed (and counted) by try_fixture
     else:
         page = browser.new_page()
         page.goto(base_url)
@@ -598,8 +599,8 @@ with sync_playwright() as pw:
     test('Profile: px font-size becomes em of the parent (12px → 0.75em, 24pt → 2em)',
          lambda: has(kp['small'], r'font-size:0\.75em') and has(kp['dropcap'], r'font-size:2em'))
     test('Profile: calc() ignored, the earlier width wins', lambda: has(kp['calc'], r'width:50%') and 'calc(' not in kp['sheet'])
-    test('Profile: position/top/float dropped on a text block, float kept on the drop cap',
-         lambda: kp['pos'] is not None and not has(kp['pos'], r'position|top:|float') and has(kp['dropcap'], r'float:left'))
+    test('Profile: position/top dropped on a text block, float kept (also on the drop cap)',
+         lambda: kp['pos'] is not None and not has(kp['pos'], r'position|top:') and has(kp['pos'], r'float:') and has(kp['dropcap'], r'float:left'))
     test('Profile: hidden element has a class with display:none', lambda: has(kp['hidden'], r'display:none'))
     test('Profile: no author class or style attribute left in the HTML',
          lambda: re.search(r'class="(?!kp\d)', kp['ch']) is None and ' style="' not in kp['ch'])
@@ -635,6 +636,8 @@ with sync_playwright() as pw:
                 '<p><span class="cur">Désolé, Madame.</span> <span class="sc">Caps</span> <span class="plainff">Plain</span></p>\n'
                 '<p class="m">m1</p><p class="m"></p><p class="m">m2</p><div class="pb"></div><p>end</p>\n'
                 '<div class="st"><div class="mm"></div><div class="mm">first stanza line</div></div>\n<div class="verse"><span class="vl">line one<br class="hb"/></span><span class="vl">line two<br class="hb"/></span></div>\n'
+                '<p>Text<span id="pgA" class="pgx">[Pg 12]</span> more<span class="pagenum">xiv</span> and<span class="pgx">Not a page number here</span>'
+                '<span class="pgx" id="pgI"><img src="x.png" alt=""/>12</span></p>\n'
                 '<div><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9">\n  <g>\n    <rect width="9" height="9"/>\n  </g>\n  <text> spaced  text </text>\n</svg></div>'),
     ], css_rules=[
         ('p', 'margin: 0; font-weight: bold'),
@@ -656,7 +659,7 @@ with sync_playwright() as pw:
         ('@font-face', 'font-family: fSC; src: url(fonts/Book-SCSemibold.otf)'),
         ('@font-face', 'font-family: "fR"; src: url(fonts/Book-Regular.otf)'),
         ('.cur', 'font-family: "fI"'), ('.sc', 'font-family: fSC, Georgia, serif; font-weight: normal'),
-        ('.plainff', 'font-family: "fR"'),
+        ('.plainff', 'font-family: "fR"'), ('.pgx', 'position: absolute; right: 1em'),
     ])
     page = browser.new_page()
     page.goto(base_url)
@@ -682,11 +685,80 @@ with sync_playwright() as pw:
             anc: decls('<p[^>]*>(?=Indented by the ancestor)'), plain: decls('<p[^>]*>(?=<a )'),
             h2h: decls('<h2[^>]*>(?=Hidden title)'), ph: decls('<p[^>]*>(?=Hidden para)'), shown: decls('<p[^>]*>(?=Shown para)'),
             closed: decls('<p[^>]*>(?=Closed content)'), summ: decls('<summary[^>]*>(?=Sum)'),
+            pgA: decls('<span id="pgA"[^>]*>'), pgB: decls('<span class="[^"]*"[^>]*>(?=xiv)'),
+            pgC: decls('<span[^>]*>(?=Not a page)'), pgI: decls('<span[^>]*id="pgI"[^>]*>'),
             cur: decls('<span[^>]*>(?=Désolé)'), sc: decls('<span[^>]*>(?=Caps)'), pff: decls('<span[^>]*>(?=Plain)')};
     }''', base64.b64encode(kp2_epub).decode())
     page.close()
     test('Profile: clip / clip-path screen-reader text stays hidden (display:none), not revealed',
          lambda: 'display:none' in kp2['sr'] and 'display:none' in kp2['sr2'] and 'position' not in kp2['sr'])
+    test('Profile: page-number markers (absolute "[Pg 12]", class pagenum "xiv") are display:none and keep their id',
+         lambda: 'display:none' in kp2['pgA'] and 'position' not in kp2['pgA'] and 'id="pgA"' in kp2['ch']
+                 and 'display:none' in kp2['pgB'])
+    test('Profile: a positioned span with longer text, or one holding an image, is not hidden (position dropped)',
+         lambda: 'display:none' not in kp2['pgC'] and 'position' not in kp2['pgC'] and 'display:none' not in kp2['pgI'])
+    # Case-insensitive resource lookup: hrefs whose letter case differs from the zip entry names
+    import zipfile
+    from epub_fixtures import CONTAINER_XML
+    def case_epub() -> bytes:
+        buf = io.BytesIO()
+        xh = ('<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title>'
+              '<link rel="stylesheet" type="text/css" href="%s"/></head><body>%s</body></html>')
+        opf = ('<?xml version="1.0" encoding="UTF-8"?><package version="2.0" xmlns="http://www.idpf.org/2007/opf" unique-identifier="u">'
+               '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Case</dc:title><dc:language>en</dc:language>'
+               '<dc:identifier id="u">case-1</dc:identifier></metadata><manifest>'
+               '<item id="c1" href="Text/Ch1.XHTML" media-type="application/xhtml+xml"/>'
+               '<item id="c2" href="text/ch2.xhtml" media-type="application/xhtml+xml"/>'
+               '<item id="css" href="STYLES/Main.css" media-type="text/css"/>'
+               '<item id="img" href="Images/Pic.PNG" media-type="image/png"/>'
+               '<item id="ncx" href="TOC.ncx" media-type="application/x-dtbncx+xml"/></manifest>'
+               '<spine toc="ncx"><itemref idref="c1"/><itemref idref="c2"/></spine></package>')
+        ncx = ('<?xml version="1.0" encoding="UTF-8"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><head/>'
+               '<docTitle><text>Case</text></docTitle><navMap>'
+               '<navPoint id="n1" playOrder="1"><navLabel><text>First</text></navLabel><content src="TEXT/CH1.xhtml"/></navPoint>'
+               '<navPoint id="n2" playOrder="2"><navLabel><text>Second</text></navLabel><content src="Text/Ch2.xhtml#t2"/></navPoint>'
+               '</navMap></ncx>')
+        with zipfile.ZipFile(buf, 'w') as z:
+            z.writestr('mimetype', 'application/epub+zip', compress_type=zipfile.ZIP_STORED)
+            z.writestr('META-INF/container.xml', CONTAINER_XML.replace('OEBPS/content.opf', 'oebps/CONTENT.opf'))
+            z.writestr('oebps/CONTENT.opf', opf)
+            z.writestr('oebps/toc.ncx', ncx)
+            z.writestr('oebps/text/ch1.xhtml', xh % ('../Styles/MAIN.css',
+                '<p class="m">Mixed case</p><img src="../images/pic.png" alt=""/><p><a href="CH2.xhtml#t2">next</a></p>'))
+            z.writestr('oebps/text/ch2.xhtml', xh % ('../styles/A.css',
+                '<p id="t2" class="m">Exact name wins</p>'))
+            z.writestr('oebps/styles/main.css', '.m { color: red }')
+            z.writestr('oebps/styles/a.css', '.m { color: blue }')
+            z.writestr('oebps/styles/A.css', '.m { color: green }')
+            z.writestr('oebps/images/pic.png', MINIMAL_PNG)
+        return buf.getvalue()
+    page = browser.new_page()
+    case_warns = []
+    page.on('console', lambda m: case_warns.append(m.text) if m.type == 'warning' and 'Case-insensitive' in m.text else None)
+    page.goto(base_url)
+    ci = page.evaluate('''async (b64) => {
+        const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+        const e = await parseEpub(buf, {mobi: true, kf8: true});
+        return {n: e.chapters.length, sheet: e.stylesheets[0], c1: e.chapters[0].content, c2: e.chapters[1].content,
+                m1: e.chapters[0].mobiContent || '', m2: e.chapters[1].mobiContent || '',
+                imgs: e.imageResources.length, toc: e.toc.map(t => [t.label, t.chapter]),
+                first: e.chapters[0].path, canon: _pathCanon === null};
+    }''', base64.b64encode(case_epub()).decode())
+    page.wait_for_timeout(200)
+    page.close()
+    test('Case fallback: chapters, OPF, NCX and spine resolve despite different letter case',
+         lambda: ci['n'] == 2 and ci['first'] == 'oebps/text/ch1.xhtml' and ci['toc'] == [['First', 0], ['Second', 1]])
+    test('Case fallback: a stylesheet linked/listed with other case is found (cascade applied, color:red)',
+         lambda: 'color:red' in ci['sheet'] and 'class="kp' in ci['c1'])
+    test('Case fallback: an exact-case match wins over a casefolded one (A.css green, not a.css blue)',
+         lambda: 'color:green' in ci['sheet'] and 'color:blue' not in ci['sheet'])
+    test('Case fallback: an image and an internal link with other case resolve',
+         lambda: ci['imgs'] == 1 and 'kindle:embed:' in ci['c1'] and 'kindle:pos:fid:' in ci['c1'] and 'CH2' not in ci['c1']
+                 and 'id="t2"' in ci['c2'])
+    test('Case fallback: MOBI markup gets the cascade too (<font color> from the casefolded sheet)',
+         lambda: 'color="#ff0000"' in ci['m1'].lower() or 'color="red"' in ci['m1'].lower())
+    test('Case fallback: one console.warn per book, and the lookup table is released afterwards',
+         lambda: len(case_warns) == 1 and ci['canon'] is True)
     test('Profile: <ol type> not overridden (no pinned list-style-type), attribute kept',
          lambda: 'list-style-type' not in kp2['sheet'] and re.search(r'<ol [^>]*type="a"', kp2['ch']) is not None)
     test('Profile: <hr size color align> and <table cellpadding> carried into the class',
@@ -832,7 +904,8 @@ with sync_playwright() as pw:
         sw_works = True
     except Exception:
         sw_works = False
-        print('  ⚠ Service worker did not activate — skipping offline tests')
+        test('Service worker activates and controls the page', lambda: (_ for _ in ()).throw(
+            AssertionError('navigator.serviceWorker.controller still null after 15 s')))
 
     if sw_works:
         test('Service worker is registered and controlling the page',
@@ -882,9 +955,14 @@ with sync_playwright() as pw:
     # - No CSS leakage in the rendered chapters
 
     import glob
+    # Gutenberg fixtures (tests/fixtures.py) make the section self-sufficient when no local books exist.
     local_epubs = sorted(glob.glob(str(Path(docs_dir).parent / '*.epub')))
+    for _name in ('sherlock', 'tale_two_cities'):
+        _fx = fixtures.try_fixture(_name, f'T9: Real-world EPUB {_name}')
+        if _fx:
+            local_epubs.append(str(_fx))
     if local_epubs:
-        print('\n── T9: Real-world EPUBs (local only) ──────────────────────────')
+        print('\n── T9: Real-world EPUBs ───────────────────────────────────────')
         for epub_path in local_epubs:
             epub_name = Path(epub_path).name
             label = epub_name.replace('.epub', '')[:50]
@@ -1016,7 +1094,11 @@ with sync_playwright() as pw:
         webkit.close()
 
     except Exception as e:
-        print(f'  ⚠ WebKit tests skipped: {e}')
+        # A missing WebKit engine is an environment gap (skip, loudly); anything else is a failure.
+        if 'Executable doesn' in str(e) or 'playwright install' in str(e):
+            fixtures.skip('T10: WebKit (Safari engine)', 'WebKit browser not installed')
+        else:
+            test('WebKit section runs to completion', lambda: (_ for _ in ()).throw(e))
 
     print('\n── T11: Mobile viewport (iPhone 15 emulation) ─────────────────')
 
@@ -1157,7 +1239,7 @@ httpd.shutdown()
 # ── Results ──────────────────────────────────────────────────────────────────
 
 print(f'\n{"═"*60}')
-print(f'  {passed} passed  {failed} failed')
+print(f'  {passed} passed  {failed} failed  {fixtures.skip_count()} skipped')
 if failures:
     print('\nFailed:')
     for name, err in failures:

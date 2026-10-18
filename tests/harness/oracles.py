@@ -1987,13 +1987,22 @@ _COLLECT_JS = r"""
     clipMemo.set(e, v);
     return v;
   };
+  // Text far to the RIGHT of the page counts as moved off it only when something positions it
+  // (position other than static on the element or an ancestor): in normal flow it is a wide table or an
+  // unwrapped <pre> line that overflows the viewport, which a reader scrolls or wraps (not hidden).
+  const positionedUp = e => {
+    for (let x = e; x && x !== document.documentElement; x = x.parentElement)
+      if (getComputedStyle(x).position !== 'static') return true;
+    return false;
+  };
   const rendered = (e, cs) => {
     if (cs.visibility !== 'visible' || clippedUp(e, cs)) return false;
     for (const c of e.childNodes) {
       if (c.nodeType !== 3 || !/\S/.test(c.data)) continue;
       rng.selectNodeContents(c);
       for (const r of rng.getClientRects())
-        if (r.width > 0 && r.height > 0 && r.right > -500 && r.bottom > -500 && r.left < vw + 500) return true;
+        if (r.width > 0 && r.height > 0 && r.right > -500 && r.bottom > -500 &&
+            (r.left < vw + 500 || !positionedUp(e))) return true;
     }
     return false;
   };

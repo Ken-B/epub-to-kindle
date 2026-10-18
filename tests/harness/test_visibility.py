@@ -53,6 +53,12 @@ CASES = [
     ("font-size 0", ".x {{ font-size: 0 }}", "<p class='x'>{t}</p>", False),
     ("display contents", ".x {{ display: contents }}", "<div><p class='x'>{t}</p></div>", True),
     ("long page, text far below", "", "<div style='height: 5000px'></div><p>{t}</p>", True),
+    # normal-flow overflow to the right (wide table, unwrapped <pre> line) is not a hiding idiom
+    ("wide table, cell text beyond the viewport", "td {{ width: 1500px }}",
+     "<table><tr><td>filler</td><td>{t}</td></tr></table>", True),
+    ("unwrapped pre line, text beyond the viewport", "", "<pre>" + "x" * 200 + "<b>{t}</b></pre>", True),
+    ("positioned far right", ".x {{ position: absolute; left: 9999px }}", "<p class='x'>{t}</p>", False),
+    ("positioned far right (ancestor)", ".x {{ position: relative; left: 3000px }}", "<div class='x'><p>{t}</p></div>", False),
 ]
 
 

@@ -38,11 +38,11 @@ tests/reports/<YYYY-MM-DD>-<subset>.md and .json
 
 - `id`: `<subset>/<folder>/<basename without .epub>`; must be unique and filesystem-safe.
 - `category`: one of `idpf`, `w3c`, `epubcheck-valid`, `epubcheck-warnings`, `epubcheck-invalid`,
-  `epubcheck-other`, `se`, `pg`, `generated`, `local`.
+  `epubcheck-other`, `se`, `pg`, `generated`, `local`, `private`.
 - `expected_verdict`: `valid` | `warning` | `error` | `unknown`. For `03-epubcheck-*` derive from the
   filename suffix (`-valid`, `-warning`, `-error`, `-usage` → warning); else `valid` for idpf/w3c/se/pg,
   `error` for generated cases that are meant to be broken, `unknown` otherwise.
-- `subset`: `core` | `heavy` | `real` | `generated` | `local`. `cli.py --subset` filters on this.
+- `subset`: `core` | `heavy` | `real` | `generated` | `local` | `private`. `cli.py --subset` filters on this.
 - `sha256` is unique: byte-identical books are folded into the first entry by id, whose optional
   `aliases` lists the other ids (they would share `out/<sha256>/`).
 - The local reference book (`Oorlog en terpentijn - Stefan Hertmans.epub` in the repo root) is entry
@@ -327,7 +327,10 @@ elements), elements, chars (visible chars removed), anchors (<a href> removed), 
     the screen-reader patterns on the element or an ancestor (`clip: rect(..)` of at most 1 px under
     `position: absolute|fixed`, `clip-path: inset(..)` with the insets adding up to 100 % in a direction,
     `circle(0)`, a box of 1 px or less with `overflow` other than visible), and not positioned 500 px or
-    more off the page (right/bottom edge above -500, left edge below viewport width + 500). The input
+    more off the page (right/bottom edge above -500; left edge below viewport width + 500, which applies only
+    to text that something positions: `position` other than static on the element or an ancestor, since text
+    in normal flow far to the right is a wide table or an unwrapped `<pre>` line that overflows the page,
+    not a hiding idiom). The input
     is measured with its author CSS (MOBI v6: also the elements the writer removes, which count as hidden);
     the MOBI output with MOBI_CSS applied like the style score.
   - Matching is by text, per spine item (aligned mode) or for the whole book (concat mode): text T of a

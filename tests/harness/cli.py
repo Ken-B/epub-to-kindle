@@ -7,11 +7,11 @@
     uv run tests/harness/cli.py prepare [--fetch | --fetch-spec]
     uv run tests/harness/cli.py convert [flags]     # app (Chromium) + Calibre ebook-convert
     uv run tests/harness/cli.py check   [flags]     # gate + invariants + calibre_diff -> result.<fmt>.json
-    uv run tests/harness/cli.py report  [flags]     # tests/reports/<date>-<subset>.md/.json
+    uv run tests/harness/cli.py report  [flags]     # tests/reports/<date>-<subset>.md/.json (private: tests/corpus/reports-private/)
     uv run tests/harness/cli.py all     [flags]     # convert, check, report
     uv run tests/harness/cli.py compare --before DIR --name N  # report + 'Before vs after' section
 
-Flags (all stages): --subset core,heavy,real,generated,local  --ids GLOBS  --fmt azw3,mobi
+Flags (all stages): --subset core,heavy,real,generated,local,private  --ids GLOBS  --fmt azw3,mobi
                     --workers N  --force  --no-style  --limit N
 Every stage caches; --force recomputes. See tests/harness/schema.md for the file layout.
 """
@@ -36,6 +36,7 @@ ROOT = HARNESS_DIR.parents[1]
 CORPUS = ROOT / "tests/corpus"
 OUT_ROOT = CORPUS / "out"
 REPORTS = ROOT / "tests/reports"
+REPORTS_PRIVATE = CORPUS / "reports-private"   # git-ignored: reports that include the private subset
 DEFAULT_BEFORE = CORPUS / "baseline-results"
 DEFAULT_SUBSETS = "core,real,generated,local"
 
@@ -66,6 +67,21 @@ def select(args) -> list[dict]:
 
 def subset_label(args) -> str:
     return "-".join(_csv(args.subset))
+
+
+def reports_dir(args) -> Path:
+    """Committed reports go to tests/reports/; any selection that includes the private subset goes
+    to the git-ignored tests/corpus/reports-private/."""
+    return REPORTS_PRIVATE if "private" in _csv(args.subset) else REPORTS
+
+
+def _result_head(e: dict) -> dict:
+    """Identity fields copied into result.<fmt>.json; the path of a private book (a title) is dropped."""
+    r = {k: e.get(k) for k in ("id", "path", "sha256", "category", "expected_verdict",
+                               "size_bytes", "subset")}
+    if e.get("subset") == "private":
+        r["path"] = ""
+    return r
 
 
 def log(msg: str) -> None:
@@ -233,8 +249,7 @@ def check_one(entry: dict, fmt: str, force: bool, no_style: bool) -> dict:
     import oracles
     import report
     out_dir = OUT_ROOT / entry["sha256"]
-    res = {k: entry.get(k) for k in ("id", "path", "sha256", "category", "expected_verdict",
-                                     "size_bytes", "subset")}
+    res = _result_head(entry)
     res["format"] = fmt
     res.update(app=None, calibre=None, gate=None, invariants=None, calibre_diff=None, categories=[])
     errors = []
@@ -361,8 +376,7 @@ def cmd_check(args) -> None:
         for b in pending:
             for e, fm in b:
                 if not _is_fresh(e, fm):
-                    r = {k: e.get(k) for k in ("id", "path", "sha256", "category", "expected_verdict",
-                                               "size_bytes", "subset")}
+                    r = _result_head(e)
                     r.update(format=fm, app=_meta_app(OUT_ROOT / e["sha256"], fm),
                              calibre=_meta_calibre(OUT_ROOT / e["sha256"], fm), gate=None,
                              invariants=None, calibre_diff=None, categories=[],
@@ -412,9 +426,10 @@ def cmd_report(args) -> None:
                 results.append(r)
     label = subset_label(args)
     today = datetime.date.today().isoformat()
-    REPORTS.mkdir(parents=True, exist_ok=True)
+    rdir = reports_dir(args)
+    rdir.mkdir(parents=True, exist_ok=True)
     stem = getattr(args, "name", None) or f"{today}-{label}"
-    md, js = REPORTS / f"{stem}.md", REPORTS / f"{stem}.json"
+    md, js = rdir / f"{stem}.md", rdir / f"{stem}.json"
     report.write_report(results, md, js, subset=label)
     before = getattr(args, "before", None)
     if before:
@@ -439,7 +454,8 @@ def main(argv=None) -> int:
 
     def common(p):
         p.add_argument("--subset", default=DEFAULT_SUBSETS,
-                       help="comma list of core,heavy,real,generated,local (default: %(default)s)")
+                       help="comma list of core,heavy,real,generated,local,private (default: %(default)s); "
+                            "a selection that includes private reports to tests/corpus/reports-private/")
         p.add_argument("--ids", help="comma-separated fnmatch globs on entry ids")
         p.add_argument("--fmt", default="azw3,mobi")
         p.add_argument("--workers", type=int, default=8)
