@@ -144,7 +144,7 @@
  */
 'use strict';
 
-const APP_VERSION = 'v1.0.16';
+const APP_VERSION = 'v1.0.17';
 document.getElementById('appVersion').textContent = APP_VERSION;
 
 // ─── Binary helpers ───────────────────────────────────────────────────────────
@@ -796,7 +796,14 @@ function normPath(p) {
 function dirOf(p) { const i = p.lastIndexOf('/'); return i >= 0 ? p.slice(0, i + 1) : ''; }
 /** Normalised zip path of a relative URL used in a file in directory dir (a
  *  path-absolute URL, "/x/y", is relative to the container root). */
-function joinPath(dir, url) { return normPath(url.startsWith('/') ? url : dir + url); }
+function joinPath(dir, url) {
+  const p = normPath(url.startsWith('/') ? url : dir + url);
+  return typeof _pathCanon === 'function' ? _pathCanon(p) : p;
+}
+/** Set by parseEpub while it runs: maps a normalised path to the name of the zip entry it
+ *  denotes (exact match, else NFC/NFD-tolerant, else case-insensitive), so every table keyed
+ *  by path (chapters, stylesheets, images, TOC, links) agrees on one spelling. */
+let _pathCanon = null;
 
 function escAttr(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1029,6 +1036,9 @@ function uuid4() {
  *  opts.css (KF8): 'profile' (default; the Kindle profile, kpNormalise: one generated
  *  stylesheet) or 'author' (the author sheets verbatim as flows). */
 async function parseEpub(buf, opts = {}) {
+  try { return await parseEpubBook(buf, opts); } finally { _pathCanon = null; }
+}
+async function parseEpubBook(buf, opts) {
   const mobi = opts.mobi !== false;
   const kf8 = opts.kf8 !== false;
   const profile = kf8 && opts.css !== 'author';
@@ -1043,7 +1053,25 @@ async function parseEpub(buf, opts = {}) {
     const key = normPath(name).normalize('NFC');
     if (!entry.dir && !zipByName.has(key)) zipByName.set(key, entry);
   }
-  const zipFile = p => zip.file(p) || zipByName.get(normPath(p).normalize('NFC')) || null;
+  // Case-insensitive fallback (some books link "Styles/Style.CSS" to the entry
+  // "styles/style.css"; readers on case-insensitive file systems cope): the first entry per
+  // lower-cased name; an exact (NFC-normalised) match always wins. One console.warn per book.
+  const zipByLower = new Map();
+  for (const key of zipByName.keys()) {
+    const lk = key.toLowerCase();
+    if (!zipByLower.has(lk)) zipByLower.set(lk, key);
+  }
+  let caseWarned = false;
+  const canonKey = p => {
+    const key = p.normalize('NFC');
+    if (zipByName.has(key)) return key;
+    const hit = zipByLower.get(key.toLowerCase());
+    if (hit === undefined) return p;
+    if (!caseWarned) { caseWarned = true; console.warn('Case-insensitive resource lookup used:', p, '->', hit); }
+    return hit;
+  };
+  _pathCanon = canonKey;
+  const zipFile = p => zip.file(p) || zipByName.get(canonKey(normPath(p))) || null;
 
   // Find OPF: container.xml's rootfile; when that is missing, empty or names a file
   // that is not there, the zip's only *.opf (Calibre does the same). Errors are
@@ -1064,7 +1092,7 @@ async function parseEpub(buf, opts = {}) {
   }
   const opfXml = await readText(opfFile);
   const opf = new DOMParser().parseFromString(opfXml, 'application/xhtml+xml');
-  opfPath = normPath(opfPath);
+  opfPath = canonKey(normPath(opfPath));
   const opfDir = dirOf(opfPath);
   // Manifest href → normalised zip path (a leading '/' is relative to the zip root)
   const resolve = h => joinPath(opfDir, h.split('#')[0]);
@@ -2390,9 +2418,11 @@ function mobiMarkup(doc, body, decl) {
 //      line-height up to 1.2× its own font size becomes em of that size, a larger one is dropped.
 //   7. position/top/left/right/bottom/z-index dropped on elements with text (absolute/fixed
 //      and visually hidden, ≥ 500px off the page or clipped to ≤ 1px: kpVisuallyHidden,
-//      becomes display:none); float dropped
-//      on block elements (p, div, h1, li, figure…) with text (kept on images, image-only
-//      figures and inline elements such as drop caps).
+//      becomes display:none). float (with its clear/width) is kept as authored on every
+//      element: KF8 renders floats (figleft/figright captions, sidenotes, drop caps). An
+//      absolute/fixed element, or one with class pagenum/pageno/page-number/pb, that holds no
+//      image and only a page number of ≤ 12 chars ("12", "[Pg 12]", "p. xiv", kpPageMarker)
+//      becomes display:none instead of flowing inline (its id stays reachable).
 //   8. font-size in px/pt/pc/in/cm/mm/rem → em of the parent's computed size (16px root),
 //      3 decimals; keywords, % and em stay.
 // Any exception in a chapter's pass makes that chapter fall back to the author sheets as
@@ -2883,6 +2913,24 @@ function kpVisuallyHidden(out, size) {
   return (tiny('width') || tiny('height')) && /^(hidden|clip)$/i.test((out.get('overflow') || '').trim());
 }
 
+const KP_PAGENUM_CLASS_RE = /(?:^|\s)(?:pagenum|pageno|page-number|pb)(?:\s|$)/i;
+const KP_PAGENUM_TEXT_RE = new RegExp('^[\\[{(]?\\s*(?:(?:p|pg|page|pp)\\.?\\s*)?(?:\\d{1,6}|' +
+  '(?=[ivxlcdm])m{0,3}(?:cm|cd|d?c{0,3})(?:xc|xl|l?x{0,3})(?:ix|iv|v?i{0,3}))\\s*[\\]})]?$', 'i');
+
+/** Is an element a page-number marker: text of at most 12 characters like "12", "[Pg 12]", "p. xiv",
+ *  without an image, that is absolutely/fixed positioned or has a page-number class (pagenum,
+ *  pageno, page-number, pb; not inside a cell, list item or link)? out: its winning declarations. */
+function kpPageMarker(el, out) {
+  const t = el.textContent.trim();
+  if (!t || t.length > 12 || !KP_PAGENUM_TEXT_RE.test(t)) return false;
+  if (el.querySelector('img, image, svg, object, video, canvas')) return false;
+  if (/^(absolute|fixed)$/i.test((out.get('position') || '').trim())) return true;
+  // by class only: not a table/list cell or a link's text, where a page number is a real
+  // reference (Gutenberg's list of illustrations: <td class="pageno">8</td>)
+  return KP_PAGENUM_CLASS_RE.test(el.getAttribute('class') || '') &&
+         !el.closest('a[href], td, th, li, dd, dt');
+}
+
 /**
  * The Kindle profile pass of one chapter (see the section comment) on a clone of body:
  * returns {content, htmlClass, bodyClass}. cascade: mobiCascade() with the KF8 profile
@@ -2966,6 +3014,9 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
       const block = c === clone || kpIsBlock(disp, tag);
       let text;
       const hasText = () => text ??= HAS_TEXT_RE.test(c.textContent);
+      // page-number markers (Gutenberg span.pagenum { position:absolute; right:… } "[Pg 12]"): flowed
+      // inline they would litter the text, so they are hidden (the element stays for id/anchor targets)
+      if (kpPageMarker(c, out)) out.set('display', 'none');
       if (KP_POSITION.some(k => out.has(k)) && hasText()) {
         // "visually hidden" (absolute/fixed and moved far off the page, Standard Ebooks'
         // titlepage, or clipped away, the screen-reader-text / sr-only idiom) stays hidden;
@@ -2973,7 +3024,6 @@ function kpNormalise(doc, body, cascade, firstAid, reg) {
         if (cssHiddenOffPage(out, size)) out.set('display', 'none');
         for (const k of KP_POSITION) out.delete(k);
       }
-      if (out.has('float') && MOBI_BLOCK.has(tag) && hasText()) out.delete('float');
       kpPresentational(c, tag, out, p.cellpadding);
       // p has a pinned text-indent:0, which would stop an ancestor's indent from inheriting
       if (tag === 'p' && !out.has('text-indent') && p.ti && !KP_ZERO_RE.test(p.ti)) out.set('text-indent', 'inherit');
